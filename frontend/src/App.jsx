@@ -15,6 +15,15 @@ import {
 import "./style.css";
 
 const API_BASE = "http://localhost:3001";
+const oggi = new Date();
+
+const dataLiturgica =
+  oggi.getFullYear().toString() +
+  String(oggi.getMonth() + 1).padStart(2, "0") +
+  String(oggi.getDate()).padStart(2, "0");
+
+const CEI_URL =
+  `https://www.chiesacattolica.it/liturgia-del-giorno/?data-liturgia=${dataLiturgica}`;
 
 function testoBreve(testo, max = 520) {
   if (!testo) return "Dato non ancora disponibile.";
@@ -124,7 +133,7 @@ function App() {
                 <h2>Vangelo del giorno</h2>
                 <p className="reference">Fonte CEI</p>
                 <p className="gospel-text">{testoBreve(liturgia.vangelo)}</p>
-                <a className="dark-button" href={fonte.url} target="_blank" rel="noreferrer">
+                <a className="dark-button" href={CEI_URL} target="_blank" rel="noreferrer">
                   Leggi il Vangelo completo ›
                 </a>
                 <p className="source-note">{fonte.nota}</p>
