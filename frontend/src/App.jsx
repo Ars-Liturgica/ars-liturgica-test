@@ -13,8 +13,7 @@ import {
   Cross
 } from "lucide-react";
 import "./style.css";
-
-const API_BASE = "http://localhost:3001";
+const API_BASE = "https://ars-liturgica-test-k1tzaay1n-leonardo1-s-projects.vercel.app";
 const oggi = new Date();
 
 const dataLiturgica =
