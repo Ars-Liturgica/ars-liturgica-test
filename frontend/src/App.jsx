@@ -73,9 +73,7 @@ function App() {
     }
   }
 
-  useEffect(() => {
-    caricaLiturgia();
-  }, []);
+
 
   const liturgia = dati?.liturgia || {};
   const ars = dati?.arsLiturgica || {};
