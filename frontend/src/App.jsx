@@ -122,6 +122,11 @@ function App() {
               <div className="date-row">
                 <CalendarDays />
                 <span>{liturgia.data || "Data liturgica"}</span>
+                <div className="liturgical-info">
+  <p>{liturgia.tempo || "Tempo Ordinario"}</p>
+  <p>Colore liturgico: {liturgia.colore || "Verde"}</p>
+  <p>{liturgia.memoria || "Memoria del giorno"}</p>
+</div>
               </div>
               <div className="season">• {liturgia.titolo || "Periodo liturgico"}</div>
             </div>
