@@ -117,7 +117,7 @@ const pulsanteProdotti =
         </div>
 
         {caricamento && <div className="status">Caricamento liturgia CEI...</div>}
-        {errore && <div className="error">Errore: {errore}</div>}
+        
 
         <main className="hero">
           <section className="left-ambience">
