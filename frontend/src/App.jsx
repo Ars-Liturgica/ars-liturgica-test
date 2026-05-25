@@ -88,6 +88,16 @@ function App() {
     { nome: "Meditazione", Icon: Flame },
     { nome: "Carità", Icon: Sparkles }
   ];
+  const tempoLiturgico = liturgia.tempo || "Tempo Ordinario";
+
+const pulsanteProdotti =
+  tempoLiturgico === "Quaresima"
+    ? "Prodotti per la Quaresima"
+    : tempoLiturgico === "Avvento"
+    ? "Prodotti per l’Avvento"
+    : tempoLiturgico === "Pasqua"
+    ? "Prodotti per il Tempo Pasquale"
+    : "Prodotti per il Tempo Ordinario";
 
   return (
     <div className="page">
