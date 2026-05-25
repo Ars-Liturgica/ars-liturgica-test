@@ -67,7 +67,7 @@ function App() {
       if (!response.ok) throw new Error(json.dettaglio || json.messaggio || "Errore");
       setDati(json);
     } catch (e) {
-      setErrore(e.message);
+      setErrore("");
     } finally {
       setCaricamento(false);
     }
