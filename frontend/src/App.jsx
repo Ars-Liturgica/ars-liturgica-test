@@ -1,7 +1,7 @@
 import React from "react";
 import datiLiturgia from "./data/liturgia.json";
 import "./style.css";
-
+import LiturgiaManager from "./admin/LiturgiaManager";
 export default function App() {
 
   const oggi = "2026-05-26";
@@ -146,6 +146,7 @@ export default function App() {
       </div>
 
     </div>
+    <LiturgiaManager />
   );
 }
 
