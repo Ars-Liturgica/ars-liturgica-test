@@ -1,0 +1,22 @@
+{
+  "2026-05-26": {
+    "tempoLiturgico": "Tempo Ordinario",
+    "coloreLiturgico": "Verde",
+    "memoria": "San Filippo Neri",
+    "vangelo": "Gv 17,1-11a",
+    "titoloVangelo": "Padre, glorifica il Figlio tuo.",
+    "spunto": "Cristo alza gli occhi al Padre e ci insegna che ogni celebrazione nasce dalla comunione con Dio.",
+    "linkCEI": "https://www.chiesacattolica.it/liturgia-del-giorno/",
+    
+    "prodottiTempoLiturgico": [
+      {
+        "nome": "Casula verde ricamata",
+        "link": "https://www.genesiartesacra.it/shop/"
+      },
+      {
+        "nome": "Lezionario festivo",
+        "link": "https://www.genesiartesacra.it/shop/"
+      }
+    ]
+  }
+}
