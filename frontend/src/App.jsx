@@ -1,218 +1,157 @@
-import React, { useEffect, useState } from "react";
-import { createRoot } from "react-dom/client";
-import {
-  BookOpen,
-  CalendarDays,
-  Church,
-  Flame,
-  Home,
-  Menu,
-  Search,
-  ShoppingBag,
-  Sparkles,
-  Cross
-} from "lucide-react";
+import React from "react";
+import datiLiturgia from "./data/liturgia.json";
 import "./style.css";
-const API_BASE = "https://ars-liturgica-test-k1tzaay1n-leonardo1-s-projects.vercel.app";
-const oggi = new Date();
 
-const dataLiturgica =
-  oggi.getFullYear().toString() +
-  String(oggi.getMonth() + 1).padStart(2, "0") +
-  String(oggi.getDate()).padStart(2, "0");
+export default function App() {
 
-const CEI_URL =
-  `https://www.chiesacattolica.it/liturgia-del-giorno/?data-liturgia=${dataLiturgica}`;
+  const oggi = "2026-05-26";
 
-function testoBreve(testo, max = 520) {
-  if (!testo) return "Dato non ancora disponibile.";
-  return testo.length > max ? testo.slice(0, max).trim() + "..." : testo;
-}
+  const liturgia = datiLiturgia[oggi];
 
-function Header() {
-  return (
-    <div className="header">
-      <Menu />
-      <div className="brand">
-        <div className="brand-title">✠ ARS LITURGICA</div>
-        <div className="brand-subtitle">Al servizio della celebrazione</div>
+  if (!liturgia) {
+    return (
+      <div
+        style={{
+          background: "#2b0000",
+          minHeight: "100vh",
+          color: "#f5e6c8",
+          padding: "40px",
+          fontFamily: "serif"
+        }}
+      >
+        <h1>Ars Liturgica</h1>
+        <p>Dati liturgici non disponibili.</p>
       </div>
-      <div className="header-icons">
-        <Search />
-        <ShoppingBag />
-      </div>
-    </div>
-  );
-}
-
-function Card({ children, className = "" }) {
-  return <div className={"card " + className}>{children}</div>;
-}
-
-function App() {
-  const [dataTest, setDataTest] = useState("");
-  const [dati, setDati] = useState(null);
-  const [errore, setErrore] = useState("");
-  const [caricamento, setCaricamento] = useState(false);
-
-  async function caricaLiturgia(data = "") {
-    setCaricamento(true);
-    setErrore("");
-    try {
-      const endpoint = data
-        ? `${API_BASE}/api/liturgia?data=${encodeURIComponent(data)}`
-        : `${API_BASE}/api/liturgia-oggi`;
-      const response = await fetch(endpoint);
-      const json = await response.json();
-      if (!response.ok) throw new Error(json.dettaglio || json.messaggio || "Errore");
-      setDati(json);
-    } catch (e) {
-     setErrore("");
-    } finally {
-      setCaricamento(false);
-    }
+    );
   }
 
-
-
-  const liturgia = dati?.liturgia || {};
-  const ars = dati?.arsLiturgica || {};
-  const fonte = dati?.fonte || {};
-
-  const strumenti = [
-    { nome: "Preghiera", Icon: BookOpen },
-    { nome: "Celebrazione", Icon: Church },
-    { nome: "Formazione", Icon: Cross },
-    { nome: "Meditazione", Icon: Flame },
-    { nome: "Carità", Icon: Sparkles }
-  ];
-  const tempoLiturgico = liturgia.tempo || "Tempo Ordinario";
-
-const pulsanteProdotti =
-  tempoLiturgico === "Quaresima"
-    ? "Prodotti per la Quaresima"
-    : tempoLiturgico === "Avvento"
-    ? "Prodotti per l’Avvento"
-    : tempoLiturgico === "Pasqua"
-    ? "Prodotti per il Tempo Pasquale"
-    : "Prodotti per il Tempo Ordinario";
-
   return (
-    <div className="page">
-      <div className="app-shell">
-        <Header />
+    <div
+      style={{
+        background: "#2b0000",
+        minHeight: "100vh",
+        color: "#f5e6c8",
+        padding: "30px",
+        fontFamily: "serif"
+      }}
+    >
 
-        <div className="test-panel">
-          <strong>Modalità test privata</strong>
-          <span>Inserisci una data CEI in formato AAAAMMGG oppure usa la liturgia di oggi.</span>
-          <input
-            value={dataTest}
-            onChange={(e) => setDataTest(e.target.value)}
-            placeholder="Esempio: 20260521"
-          />
-          <button onClick={() => caricaLiturgia(dataTest)}>Prova data</button>
-          <button onClick={() => { setDataTest(""); caricaLiturgia(""); }}>Oggi</button>
-        </div>
+      <h1
+        style={{
+          color: "#d4a017",
+          fontSize: "42px",
+          marginBottom: "10px"
+        }}
+      >
+        Ars Liturgica
+      </h1>
 
-        {caricamento && <div className="status">Caricamento liturgia CEI...</div>}
-        
+      <h2 style={{ marginBottom: "20px" }}>
+        Liturgia del Giorno
+      </h2>
 
-        <main className="hero">
-          <section className="left-ambience">
-            <div className="candle" />
-            <div className="ambience-text">Candela • Parola • Celebrazione</div>
-          </section>
+      <div
+        style={{
+          background: "#f5e6c8",
+          color: "#2b0000",
+          padding: "25px",
+          borderRadius: "18px",
+          marginBottom: "25px"
+        }}
+      >
 
-          <section className="content">
-            <div className="title-block">
-              <h1>Liturgia del Giorno</h1>
-              <div className="gold-line" />
-              <div className="date-row">
-                <CalendarDays />
-                <span>{liturgia.data || "Data liturgica"}</span>
-                <div className="liturgical-info">
-  <p>{liturgia.tempo || "Tempo Ordinario"}</p>
-  <p>Colore liturgico: {liturgia.colore || "Verde"}</p>
-  <p>{liturgia.memoria || "Memoria del giorno"}</p>
-</div>
-              </div>
-              <div className="season">• {liturgia.titolo || "Periodo liturgico"}</div>
-            </div>
+        <p><strong>Tempo Liturgico:</strong> {liturgia.tempoLiturgico}</p>
 
-            <Card className="gospel-card">
-              <div className="icon-round"><BookOpen /></div>
-              <div>
-                <h2>Vangelo del giorno</h2>
-                <p className="reference">Fonte CEI</p>
-                <p className="gospel-text">{testoBreve(liturgia.vangelo)}</p>
-                <a className="dark-button" href={CEI_URL} target="_blank" rel="noreferrer">
-                  Leggi il Vangelo completo ›
-                </a>
-                <p className="source-note">{fonte.nota}</p>
-              </div>
-            </Card>
+        <p><strong>Colore:</strong> {liturgia.coloreLiturgico}</p>
 
-            <Card className="tools-card">
-              <div className="tools-header">
-                <h2>Strumenti per vivere questo tempo</h2>
-                <span>Scopri tutti</span>
-              </div>
-              <div className="tools-grid">
-                {strumenti.map(({ nome, Icon }) => (
-                  <div className="tool" key={nome}>
-                    <Icon />
-                    <span>{nome}</span>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          </section>
+        <p><strong>Memoria:</strong> {liturgia.memoria}</p>
 
-          <aside className="side">
-            <Card>
-              <div className="side-title"><Flame /> Una luce sulla Parola</div>
-              <p>{ars.unaLuceSullaParola || "Breve spunto meditativo."}</p>
-              <span className="linkish">Approfondisci ›</span>
-            </Card>
+        <p><strong>Vangelo:</strong> {liturgia.vangelo}</p>
 
-            <Card>
-              <h3>Memoria del giorno</h3>
-              <p>Da integrare dal blocco CEI quando disponibile in modo stabile.</p>
-              <span className="linkish">Scopri di più ›</span>
-            </Card>
+        <p><strong>Titolo:</strong> {liturgia.titoloVangelo}</p>
 
-            <Card>
-              <h3>Celebrazione</h3>
-              <ul>
-                <li>Colore liturgico: {liturgia.coloreLiturgico || "-"}</li>
-                <li>Periodo: {liturgia.periodoNome || "-"}</li>
-                <li>Fonte: CEI</li>
-              </ul>
-            </Card>
+        <hr />
 
-            <Card className="shop-card">
-              <ShoppingBag />
-              <div>
-                <h3>Prodotti</h3>
-                <p>Selezione Ars Liturgica</p>
-                <a href={ars.pulsanteProdotti?.url || "https://www.genesiartesacra.it/shop/"} target="_blank" rel="noreferrer">
-                  Vai allo shop ›
-                </a>
-              </div>
-            </Card>
-          </aside>
-        </main>
+        <p>
+          <strong>Una luce sulla Parola:</strong>
+        </p>
 
-        <nav className="bottom-nav">
-          <div><Home />Home</div>
-          <div><BookOpen />Liturgia del giorno</div>
-          <div><Flame />Luce e incenso</div>
-          <div><Church />Sacramenti</div>
-          <div><ShoppingBag />La mia sacrestia</div>
-        </nav>
+        <p>{liturgia.spunto}</p>
+
+        <a
+          href={liturgia.linkCEI}
+          target="_blank"
+          rel="noreferrer"
+          style={{
+            display: "inline-block",
+            marginTop: "15px",
+            background: "#7a0000",
+            color: "#f5e6c8",
+            padding: "12px 20px",
+            borderRadius: "10px",
+            textDecoration: "none"
+          }}
+        >
+          Per approfondire sul sito CEI
+        </a>
+
       </div>
+
+      <h2
+        style={{
+          marginBottom: "20px",
+          color: "#d4a017"
+        }}
+      >
+        Prodotti del Tempo Liturgico
+      </h2>
+
+      <div
+        style={{
+          display: "grid",
+          gap: "20px"
+        }}
+      >
+
+        {liturgia.prodottiTempoLiturgico.map((prodotto, index) => (
+
+          <div
+            key={index}
+            style={{
+              background: "#f5e6c8",
+              color: "#2b0000",
+              padding: "20px",
+              borderRadius: "16px"
+            }}
+          >
+
+            <h3>{prodotto.nome}</h3>
+
+            <a
+              href={prodotto.link}
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                color: "#7a0000",
+                fontWeight: "bold"
+              }}
+            >
+              Vai al prodotto
+            </a>
+
+          </div>
+
+        ))}
+
+      </div>
+
     </div>
   );
 }
 
-createRoot(document.getElementById("root")).render(<App />);
+
+   
+
+ 
+  
+
