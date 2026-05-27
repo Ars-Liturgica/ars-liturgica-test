@@ -296,10 +296,14 @@ export default function App() {
 
 const inputStyle = {
   width: "100%",
-  padding: "12px",
-  marginBottom: "15px",
-  borderRadius: "10px",
-  border: "1px solid #ccc",
+  padding: "14px",
+  marginBottom: "18px",
+  borderRadius: "12px",
+  border: "1px solid #d4af37",
+  background: "#fffdf7",
+  color: "#3a1c00",
+  fontSize: "16px",
+  boxSizing: "border-box",
 };
 
 const textareaStyle = {
