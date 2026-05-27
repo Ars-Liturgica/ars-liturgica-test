@@ -176,18 +176,28 @@ export default function App() {
             </a>
 
             <button
-              onClick={() => setAdminMode(!adminMode)}
-              style={{
-                background: "#d4af37",
-                color: "#3a1c00",
-                border: "none",
-                padding: "12px 20px",
-                borderRadius: "10px",
-                cursor: "pointer",
-              }}
-            >
-              Admin
-            </button>
+  onClick={() => {
+    const password = prompt("Inserisci password Admin");
+
+    if (password === "ars2026") {
+      setAdminMode(!adminMode);
+    } else {
+      alert("Password errata");
+    }
+  }}
+  style={{
+    marginTop: "20px",
+    padding: "10px 18px",
+    borderRadius: "50%",
+    border: "1px solid #d4af37",
+    background: "transparent",
+    color: "#d4af37",
+    cursor: "pointer",
+    fontSize: "18px",
+  }}
+>
+  ⚙️
+</button>
           </div>
         </div>
 
