@@ -9,7 +9,9 @@ export default function App() {
     colore: "Verde",
     vangelo: "Dal Vangelo secondo Giovanni (Gv 17,1-11a)",
     riflessione:
+      
       "Cristo prega il Padre per i suoi discepoli e li affida al Suo amore.",
+    linkCei: "",
     santo: "Sant'Agostino di Canterbury",
     prodotti: [
       "Casula Verde",
