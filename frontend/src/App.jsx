@@ -161,11 +161,55 @@ export default function App() {
               Prodotti consigliati
             </h3>
 
-            <ul>
-              {liturgia.prodotti.map((p, index) => (
-                <li key={index}>{p}</li>
-              ))}
-            </ul>
+            <div
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    gap: "20px",
+  }}
+>
+  {liturgia.prodotti.map((p, index) => (
+    <div
+      key={index}
+      style={{
+        background: "#fffdfa",
+        borderRadius: "15px",
+        padding: "20px",
+        border: "1px solid #d4b06a",
+      }}
+    >
+      <h4 style={{ color: "#7a0000", marginBottom: "10px" }}>
+        {p.nome}
+      </h4>
+
+      <p>{p.nota}</p>
+
+      <p
+        style={{
+          marginTop: "10px",
+          fontWeight: "bold",
+          color: "#7a0000",
+        }}
+      >
+        {p.prezzo}
+      </p>
+
+      <button
+        style={{
+          marginTop: "15px",
+          background: "#7a0000",
+          color: "#fff",
+          border: "none",
+          padding: "10px 18px",
+          borderRadius: "10px",
+          cursor: "pointer",
+        }}
+      >
+        Dettagli e acquisto
+      </button>
+    </div>
+  ))}
+</div>
           </div>
 
           <div
