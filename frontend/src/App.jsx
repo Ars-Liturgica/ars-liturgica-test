@@ -161,7 +161,7 @@ export default function App() {
 
   <div className="rounded-2xl border border-[#d6b86a] bg-[#f7edd8] p-2 shadow-inner">
     <img
-      src="/immagini/segni-celebrazione.jpg"
+      src="https://images.unsplash.com/photo-1507692049790-de58290a4334"
       alt="Segni per la celebrazione"
       className="w-full rounded-xl object-cover"
     />
