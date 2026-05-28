@@ -29,6 +29,7 @@ export default function App() {
 
   const salvaModifiche = () => {
     setLiturgia(formData);
+    localStorage.setItem("liturgia", JSON.stringify(formData));
     alert("Liturgia aggiornata correttamente");
   };
 
