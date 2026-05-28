@@ -4,7 +4,7 @@ export default function App() {
   const [adminMode, setAdminMode] = useState(false);
 
  const [liturgia, setLiturgia] = useState(() => {
-  const saved = localStorage.getItem("liturgia");
+  const saved = localStorage.getItem("liturgia_v2");
   return saved
     ? JSON.parse(saved)
     : {
@@ -33,7 +33,7 @@ export default function App() {
 
   const salvaModifiche = () => {
     setLiturgia(formData);
-    localStorage.setItem("liturgia", JSON.stringify(formData));
+    localStorage.setItem("liturgia_v2", JSON.stringify(formData));
     alert("Liturgia aggiornata correttamente");
   };
 
