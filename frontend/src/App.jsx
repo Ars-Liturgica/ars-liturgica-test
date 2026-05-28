@@ -3,7 +3,11 @@ import React, { useState } from "react";
 export default function App() {
   const [adminMode, setAdminMode] = useState(false);
 
-  const [liturgia, setLiturgia] = useState({
+ const [liturgia, setLiturgia] = useState(() => {
+  const saved = localStorage.getItem("liturgia");
+  return saved
+    ? JSON.parse(saved)
+    : {
     data: "27 Maggio 2026",
     tempo: "Tempo Ordinario",
     colore: "Verde",
@@ -18,7 +22,8 @@ export default function App() {
       "Lezionario",
       "Candela liturgica",
     ],
-  });
+      };
+});
 
   const [formData, setFormData] = useState(liturgia);
 
