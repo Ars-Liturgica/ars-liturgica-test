@@ -148,7 +148,36 @@ export default function App() {
   {liturgia.riflessione}
 </p>
           </div>
+<section className="mt-8 rounded-3xl border border-[#c9a44c] bg-[#fff8ea] p-5 shadow-lg">
+  <div className="text-center mb-4">
+    <h2 className="text-xl font-serif text-[#6b1f2b]">
+      Segni per la celebrazione
+    </h2>
 
+    <p className="mt-2 text-sm italic text-[#6b4b2a]">
+      Una selezione pensata per accompagnare il tempo liturgico di oggi.
+    </p>
+  </div>
+
+  <div className="rounded-2xl border border-[#d6b86a] bg-[#f7edd8] p-2 shadow-inner">
+    <img
+      src="/immagini/segni-celebrazione.jpg"
+      alt="Segni per la celebrazione"
+      className="w-full rounded-xl object-cover"
+    />
+  </div>
+
+  <div className="mt-5 text-center">
+    <a
+      href="https://www.genesiartesacra.it/shop/"
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-block rounded-full bg-[#6b1f2b] px-6 py-3 text-sm font-semibold text-white shadow-md"
+    >
+      Scopri i prodotti del momento
+    </a>
+  </div>
+</section>
           <div
             style={{
               marginTop: "20px",
