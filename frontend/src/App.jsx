@@ -138,7 +138,9 @@ export default function App() {
               Una luce sulla Parola
             </h3>
 
-            <p>{liturgia.riflessione}</p>
+            <p style={{ whiteSpace: "pre-line" }}>
+  {liturgia.riflessione}
+</p>
           </div>
 
           <div
