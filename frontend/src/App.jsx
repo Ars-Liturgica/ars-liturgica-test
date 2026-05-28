@@ -18,10 +18,14 @@ export default function App() {
     linkCei: "",
     santo: "Sant'Agostino di Canterbury",
     prodotti: [
-      "Casula Verde",
-      "Lezionario",
-      "Candela liturgica",
-    ],
+  {
+    nome: "Astuccio porta-Viatico",
+    prezzo: "€ 0,00",
+    nota: "Selezione liturgica del momento",
+    link: "",
+    immagine: "",
+  },
+],
       };
 });
 
