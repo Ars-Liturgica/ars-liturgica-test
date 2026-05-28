@@ -123,7 +123,9 @@ export default function App() {
               Vangelo del Giorno
             </h3>
 
-            <p>{liturgia.vangelo}</p>
+            <p style={{ whiteSpace: "pre-line" }}>
+  {liturgia.vangelo}
+</p>
           </div>
 
           <div
