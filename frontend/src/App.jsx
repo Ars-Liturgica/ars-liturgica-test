@@ -163,7 +163,7 @@ export default function App() {
     <img
       src="https://images.unsplash.com/photo-1507692049790-de58290a4334"
       alt="Segni per la celebrazione"
-      className="w-full rounded-xl object-cover"
+      className="w-full h-[340px] rounded-xl object-cover"
     />
   </div>
 
