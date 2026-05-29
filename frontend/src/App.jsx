@@ -159,13 +159,22 @@ export default function App() {
     </p>
   </div>
 
-  <div className="rounded-2xl border border-[#d6b86a] bg-[#f7edd8] p-2 shadow-inner">
-    <img
-      src="https://images.unsplash.com/photo-1507692049790-de58290a4334"
-      alt="Segni per la celebrazione"
-      className="w-full h-[340px] rounded-xl object-cover"
-    />
-  </div>
+ <div
+  className="rounded-2xl border border-[#d6b86a] bg-[#f7edd8] p-2 shadow-inner overflow-hidden"
+  style={{ maxHeight: "360px" }}
+>
+  <img
+    src="https://images.unsplash.com/photo-1507692049790-de58290a4334"
+    alt="Segni per la celebrazione"
+    style={{
+      width: "100%",
+      height: "340px",
+      objectFit: "cover",
+      borderRadius: "14px",
+      display: "block"
+    }}
+  />
+</div>
 
   <div className="mt-5 text-center">
     <a
