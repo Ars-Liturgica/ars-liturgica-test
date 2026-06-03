@@ -187,69 +187,125 @@ export default function App() {
     </a>
   </div>
 </section>
-          <div
-            style={{
-              marginTop: "20px",
-              padding: "20px",
-              background: "#fff8ea",
-              borderRadius: "15px",
-            }}
-          >
-            <h3 style={{ color: "#7a0000" }}>
-              Prodotti consigliati
-            </h3>
-
-            <div
+         <div
   style={{
-    display: "flex",
-    flexDirection: "column",
-    gap: "20px",
+    marginTop: "30px",
+    padding: "28px",
+    background: "linear-gradient(180deg, #fff8ea 0%, #f7ead0 100%)",
+    borderRadius: "24px",
+    border: "1px solid #d4b06a",
+    boxShadow: "0 8px 24px rgba(122,0,0,0.12)",
   }}
 >
-  {liturgia.prodotti.map((p, index) => (
-    <div
-      key={index}
+  <h2 style={{ color: "#7a0000", textAlign: "center", letterSpacing: "1px" }}>
+    Prodotti consigliati per la celebrazione
+  </h2>
+
+  <p style={{ textAlign: "center", fontSize: "18px", color: "#3b2a20" }}>
+    Strumenti e segni scelti per accompagnare il tempo liturgico e il servizio all’altare.
+  </p>
+
+  <div
+    style={{
+      marginTop: "30px",
+      padding: "30px",
+      borderRadius: "22px",
+      background: "#fffdfa",
+      border: "1px solid #d4b06a",
+    }}
+  >
+    <p style={{ color: "#9b7a2f", fontWeight: "bold", letterSpacing: "1px" }}>
+      CATEGORIA IN EVIDENZA
+    </p>
+
+    <h1 style={{ color: "#7a0000", fontSize: "42px" }}>
+      Paramenti
+    </h1>
+
+    <p style={{ fontSize: "18px", lineHeight: "1.6", color: "#3b2a20" }}>
+      Vesti che esprimono la bellezza del culto e accompagnano il mistero celebrato.
+    </p>
+
+    <a
+      href="https://www.genesiartesacra.it/product-category/paramenti/"
+      target="_blank"
+      rel="noopener noreferrer"
       style={{
-        background: "#fffdfa",
-        borderRadius: "15px",
-        padding: "20px",
-        border: "1px solid #d4b06a",
+        display: "inline-block",
+        marginTop: "20px",
+        background: "#7a0000",
+        color: "#fff",
+        padding: "14px 24px",
+        borderRadius: "12px",
+        textDecoration: "none",
+        fontWeight: "bold",
       }}
     >
-      <h4 style={{ color: "#7a0000", marginBottom: "10px" }}>
-        {p.nome}
-      </h4>
+      Scopri la categoria →
+    </a>
+  </div>
 
-      <p>{p.nota}</p>
+  <h3
+    style={{
+      marginTop: "35px",
+      textAlign: "center",
+      color: "#7a0000",
+      letterSpacing: "1px",
+    }}
+  >
+    Categorie consigliate
+  </h3>
 
-      <p
+  <div
+    style={{
+      display: "grid",
+      gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))",
+      gap: "18px",
+      marginTop: "20px",
+    }}
+  >
+    {[
+      ["Luce e Incenso", "https://www.genesiartesacra.it/product-category/luce-e-incenso/"],
+      ["Calici e Pissidi", "https://www.genesiartesacra.it/product-category/calici-e-pissidi/"],
+      ["Battesimo", "https://www.genesiartesacra.it/product-category/battesimo/"],
+      ["Matrimonio", "https://www.genesiartesacra.it/product-category/matrimonio/"],
+      ["Cresima", "https://www.genesiartesacra.it/product-category/cresima/"],
+    ].map((categoria, index) => (
+      <div
+        key={index}
         style={{
-          marginTop: "10px",
-          fontWeight: "bold",
-          color: "#7a0000",
+          background: "#fffdfa",
+          border: "1px solid #d4b06a",
+          borderRadius: "18px",
+          padding: "18px",
+          textAlign: "center",
+          boxShadow: "0 6px 18px rgba(122,0,0,0.10)",
         }}
       >
-        {p.prezzo}
-      </p>
+        <h4 style={{ color: "#7a0000" }}>{categoria[0]}</h4>
 
-      <button
-        style={{
-          marginTop: "15px",
-          background: "#7a0000",
-          color: "#fff",
-          border: "none",
-          padding: "10px 18px",
-          borderRadius: "10px",
-          cursor: "pointer",
-        }}
-      >
-        Dettagli e acquisto
-      </button>
-    </div>
-  ))}
+        <a
+          href={categoria[1]}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: "inline-block",
+            marginTop: "10px",
+            background: "#7a0000",
+            color: "#fff",
+            padding: "10px 14px",
+            borderRadius: "10px",
+            textDecoration: "none",
+            fontWeight: "bold",
+            fontSize: "14px",
+          }}
+        >
+          Apri la categoria
+        </a>
+      </div>
+    ))}
+  </div>
 </div>
-          </div>
-
           <div
             style={{
               marginTop: "30px",
