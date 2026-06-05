@@ -217,6 +217,19 @@ export default function App() {
     <p style={{ color: "#9b7a2f", fontWeight: "bold", letterSpacing: "1px" }}>
       CATEGORIA IN EVIDENZA
     </p>
+    <img
+  src="https://images.unsplash.com/photo-1512632578888-169bbbc64f33?auto=format&fit=crop&w=1200&q=80"
+  alt="Paramenti liturgici"
+  style={{
+    width: "100%",
+    maxWidth: "900px",
+    display: "block",
+    margin: "30px auto",
+    borderRadius: "16px",
+    border: "4px solid #d4b06a",
+    boxShadow: "0 8px 25px rgba(0,0,0,0.15)"
+  }}
+/>
 
     <h1 style={{ color: "#7a0000", fontSize: "42px" }}>
       Paramenti
