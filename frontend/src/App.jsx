@@ -278,11 +278,8 @@ export default function App() {
     }}
   >
     {[
-      ["Luce e Incenso", "https://www.genesiartesacra.it/product-category/luce-e-incenso/"],
-      ["Calici e Pissidi", "https://www.genesiartesacra.it/product-category/calici-e-pissidi/"],
-      ["Battesimo", "https://www.genesiartesacra.it/product-category/battesimo/"],
-      ["Matrimonio", "https://www.genesiartesacra.it/product-category/matrimonio/"],
-      ["Cresima", "https://www.genesiartesacra.it/product-category/cresima/"],
+     ["Paramenti", "https://www.genesiartesacra.it/product-category/paramenti/"],
+["Calici e Pissidi", "https://www.genesiartesacra.it/product-category/calici-e-pissidi/"],
     ].map((categoria, index) => (
       <div
         key={index}
