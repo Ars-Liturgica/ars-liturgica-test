@@ -57,7 +57,40 @@ export default function LiturgiaManager() {
         <button style={buttonStyle}>
           Salva Liturgia
         </button>
+<h3 style={{ marginTop: "30px", color: "#d4a017" }}>
+  Categorie consigliate
+</h3>
 
+<p>
+  Categoria principale
+</p>
+<input
+  type="text"
+  placeholder="Paramenti"
+  style={inputStyle}
+/>
+
+<p>
+  Categoria consigliata 1
+</p>
+<input
+  type="text"
+  placeholder="Calici e Pissidi"
+  style={inputStyle}
+/>
+
+<p>
+  Categoria consigliata 2
+</p>
+<input
+  type="text"
+  placeholder="Candelieri"
+  style={inputStyle}
+/>
+
+<button style={buttonStyle}>
+  Salva le categorie consigliate
+</button>
       </div>
     </div>
   );
