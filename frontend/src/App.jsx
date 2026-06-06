@@ -462,62 +462,7 @@ export default function App() {
               Salva Liturgia
             </button>
           </div>
-        <div
-  style={{
-    marginTop: "40px",
-    padding: "24px",
-    borderRadius: "16px",
-    background: "#fff8ef",
-    border: "1px solid #d4af37",
-  }}
->
-  <h2 style={{ color: "#7a0000", marginBottom: "10px" }}>
-    Gestione categorie pubblicate
-  </h2>
-
-  <p style={{ color: "#5a4635", marginBottom: "20px" }}>
-    Seleziona la categoria principale e fino a 5 categorie consigliate da mostrare nell'app.
-  </p>
-
-  {[
-    "Categoria principale",
-    "Categoria consigliata 1",
-    "Categoria consigliata 2",
-    "Categoria consigliata 3",
-    "Categoria consigliata 4",
-    "Categoria consigliata 5",
-  ].map((label, index) => (
-    <select
-      key={index}
-      style={inputStyle}
-      defaultValue=""
-    >
-      <option value="">{label}</option>
-      <option value="avvento">Avvento</option>
-      <option value="natale">Natale</option>
-      <option value="quaresima">Quaresima</option>
-      <option value="pasqua">Pasqua</option>
-      <option value="tempo-ordinario">Tempo Ordinario</option>
-      <option value="luce-e-incenso">Luce e Incenso</option>
-    </select>
-  ))}
-
-  <button
-    type="button"
-    onClick={() => alert("Categorie salvate provvisoriamente")}
-    style={{
-      background: "#7a0000",
-      color: "white",
-      border: "none",
-      padding: "14px 24px",
-      borderRadius: "10px",
-      cursor: "pointer",
-      marginTop: "20px",
-    }}
-  >
-    Salva categorie consigliate
-  </button>
-</div>
+        
         )}
       </div>
     </div>
