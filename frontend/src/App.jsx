@@ -278,8 +278,8 @@ export default function App() {
     }}
   >
     {[
-     ["Paramenti", "https://www.genesiartesacra.it/product-category/paramenti/"],
-["Calici e Pissidi", "https://www.genesiartesacra.it/product-category/calici-e-pissidi/"],
+    ["Paramenti", "https://www.genesiartesacra.it/product-category/paramenti/", ""],
+["Calici e Pissidi", "https://www.genesiartesacra.it/product-category/calici-e-pissidi/", ""],
     ].map((categoria, index) => (
       <div
         key={index}
