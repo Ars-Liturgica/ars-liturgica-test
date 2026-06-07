@@ -458,7 +458,18 @@ export default function App() {
               }
               style={textareaStyle}
             />
-
+<input
+  type="text"
+  placeholder="Link CEI del giorno"
+  value={formData.linkCei}
+  onChange={(e) =>
+    setFormData({
+      ...formData,
+      linkCei: e.target.value,
+    })
+  }
+  style={inputStyle}
+/>
             <button
               onClick={salvaModifiche}
               style={{
