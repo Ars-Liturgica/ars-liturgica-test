@@ -422,6 +422,18 @@ export default function App() {
               }
               style={inputStyle}
             />
+            <input
+  type="text"
+  placeholder="Memoria / Santo"
+  value={formData.santo}
+  onChange={(e) =>
+    setFormData({
+      ...formData,
+      santo: e.target.value,
+    })
+  }
+  style={inputStyle}
+/>
 
             <textarea
               placeholder="Vangelo"
