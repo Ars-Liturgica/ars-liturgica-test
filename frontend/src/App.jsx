@@ -148,6 +148,20 @@ export default function App() {
   {liturgia.riflessione}
 </p>
           </div>
+           <a
+              href={liturgia.linkCei || "https://liturgico.chiesacattolica.it/"}
+              target="_blank"
+              rel="noreferrer"
+              style={{
+                background: "#7a0000",
+                color: "white",
+                padding: "12px 20px",
+                borderRadius: "10px",
+                textDecoration: "none",
+              }}
+            >
+              Per approfondire
+            </a>
 <section className="mt-8 rounded-3xl border border-[#c9a44c] bg-[#fff8ea] p-5 shadow-lg">
   <div className="text-center mb-4">
     <h2 className="text-xl font-serif text-[#6b1f2b]">
@@ -324,20 +338,7 @@ export default function App() {
               flexWrap: "wrap",
             }}
           >
-            <a
-              href={liturgia.linkCei || "https://liturgico.chiesacattolica.it/"}
-              target="_blank"
-              rel="noreferrer"
-              style={{
-                background: "#7a0000",
-                color: "white",
-                padding: "12px 20px",
-                borderRadius: "10px",
-                textDecoration: "none",
-              }}
-            >
-              Per approfondire
-            </a>
+            
 
             <button
   onClick={() => {
