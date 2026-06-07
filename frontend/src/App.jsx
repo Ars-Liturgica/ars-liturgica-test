@@ -325,7 +325,7 @@ export default function App() {
             }}
           >
             <a
-              href="https://liturgico.chiesacattolica.it/"
+              href={liturgia.linkCei || "https://liturgico.chiesacattolica.it/"}
               target="_blank"
               rel="noreferrer"
               style={{
