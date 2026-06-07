@@ -487,6 +487,71 @@ export default function App() {
               Salva Liturgia
             </button>
           </div>
+        <div
+  style={{
+    marginTop: "35px",
+    paddingTop: "25px",
+    borderTop: "1px solid #d4af37",
+  }}
+>
+  <h2 style={{ color: "#7a0000", marginBottom: "20px" }}>
+    Area Admin Categorie
+  </h2>
+
+  <select
+    value={formData.categoriaPrincipale || ""}
+    onChange={(e) =>
+      setFormData({
+        ...formData,
+        categoriaPrincipale: e.target.value,
+      })
+    }
+    style={inputStyle}
+  >
+    <option value="">Categoria principale</option>
+    <option value="avvento">Avvento</option>
+    <option value="natale">Natale</option>
+    <option value="quaresima">Quaresima</option>
+    <option value="pasqua">Pasqua</option>
+    <option value="luce-incenso">Luce e Incenso</option>
+  </select>
+
+  {[1, 2, 3, 4, 5].map((num) => (
+    <select
+      key={num}
+      value={formData[`categoriaConsigliata${num}`] || ""}
+      onChange={(e) =>
+        setFormData({
+          ...formData,
+          [`categoriaConsigliata${num}`]: e.target.value,
+        })
+      }
+      style={inputStyle}
+    >
+      <option value="">Categoria consigliata {num}</option>
+      <option value="avvento">Avvento</option>
+      <option value="natale">Natale</option>
+      <option value="quaresima">Quaresima</option>
+      <option value="pasqua">Pasqua</option>
+      <option value="luce-incenso">Luce e Incenso</option>
+    </select>
+  ))}
+
+  <button
+    onClick={salvaModifiche}
+    style={{
+      background: "#7a0000",
+      color: "white",
+      border: "none",
+      padding: "14px 24px",
+      borderRadius: "10px",
+      cursor: "pointer",
+      marginTop: "20px",
+    }}
+  >
+    Salva Categorie
+  </button>
+</div>
         
         )}
       </div>
