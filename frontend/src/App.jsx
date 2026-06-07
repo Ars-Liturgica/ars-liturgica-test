@@ -32,10 +32,11 @@ export default function App() {
   const [formData, setFormData] = useState(liturgia);
 
   const salvaModifiche = () => {
-    setLiturgia(formData);
-    localStorage.setItem("liturgia_v2", JSON.stringify(formData));
-    alert("Liturgia aggiornata correttamente");
-  };
+  setLiturgia(formData);
+  localStorage.setItem("liturgia_v2", JSON.stringify(formData));
+  alert("Liturgia aggiornata correttamente");
+  setAdminMode(false);
+};
 
   return (
     <div
