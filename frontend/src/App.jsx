@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 export default function App() {
   const [adminMode, setAdminMode] = useState(false);
@@ -17,6 +17,12 @@ export default function App() {
       "Cristo prega il Padre per i suoi discepoli e li affida al Suo amore.",
     linkCei: "",
     santo: "Sant'Agostino di Canterbury",
+      categoriaPrincipale: "",
+categoriaConsigliata1: "",
+categoriaConsigliata2: "",
+categoriaConsigliata3: "",
+categoriaConsigliata4: "",
+categoriaConsigliata5: "",
     prodotti: [
   {
     nome: "Astuccio porta-Viatico",
@@ -30,7 +36,18 @@ export default function App() {
 });
 
   const [formData, setFormData] = useState(liturgia);
+const [categorieWoo, setCategorieWoo] = useState([]);
 
+useEffect(() => {
+  fetch("https://www.genesiartesacra.it/wp-json/wc/store/v1/products/categories")
+    .then((res) => res.json())
+    .then((data) => {
+      setCategorieWoo(data);
+    })
+    .catch((error) => {
+      console.error("Errore nel caricamento categorie WooCommerce:", error);
+    });
+}, []);
   const salvaModifiche = () => {
   setLiturgia(formData);
   localStorage.setItem("liturgia_v2", JSON.stringify(formData));
