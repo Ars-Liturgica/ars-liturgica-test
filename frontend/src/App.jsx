@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, } from "react";
 
 export default function App() {
   const [adminMode, setAdminMode] = useState(false);
@@ -36,18 +36,7 @@ categoriaConsigliata5: "",
 });
 
   const [formData, setFormData] = useState(liturgia);
-const [categorieWoo, setCategorieWoo] = useState([]);
 
-useEffect(() => {
-  fetch("https://www.genesiartesacra.it/wp-json/wc/store/v1/products/categories")
-    .then((res) => res.json())
-    .then((data) => {
-      setCategorieWoo(data);
-    })
-    .catch((error) => {
-      console.error("Errore nel caricamento categorie WooCommerce:", error);
-    });
-}, []);
   const salvaModifiche = () => {
   setLiturgia(formData);
   localStorage.setItem("liturgia_v2", JSON.stringify(formData));
