@@ -488,6 +488,23 @@ categoriaConsigliata5: "",
   Area Categorie
 </h3>
 
+            <p style={{ marginBottom: "8px", fontWeight: "bold" }}>
+  Categoria Principale
+</p>
+
+<input
+  type="text"
+  placeholder="Categoria Principale"
+  value={formData.categoriaPrincipale}
+  onChange={(e) =>
+    setFormData({
+      ...formData,
+      categoriaPrincipale: e.target.value,
+    })
+  }
+  style={inputStyle}
+/>
+
             
             <button
               onClick={salvaModifiche}
