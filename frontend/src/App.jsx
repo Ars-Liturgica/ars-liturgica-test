@@ -504,7 +504,22 @@ categoriaConsigliata5: "",
   }
   style={inputStyle}
 />
+<p style={{ marginBottom: "8px", fontWeight: "bold" }}>
+  Categoria Consigliata 1
+</p>
 
+<input
+  type="text"
+  placeholder="Categoria Consigliata 1"
+  value={formData.categoriaConsigliata1}
+  onChange={(e) =>
+    setFormData({
+      ...formData,
+      categoriaConsigliata1: e.target.value,
+    })
+  }
+  style={inputStyle}
+/>
             
             <button
               onClick={salvaModifiche}
