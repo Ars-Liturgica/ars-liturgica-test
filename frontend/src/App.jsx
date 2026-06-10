@@ -47,6 +47,7 @@ useEffect(() => {
   fetch("https://www.genesiartesacra.it/wp-json/wc/store/v1/products/categories")
     .then((res) => res.json())
     .then((data) => {
+      console.log("Categorie WooCommerce:", data);
       setCategorie(data);
     })
     .catch((error) => {
