@@ -552,7 +552,38 @@ categoriaConsigliata5: "",
   }
   style={inputStyle}
 />        
-            
+  <p style={{ marginBottom: "8px", fontWeight: "bold" }}>
+  Categoria Consigliata 4
+</p>
+
+<input
+  type="text"
+  placeholder="Categoria Consigliata 4"
+  value={formData.categoriaConsigliata4}
+  onChange={(e) =>
+    setFormData({
+      ...formData,
+      categoriaConsigliata4: e.target.value,
+    })
+  }
+  style={inputStyle}
+/>
+            <p style={{ marginBottom: "8px", fontWeight: "bold" }}>
+  Categoria Consigliata 5
+</p>
+
+<input
+  type="text"
+  placeholder="Categoria Consigliata 5"
+  value={formData.categoriaConsigliata5}
+  onChange={(e) =>
+    setFormData({
+      ...formData,
+      categoriaConsigliata5: e.target.value,
+    })
+  }
+  style={inputStyle}
+/>
             <button
               onClick={salvaModifiche}
               style={{
