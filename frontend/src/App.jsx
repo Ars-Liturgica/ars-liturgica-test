@@ -43,7 +43,16 @@ categoriaConsigliata5: "",
   alert("Liturgia aggiornata correttamente");
   setAdminMode(false);
 };
-
+useEffect(() => {
+  fetch("https://www.genesiartesacra.it/wp-json/wc/store/v1/products/categories")
+    .then((res) => res.json())
+    .then((data) => {
+      setCategorie(data);
+    })
+    .catch((error) => {
+      console.error("Errore caricamento categorie WooCommerce:", error);
+    });
+}, []);
   return (
     <div
       style={{
