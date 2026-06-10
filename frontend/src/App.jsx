@@ -1,8 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 export default function App() {
   const [adminMode, setAdminMode] = useState(false);
-
+const [categorie, setCategorie] = useState([]);
  const [liturgia, setLiturgia] = useState(() => {
   const saved = localStorage.getItem("liturgia_v2");
   return saved
