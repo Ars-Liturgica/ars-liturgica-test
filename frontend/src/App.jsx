@@ -44,7 +44,7 @@ categoriaConsigliata5: "",
   setAdminMode(false);
 };
 useEffect(() => {
-  fetch("https://www.genesiartesacra.it/wp-json/wc/store/v1/products/categories")
+  fetch("/api/categorie")
     .then((res) => res.json())
     .then((data) => {
       console.log("Categorie WooCommerce:", data);
