@@ -478,6 +478,17 @@ categoriaConsigliata5: "",
   }
   style={inputStyle}
 />
+<h3
+  style={{
+    color: "#7a0000",
+    marginTop: "30px",
+    marginBottom: "15px",
+  }}
+>
+  Area Categorie
+</h3>
+
+            
             <button
               onClick={salvaModifiche}
               style={{
