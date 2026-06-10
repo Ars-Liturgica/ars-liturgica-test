@@ -501,9 +501,7 @@ useEffect(() => {
   Categoria Principale
 </p>
 
-<input
-  type="text"
-  placeholder="Categoria Principale"
+<select
   value={formData.categoriaPrincipale}
   onChange={(e) =>
     setFormData({
@@ -512,7 +510,14 @@ useEffect(() => {
     })
   }
   style={inputStyle}
-/>
+>
+  <option value="">Seleziona categoria principale</option>
+  {categorie.map((categoria) => (
+    <option key={categoria.id} value={categoria.slug}>
+      {categoria.name}
+    </option>
+  ))}
+</select>
 <p style={{ marginBottom: "8px", fontWeight: "bold" }}>
   Categoria Consigliata 1
 </p>
