@@ -48,8 +48,7 @@ useEffect(() => {
     .then((res) => res.json())
     .then((data) => {
       console.log("Categorie WooCommerce:", data);
-console.log("Prima categoria:", data[0]);
-console.log("Immagine prima categoria:", data[0]?.image);
+
       setCategorie(data);
     })
     .catch((error) => {
