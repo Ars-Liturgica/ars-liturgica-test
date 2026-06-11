@@ -523,9 +523,7 @@ useEffect(() => {
   Categoria Consigliata 1
 </p>
 
-<input
-  type="text"
-  placeholder="Categoria Consigliata 1"
+<select
   value={formData.categoriaConsigliata1}
   onChange={(e) =>
     setFormData({
@@ -534,14 +532,16 @@ useEffect(() => {
     })
   }
   style={inputStyle}
-/>
-<p style={{ marginBottom: "8px", fontWeight: "bold" }}>
-  Categoria Consigliata 2
-</p>
+>
+  <option value="">Seleziona categoria consigliata 1</option>
+  {categorie.map((categoria) => (
+    <option key={categoria.id} value={categoria.slug}>
+      {categoria.name}
+    </option>
+  ))}
+</select>
 
-<input
-  type="text"
-  placeholder="Categoria Consigliata 2"
+<select
   value={formData.categoriaConsigliata2}
   onChange={(e) =>
     setFormData({
@@ -550,14 +550,19 @@ useEffect(() => {
     })
   }
   style={inputStyle}
-/>
+>
+  <option value="">Seleziona categoria consigliata 2</option>
+  {categorie.map((categoria) => (
+    <option key={categoria.id} value={categoria.slug}>
+      {categoria.name}
+    </option>
+  ))}
+</select>
     <p style={{ marginBottom: "8px", fontWeight: "bold" }}>
   Categoria Consigliata 3
 </p>
 
-<input
-  type="text"
-  placeholder="Categoria Consigliata 3"
+<select
   value={formData.categoriaConsigliata3}
   onChange={(e) =>
     setFormData({
@@ -566,14 +571,19 @@ useEffect(() => {
     })
   }
   style={inputStyle}
-/>        
+>
+  <option value="">Seleziona categoria consigliata 3</option>
+  {categorie.map((categoria) => (
+    <option key={categoria.id} value={categoria.slug}>
+      {categoria.name}
+    </option>
+  ))}
+</select>
   <p style={{ marginBottom: "8px", fontWeight: "bold" }}>
   Categoria Consigliata 4
 </p>
 
-<input
-  type="text"
-  placeholder="Categoria Consigliata 4"
+<select
   value={formData.categoriaConsigliata4}
   onChange={(e) =>
     setFormData({
@@ -582,14 +592,19 @@ useEffect(() => {
     })
   }
   style={inputStyle}
-/>
+>
+  <option value="">Seleziona categoria consigliata 4</option>
+  {categorie.map((categoria) => (
+    <option key={categoria.id} value={categoria.slug}>
+      {categoria.name}
+    </option>
+  ))}
+</select>
             <p style={{ marginBottom: "8px", fontWeight: "bold" }}>
   Categoria Consigliata 5
 </p>
 
-<input
-  type="text"
-  placeholder="Categoria Consigliata 5"
+<select
   value={formData.categoriaConsigliata5}
   onChange={(e) =>
     setFormData({
@@ -598,7 +613,14 @@ useEffect(() => {
     })
   }
   style={inputStyle}
-/>
+>
+  <option value="">Seleziona categoria consigliata 5</option>
+  {categorie.map((categoria) => (
+    <option key={categoria.id} value={categoria.slug}>
+      {categoria.name}
+    </option>
+  ))}
+</select>
             <button
               onClick={salvaModifiche}
               style={{
