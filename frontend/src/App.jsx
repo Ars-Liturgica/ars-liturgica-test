@@ -309,9 +309,15 @@ useEffect(() => {
     }}
   >
     {[
-    ["Paramenti", "https://www.genesiartesacra.it/product-category/paramenti/", ""],
-["Calici e Pissidi", "https://www.genesiartesacra.it/product-category/calici-e-pissidi/", ""],
-    ].map((categoria, index) => (
+  formData.categoriaConsigliata1,
+  formData.categoriaConsigliata2,
+  formData.categoriaConsigliata3,
+  formData.categoriaConsigliata4,
+  formData.categoriaConsigliata5,
+]
+  .map((slug) => categorie.find((categoria) => categoria.slug === slug))
+  .filter(Boolean)
+  .map((categoria, index) => (
       <div
         key={index}
         style={{
@@ -323,10 +329,10 @@ useEffect(() => {
           boxShadow: "0 6px 18px rgba(122,0,0,0.10)",
         }}
       >
-        <h4 style={{ color: "#7a0000" }}>{categoria[0]}</h4>
+        <h4 style={{ color: "#7a0000" }}>{categoria.name}</h4>
 
         <a
-          href={categoria[1]}
+         href={"https://www.genesiartesacra.it/product-category/" + categoria.slug + "/"}
           target="_blank"
           rel="noopener noreferrer"
           style={{
