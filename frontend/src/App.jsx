@@ -250,7 +250,12 @@ useEffect(() => {
       CATEGORIA IN EVIDENZA
     </p>
     <img
-  src="https://images.unsplash.com/photo-1512632578888-169bbbc64f33?auto=format&fit=crop&w=1200&q=80"
+  src={
+  categoria.find(
+    (categoria) => categoria.slug === formData.categoriaPrincipale
+  )?.image?.src ||
+  "https://images.unsplash.com/photo-1512632578888-169bbbc64f33?auto=format&fit=crop&w=1200&q=80"
+}
   alt="Paramenti liturgici"
   style={{
     width: "100%",
