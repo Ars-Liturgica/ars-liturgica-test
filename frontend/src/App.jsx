@@ -251,7 +251,7 @@ useEffect(() => {
     </p>
     <img
   src={
-  categoria.find(
+  categorie.find(
     (categoria) => categoria.slug === formData.categoriaPrincipale
   )?.image?.src ||
   "https://images.unsplash.com/photo-1512632578888-169bbbc64f33?auto=format&fit=crop&w=1200&q=80"
