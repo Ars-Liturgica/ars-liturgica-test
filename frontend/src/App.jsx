@@ -262,16 +262,20 @@ useEffect(() => {
   }}
 />
 
-    <h1 style={{ color: "#7a0000", fontSize: "42px" }}>
-      Paramenti
-    </h1>
+   <h1 style={{ color: "#7a0000", fontSize: "42px" }}>
+  {categorie.find((categoria) => categoria.slug === formData.categoriaPrincipale)?.name || "Seleziona una categoria"}
+</h1>
 
     <p style={{ fontSize: "18px", lineHeight: "1.6", color: "#3b2a20" }}>
       Vesti che esprimono la bellezza del culto e accompagnano il mistero celebrato.
     </p>
 
     <a
-      href="https://www.genesiartesacra.it/product-category/paramenti/"
+      href={
+  "https://www.genesiartesacra.it/product-category/" +
+  formData.categoriaPrincipale +
+  "/"
+}
       target="_blank"
       rel="noopener noreferrer"
       style={{
