@@ -339,6 +339,20 @@ useEffect(() => {
           boxShadow: "0 6px 18px rgba(122,0,0,0.10)",
         }}
       >
+        {categoria.image?.src && (
+  <img
+    src={categoria.image.src}
+    alt={categoria.name}
+    style={{
+      width: "100%",
+      height: "130px",
+      objectFit: "cover",
+      borderRadius: "14px",
+      marginBottom: "12px",
+      border: "2px solid #d4b06a",
+    }}
+  />
+)}
         <h4 style={{ color: "#7a0000" }}>{categoria.name}</h4>
 
         <a
