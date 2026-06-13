@@ -265,10 +265,10 @@ objectFit: "contain",
 backgroundColor: "#fffdf8",
 display: "block",
 margin: "24px auto 18px",
-borderRadius: "18px",
-padding: "12px",
+borderRadius: "10px",
+padding: "6px",
 background: "#fffdf8",
-border: "1px solid #d4b06a",
+border: "2px solid #d4b06a",
 boxShadow: "0 8px 22px rgba(122,0,0,0.10)"
   }}
 />
