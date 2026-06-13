@@ -261,6 +261,7 @@ useEffect(() => {
     width: "auto",
 maxWidth: "560px",
 height: "auto",
+    maxHeight: "360px",
 objectFit: "contain",
 backgroundColor: "#fffdf8",
 display: "block",
