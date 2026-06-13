@@ -259,12 +259,14 @@ useEffect(() => {
   alt="Paramenti liturgici"
   style={{
     width: "100%",
-    maxWidth: "900px",
-    display: "block",
-    margin: "30px auto",
-    borderRadius: "16px",
-    border: "4px solid #d4b06a",
-    boxShadow: "0 8px 25px rgba(0,0,0,0.15)"
+maxWidth: "720px",
+height: "280px",
+objectFit: "cover",
+display: "block",
+margin: "24px auto 18px",
+borderRadius: "14px",
+border: "2px solid #d4b06a",
+boxShadow: "0 6px 18px rgba(122,0,0,0.12)"
   }}
 />
 
