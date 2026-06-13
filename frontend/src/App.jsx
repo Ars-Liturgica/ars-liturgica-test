@@ -266,7 +266,7 @@ backgroundColor: "#fffdf8",
 display: "block",
 margin: "24px auto 18px",
 borderRadius: "10px",
-padding: "6px",
+padding: "0px",
 background: "#fffdf8",
 border: "2px solid #d4b06a",
 boxShadow: "0 8px 22px rgba(122,0,0,0.10)"
