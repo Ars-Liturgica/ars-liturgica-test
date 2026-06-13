@@ -258,9 +258,9 @@ useEffect(() => {
 }
   alt="Paramenti liturgici"
   style={{
-    width: "100%",
+    width: "auto",
 maxWidth: "720px",
-height: "280px",
+height: "auto",
 objectFit: "contain",
 backgroundColor: "#fffdf8",
 display: "block",
