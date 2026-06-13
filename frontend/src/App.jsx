@@ -240,7 +240,7 @@ useEffect(() => {
   <div
     style={{
       marginTop: "30px",
-      padding: "30px",
+      padding: "36px 26px",
       borderRadius: "22px",
       background: "#fffdfa",
       border: "1px solid #d4b06a",
