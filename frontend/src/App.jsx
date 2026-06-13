@@ -243,7 +243,7 @@ useEffect(() => {
       padding: "36px 26px",
       borderRadius: "22px",
       background: "#fffdfa",
-      border: "none",
+      border: "1px solid #d4b06a",
     }}
   >
     <p style={{ color: "#9b7a2f", fontWeight: "bold", letterSpacing: "1px" }}>
