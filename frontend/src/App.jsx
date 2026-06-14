@@ -114,11 +114,11 @@ outlineOffset: "-12px",
           <div
   style={{
     position: "absolute",
-    top: "-42px",
+    top: "-34px",
     left: "50%",
     transform: "translateX(-50%)",
-    width: "86px",
-    height: "86px",
+    width: "68px",
+   height: "68px",
     borderRadius: "50%",
     background: "linear-gradient(180deg, #fff8ea 0%, #f8efd8 100%)",
     border: "3px solid #d4b06a",
@@ -128,7 +128,7 @@ outlineOffset: "-12px",
     alignItems: "center",
     justifyContent: "center",
     color: "#c99a2e",
-    fontSize: "42px",
+    fontSize: "34px",
     fontWeight: "bold",
     zIndex: 10
   }}
