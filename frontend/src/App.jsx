@@ -238,12 +238,12 @@ useEffect(() => {
   </p>
 
   <div
-    style={{
-      marginTop: "30px",
-      padding: "36px 26px",
-      borderRadius: "22px",
-      background: "#fffdfa",
-      border: "1px solid #d4b06a",
+    marginTop: "34px",
+padding: "42px 34px",
+borderRadius: "30px",
+background: "linear-gradient(180deg, #fffdfa 0%, #fff7e6 100%)",
+border: "2px solid #d4b06a",
+boxShadow: "0 10px 28px rgba(122,0,0,0.10), inset 0 0 0 2px #fff2cf",
     }}
   >
     <p style={{ color: "#9b7a2f", fontWeight: "bold", letterSpacing: "2px", textAlign: "center", fontSize: "22px" }}>
