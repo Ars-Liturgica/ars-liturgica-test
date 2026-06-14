@@ -111,29 +111,54 @@ outlineOffset: "-12px",
   boxShadow: "0 0 0 6px rgba(255,248,226,0.95), 0 18px 45px rgba(0,0,0,0.35), inset 0 0 0 2px #fff2cf",
 }}
         >
-          <div
+         {/* RIALZO CENTRALE DELLA CORNICE */}
+<div
   style={{
     position: "absolute",
-    top: "-34px",
+    top: "-30px",
     left: "50%",
     transform: "translateX(-50%)",
-    width: "68px",
-   height: "68px",
-    borderRadius: "50%",
+    width: "180px",
+    height: "58px",
     background: "linear-gradient(180deg, #fff8ea 0%, #f8efd8 100%)",
     border: "3px solid #d4b06a",
-    boxShadow:
-      "0 0 0 6px rgba(255,248,226,0.95), 0 8px 18px rgba(0,0,0,0.20)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    color: "#c99a2e",
-    fontSize: "34px",
-    fontWeight: "bold",
-    zIndex: 10
+    borderBottom: "none",
+    borderTopLeftRadius: "90px",
+    borderTopRightRadius: "90px",
+    boxShadow: "0 0 4px rgba(255,248,226,0.9)",
+    zIndex: 5,
   }}
 >
-  ✚
+  <div
+    style={{
+      position: "absolute",
+      top: "8px",
+      left: "8px",
+      right: "8px",
+      bottom: "0",
+      borderTop: "2px solid #e8c879",
+      borderLeft: "2px solid #e8c879",
+      borderRight: "2px solid #e8c879",
+      borderTopLeftRadius: "80px",
+      borderTopRightRadius: "80px",
+    }}
+  />
+</div>
+
+{/* CROCE CENTRALE */}
+<div
+  style={{
+    position: "absolute",
+    top: "-6px",
+    left: "50%",
+    transform: "translateX(-50%)",
+    color: "#c99a2e",
+    fontSize: "40px",
+    zIndex: 10,
+    lineHeight: 1,
+  }}
+>
+  ✠
 </div>
           <h2
             style={{
