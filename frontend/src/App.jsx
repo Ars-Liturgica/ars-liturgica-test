@@ -105,6 +105,8 @@ useEffect(() => {
   borderRadius: "34px",
   padding: "48px 46px",
   border: "3px solid #d4b06a",
+   outline: "2px solid #e8c879",
+outlineOffset: "-12px",         
   boxShadow: "0 0 0 6px rgba(255,248,226,0.95), 0 18px 45px rgba(0,0,0,0.35), inset 0 0 0 2px #fff2cf",
 }}
         >
