@@ -162,23 +162,7 @@ outlineOffset: "-12px",
   </svg>
 </div>
 
-{/* CROCE CENTRALE */}
-<div
-  style={{
-    position: "absolute",
-    top: "-4px",
-    left: "50%",
-    transform: "translateX(-50%)",
-    color: "#c99a2e",
-    fontSize: "42px",
-    zIndex: 12,
-    lineHeight: 1,
-    fontFamily: "Georgia, serif",
-    pointerEvents: "none",
-  }}
->
-  ✛
-</div>
+
           <h2
             style={{
               textAlign: "center",
