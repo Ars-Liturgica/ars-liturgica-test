@@ -238,6 +238,7 @@ useEffect(() => {
   </p>
 
   <div
+  style={{
     marginTop: "34px",
 padding: "42px 34px",
 borderRadius: "30px",
