@@ -111,54 +111,73 @@ outlineOffset: "-12px",
   boxShadow: "0 0 0 6px rgba(255,248,226,0.95), 0 18px 45px rgba(0,0,0,0.35), inset 0 0 0 2px #fff2cf",
 }}
         >
-         {/* RIALZO CENTRALE DELLA CORNICE */}
+    {/* TESTA SAGOMATA DELLA CORNICE */}
 <div
   style={{
     position: "absolute",
-    top: "-30px",
+    top: "-44px",
     left: "50%",
     transform: "translateX(-50%)",
-    width: "180px",
-    height: "58px",
-    background: "linear-gradient(180deg, #fff8ea 0%, #f8efd8 100%)",
-    border: "3px solid #d4b06a",
-    borderBottom: "none",
-    borderTopLeftRadius: "90px",
-    borderTopRightRadius: "90px",
-    boxShadow: "0 0 4px rgba(255,248,226,0.9)",
-    zIndex: 5,
+    width: "340px",
+    height: "92px",
+    zIndex: 8,
+    pointerEvents: "none",
   }}
 >
-  <div
-    style={{
-      position: "absolute",
-      top: "8px",
-      left: "8px",
-      right: "8px",
-      bottom: "0",
-      borderTop: "2px solid #e8c879",
-      borderLeft: "2px solid #e8c879",
-      borderRight: "2px solid #e8c879",
-      borderTopLeftRadius: "80px",
-      borderTopRightRadius: "80px",
-    }}
-  />
+  <svg
+    viewBox="0 0 340 92"
+    width="340"
+    height="92"
+    style={{ display: "block", overflow: "visible" }}
+  >
+    <path
+      d="M0 70
+         H122
+         C132 70, 137 58, 147 50
+         C157 42, 164 38, 170 32
+         C176 38, 183 42, 193 50
+         C203 58, 208 70, 218 70
+         H340"
+      fill="#fff8ea"
+      stroke="#d4b06a"
+      strokeWidth="4"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+
+    <path
+      d="M0 78
+         H118
+         C130 78, 137 63, 148 55
+         C158 47, 165 44, 170 39
+         C175 44, 182 47, 192 55
+         C203 63, 210 78, 222 78
+         H340"
+      fill="none"
+      stroke="#e8c879"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </svg>
 </div>
 
 {/* CROCE CENTRALE */}
 <div
   style={{
     position: "absolute",
-    top: "-6px",
+    top: "-4px",
     left: "50%",
     transform: "translateX(-50%)",
     color: "#c99a2e",
-    fontSize: "40px",
-    zIndex: 10,
+    fontSize: "42px",
+    zIndex: 12,
     lineHeight: 1,
+    fontFamily: "Georgia, serif",
+    pointerEvents: "none",
   }}
 >
-  ✠
+  ✛
 </div>
           <h2
             style={{
