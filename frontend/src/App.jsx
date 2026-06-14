@@ -63,7 +63,7 @@ useEffect(() => {
           "linear-gradient(to bottom, #2b0000, #4a0d0d, #1f0000)",
         color: "#f5e6c8",
         fontFamily: "serif",
-        padding: "20px",
+        padding: "36px 20px 28px",
       }}
     >
       <div
