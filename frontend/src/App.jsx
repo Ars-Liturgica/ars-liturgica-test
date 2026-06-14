@@ -111,6 +111,30 @@ outlineOffset: "-12px",
   boxShadow: "0 0 0 6px rgba(255,248,226,0.95), 0 18px 45px rgba(0,0,0,0.35), inset 0 0 0 2px #fff2cf",
 }}
         >
+          <div
+  style={{
+    position: "absolute",
+    top: "-42px",
+    left: "50%",
+    transform: "translateX(-50%)",
+    width: "86px",
+    height: "86px",
+    borderRadius: "50%",
+    background: "linear-gradient(180deg, #fff8ea 0%, #f8efd8 100%)",
+    border: "3px solid #d4b06a",
+    boxShadow:
+      "0 0 0 6px rgba(255,248,226,0.95), 0 8px 18px rgba(0,0,0,0.20)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    color: "#c99a2e",
+    fontSize: "42px",
+    fontWeight: "bold",
+    zIndex: 10
+  }}
+>
+  ✚
+</div>
           <h2
             style={{
               textAlign: "center",
