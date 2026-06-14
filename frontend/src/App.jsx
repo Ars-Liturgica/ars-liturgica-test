@@ -246,8 +246,8 @@ useEffect(() => {
       border: "1px solid #d4b06a",
     }}
   >
-    <p style={{ color: "#9b7a2f", fontWeight: "bold", letterSpacing: "1px" }}>
-      CATEGORIA IN EVIDENZA
+    <p style={{ color: "#9b7a2f", fontWeight: "bold", letterSpacing: "2px", textAlign: "center", fontSize: "22px" }}>
+      ✦ CATEGORIA IN EVIDENZA ✦
     </p>
     <img
   src={
