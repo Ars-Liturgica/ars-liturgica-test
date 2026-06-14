@@ -102,6 +102,7 @@ useEffect(() => {
           style={{
   background: "linear-gradient(180deg, #fff8ea 0%, #f8efd8 100%)",
   color: "#3a1c00",
+           position: "relative", 
   borderRadius: "34px",
   padding: "48px 46px",
   border: "3px solid #d4b06a",
