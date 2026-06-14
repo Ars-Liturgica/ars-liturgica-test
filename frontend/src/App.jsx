@@ -100,12 +100,13 @@ useEffect(() => {
 
         <div
           style={{
-            background: "#f8f1df",
-            color: "#3a1c00",
-            borderRadius: "20px",
-            padding: "30px",
-            boxShadow: "0 0 20px rgba(0,0,0,0.4)",
-          }}
+  background: "linear-gradient(180deg, #fff8ea 0%, #f8efd8 100%)",
+  color: "#3a1c00",
+  borderRadius: "34px",
+  padding: "48px 46px",
+  border: "3px solid #d4b06a",
+  boxShadow: "0 0 0 6px rgba(255,248,226,0.95), 0 18px 45px rgba(0,0,0,0.35), inset 0 0 0 2px #fff2cf",
+}}
         >
           <h2
             style={{
