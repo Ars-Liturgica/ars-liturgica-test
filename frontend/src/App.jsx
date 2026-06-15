@@ -132,7 +132,7 @@ outlineOffset: "-12px",
     marginBottom: "25px"
   }}
 >
-  <div>
+  <div style={{ paddingTop: "25px" }}>
           <p style={{ margin: "0 0 10px 0" }}>
             <strong>Data:</strong> {liturgia.data}
           </p>
