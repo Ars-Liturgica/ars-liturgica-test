@@ -129,19 +129,19 @@ outlineOffset: "-12px",
     gap: "2px"
   }}
 >
-          <p>
+          <p style={{ margin: "0 0 10px 0" }}>
             <strong>Data:</strong> {liturgia.data}
           </p>
 
-          <p>
+          <p style={{ margin: "0 0 10px 0" }}>
             <strong>Tempo Liturgico:</strong> {liturgia.tempo}
           </p>
 
-          <p>
+          <p style={{ margin: "0 0 10px 0" }}>
             <strong>Colore Liturgico:</strong> {liturgia.colore}
           </p>
 
-          <p>
+          <p style={{ margin: "0 0 10px 0" }}>
             <strong>Memoria del Giorno:</strong> {liturgia.santo}
           </p>
 </div>
