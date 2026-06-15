@@ -126,7 +126,7 @@ outlineOffset: "-12px",
   style={{
     display: "flex",
     flexDirection: "column",
-    gap: "12px"
+    gap: "2px"
   }}
 >
           <p>
