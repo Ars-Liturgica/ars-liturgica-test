@@ -153,7 +153,7 @@ outlineOffset: "-12px",
 <div>
           <div
             style={{
-              marginTop: "5px",
+              marginTop: "0px",
               padding: "20px",
               background: "transparent",
               borderRadius: "15px",
