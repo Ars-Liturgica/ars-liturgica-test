@@ -144,7 +144,7 @@ outlineOffset: "-12px",
           <p>
             <strong>Memoria del Giorno:</strong> {liturgia.santo}
           </p>
-
+</div>
           <div
             style={{
               marginTop: "25px",
