@@ -118,6 +118,7 @@ outlineOffset: "-12px",
               textAlign: "center",
               marginBottom: "20px",
               color: "#6b0000",
+              fontSize: "42px",
             }}
           >
             Liturgia del Giorno
