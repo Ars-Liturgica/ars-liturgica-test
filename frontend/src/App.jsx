@@ -124,11 +124,15 @@ outlineOffset: "-12px",
           </h2>
 <div
   style={{
-    display: "flex",
-    flexDirection: "column",
-    gap: "2px"
+    display: "grid",
+    gridTemplateColumns: "1fr 1fr",
+    gap: "28px",
+    alignItems: "stretch",
+    marginTop: "25px",
+    marginBottom: "25px"
   }}
 >
+  <div>
           <p style={{ margin: "0 0 10px 0" }}>
             <strong>Data:</strong> {liturgia.data}
           </p>
@@ -145,23 +149,7 @@ outlineOffset: "-12px",
             <strong>Memoria del Giorno:</strong> {liturgia.santo}
           </p>
 </div>
-          <div
-            style={{
-              marginTop: "25px",
-              padding: "20px",
-              background: "#fff8ea",
-              borderRadius: "15px",
-            }}
-          >
-            <h3 style={{ color: "#7a0000" }}>
-              Vangelo del Giorno
-            </h3>
-
-            <p style={{ whiteSpace: "pre-line" }}>
-  {liturgia.vangelo}
-</p>
-          </div>
-
+<div>
           <div
             style={{
               marginTop: "20px",
@@ -192,6 +180,8 @@ outlineOffset: "-12px",
             >
               Per approfondire
             </a>
+  </div>
+</div>
 <section className="mt-8 rounded-3xl border border-[#c9a44c] bg-[#fff8ea] p-5 shadow-lg">
   <div className="text-center mb-4">
     <h2 className="text-xl font-serif text-[#6b1f2b]">
