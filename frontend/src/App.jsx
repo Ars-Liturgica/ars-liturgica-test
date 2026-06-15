@@ -122,7 +122,13 @@ outlineOffset: "-12px",
           >
             Liturgia del Giorno
           </h2>
-
+<div
+  style={{
+    display: "flex",
+    flexDirection: "column",
+    gap: "12px"
+  }}
+>
           <p>
             <strong>Data:</strong> {liturgia.data}
           </p>
