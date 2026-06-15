@@ -155,7 +155,7 @@ outlineOffset: "-12px",
             style={{
               marginTop: "20px",
               padding: "20px",
-              background: "#fdf4e3",
+              background: "transparent",
               borderRadius: "15px",
             }}
           >
