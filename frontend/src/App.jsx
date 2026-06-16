@@ -252,7 +252,17 @@ outlineOffset: "-12px",
       href="https://www.genesiartesacra.it/shop/"
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-block rounded-full bg-[#6b1f2b] px-6 py-3 text-sm font-semibold text-white shadow-md"
+      style={{
+  display: "inline-block",
+  background: "#7a0000",
+  color: "#ffffff",
+  padding: "14px 28px",
+  borderRadius: "999px",
+  textDecoration: "none",
+  fontWeight: "600",
+  fontSize: "16px",
+  boxShadow: "0 4px 12px rgba(122,0,0,0.25)"
+}}
     >
       Scopri i prodotti del momento
     </a>
