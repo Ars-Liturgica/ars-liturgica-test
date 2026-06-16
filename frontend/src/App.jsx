@@ -234,7 +234,7 @@ outlineOffset: "-12px",
   style={{ maxHeight: "360px" }}
 >
   <img
-    src="https://images.unsplash.com/photo-1507692049790-de58290a4334"
+    src="/calice-liturgia.jpg.png"
     alt="Segni per la celebrazione"
     style={{
       width: "80%",
