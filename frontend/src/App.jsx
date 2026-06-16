@@ -241,7 +241,7 @@ outlineOffset: "-12px",
       height: "340px",
       objectFit: "cover",
       borderRadius: "14px",
-      display: "block"
+      display: "block",
       margin: "0 auto"
     }}
   />
