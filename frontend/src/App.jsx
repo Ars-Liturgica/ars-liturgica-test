@@ -247,7 +247,7 @@ outlineOffset: "-12px",
   />
 </div>
 
-  <div style={{ marginTop: "58px", textAlign: "center", marginLeft: "40px" }}>
+ 250 <div style={{ marginTop: "45px", textAlign: "center", marginLeft: "40px" }}>
     <a
       href="https://www.genesiartesacra.it/shop/"
       target="_blank"
