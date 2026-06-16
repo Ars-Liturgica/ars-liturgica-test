@@ -221,7 +221,7 @@ outlineOffset: "-12px",
 <section className="mt-8 rounded-3xl border border-[#c9a44c] bg-[#fff8ea] p-5 shadow-lg">
   <div className="text-center mb-4">
     <h2 className="text-5xl font-serif text-red-600 text-center">
-      Per la Celebrazione
+      PER LA CELEBRAZIONE TEST
     </h2>
 
     <p className="mt-2 text-sm italic text-[#6b4b2a] text-center">
