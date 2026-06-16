@@ -183,6 +183,41 @@ outlineOffset: "-12px",
             </a>
   </div>
 </div>
+          <div
+  style={{
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "16px",
+    margin: "40px 0 30px 0"
+  }}
+>
+  <div
+    style={{
+      flex: 1,
+      height: "1px",
+      background: "#d4b06a"
+    }}
+  />
+  
+  <div
+    style={{
+      color: "#d4b06a",
+      fontSize: "26px",
+      lineHeight: 1
+    }}
+  >
+    ✠
+  </div>
+
+  <div
+    style={{
+      flex: 1,
+      height: "1px",
+      background: "#d4b06a"
+    }}
+  />
+</div>
 <section className="mt-8 rounded-3xl border border-[#c9a44c] bg-[#fff8ea] p-5 shadow-lg">
   <div className="text-center mb-4">
     <h2 className="text-xl font-serif text-[#6b1f2b]">
