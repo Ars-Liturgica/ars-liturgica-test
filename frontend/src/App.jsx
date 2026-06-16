@@ -186,11 +186,11 @@ outlineOffset: "-12px",
 <section className="mt-8 rounded-3xl border border-[#c9a44c] bg-[#fff8ea] p-5 shadow-lg">
   <div className="text-center mb-4">
     <h2 className="text-xl font-serif text-[#6b1f2b]">
-      Segni per la celebrazione
+      Per la Celebrazione
     </h2>
 
     <p className="mt-2 text-sm italic text-[#6b4b2a]">
-      Una selezione pensata per accompagnare il tempo liturgico di oggi.
+      Strumenti e segni scelti per accompagnare il servizio liturgico.
     </p>
   </div>
 
