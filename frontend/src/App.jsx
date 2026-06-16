@@ -220,11 +220,11 @@ outlineOffset: "-12px",
 </div>
 <section className="mt-8 rounded-3xl border border-[#c9a44c] bg-[#fff8ea] p-5 shadow-lg">
   <div className="text-center mb-4">
-    <h2 className="text-5xl font-serif text-[#7a0000] text-center">
+    <h2 style={{ color: "#7a0000", textAlign: "center", fontSize: "42px", fontFamily: "serif", marginBottom: "12px" }}>
       Per la Celebrazione
     </h2>
 
-    <p className="mt-2 text-sm italic text-[#6b4b2a] text-center">
+    <p style={{ textAlign: "center", fontSize: "18px", color: "#6b4b2a", fontStyle: "italic", marginTop: "8px" }}>
       Strumenti e segni scelti per accompagnare il servizio liturgico.
     </p>
   </div>
