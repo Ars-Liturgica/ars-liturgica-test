@@ -237,7 +237,7 @@ outlineOffset: "-12px",
     src="https://images.unsplash.com/photo-1507692049790-de58290a4334"
     alt="Segni per la celebrazione"
     style={{
-      width: "85%",
+      width: "80%",
       height: "340px",
       objectFit: "cover",
       borderRadius: "14px",
