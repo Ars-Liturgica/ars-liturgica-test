@@ -304,7 +304,7 @@ boxShadow: "0 10px 28px rgba(122,0,0,0.10), inset 0 0 0 2px #fff2cf",
   categorie.find(
     (categoria) => categoria.slug === formData.categoriaPrincipale
   )?.image?.src ||
-  "https://images.unsplash.com/photo-1512632578888-169bbbc64f33?auto=format&fit=crop&w=1200&q=80"
+  "/b28bd6bf-f2f6-4aaf-87d5-bdb289c86571.png"
 }
   alt="Paramenti liturgici"
   style={{
