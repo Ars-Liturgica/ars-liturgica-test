@@ -247,7 +247,7 @@ outlineOffset: "-12px",
   />
 </div>
 
-  <div className="mt-8 text-center">
+  <div className="mt-10 text-center">
     <a
       href="https://www.genesiartesacra.it/shop/"
       target="_blank"
