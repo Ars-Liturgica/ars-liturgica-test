@@ -189,7 +189,7 @@ outlineOffset: "-12px",
     alignItems: "center",
     justifyContent: "center",
     gap: "16px",
-    margin: "40px 0 30px 0"
+    margin: "50px 0 30px 0"
   }}
 >
   <div
