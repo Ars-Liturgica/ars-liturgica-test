@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-
+import { supabase } from "./supabaseClient";
 export default function App() {
   const [adminMode, setAdminMode] = useState(false);
 const [categorie, setCategorie] = useState([]);
@@ -37,10 +37,31 @@ categoriaConsigliata5: "",
 
   const [formData, setFormData] = useState(liturgia);
 
-  const salvaModifiche = () => {
+ const salvaModifiche = async () => {
+  const datiSupabase = {
+    id: 1,
+    data: formData.data,
+    tempo_liturgico: formData.tempo,
+    colore_liturgico: formData.colore,
+    memoria_santo: formData.santo,
+    riferimento_vangelo: formData.vangelo,
+    una_luce_sulla_parola: formData.riflessione,
+    link_cei: formData.linkCei,
+  };
+
+  const { error } = await supabase
+    .from("liturgia_giorno")
+    .upsert(datiSupabase);
+
+  if (error) {
+    console.error("Errore Supabase:", error);
+    alert("Errore nel salvataggio su Supabase");
+    return;
+  }
+
   setLiturgia(formData);
   localStorage.setItem("liturgia_v2", JSON.stringify(formData));
-  alert("Liturgia aggiornata correttamente");
+  alert("Liturgia salvata su Supabase correttamente");
   setAdminMode(false);
 };
 useEffect(() => {
