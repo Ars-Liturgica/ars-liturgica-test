@@ -63,6 +63,7 @@ categoriaConsigliata5: "",
   localStorage.setItem("liturgia_v2", JSON.stringify(formData));
   alert("Liturgia salvata su Supabase correttamente");
   setAdminMode(false);
+   };
    useEffect(() => {
   async function caricaLiturgia() {
     const { data, error } = await supabase
