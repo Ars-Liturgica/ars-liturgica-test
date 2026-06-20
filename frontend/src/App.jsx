@@ -63,7 +63,42 @@ categoriaConsigliata5: "",
   localStorage.setItem("liturgia_v2", JSON.stringify(formData));
   alert("Liturgia salvata su Supabase correttamente");
   setAdminMode(false);
-};
+   useEffect(() => {
+  async function caricaLiturgia() {
+    const { data, error } = await supabase
+      .from("liturgia_giorno")
+      .select("*")
+      .eq("id", 1)
+      .single();
+
+    if (error) {
+      console.error("Errore lettura Supabase:", error);
+      return;
+    }
+
+    const datiApp = {
+      data: data.data,
+      tempo: data.tempo_liturgico,
+      colore: data.colore_liturgico,
+      santo: data.memoria_santo,
+      vangelo: data.riferimento_vangelo,
+      riflessione: data.una_luce_sulla_parola,
+      linkCei: data.link_cei,
+      categoriaPrincipale: "",
+      categoriaConsigliata1: "",
+      categoriaConsigliata2: "",
+      categoriaConsigliata3: "",
+      categoriaConsigliata4: "",
+      categoriaConsigliata5: "",
+    };
+
+    setLiturgia(datiApp);
+    setFormData(datiApp);
+  }
+
+  caricaLiturgia();
+}, []);
+
 useEffect(() => {
   fetch("/api/categorie")
     .then((res) => res.json())
