@@ -48,17 +48,31 @@ categoriaConsigliata5: "",
     una_luce_sulla_parola: formData.riflessione,
     link_cei: formData.linkCei,
   };
-
+const datiCategorie = {
+  id: 1,
+  categoria_principale: formData.categoriaPrincipale,
+  categoria_consigliata_1: formData.categoriaConsigliata1,
+  categoria_consigliata_2: formData.categoriaConsigliata2,
+  categoria_consigliata_3: formData.categoriaConsigliata3,
+  categoria_consigliata_4: formData.categoriaConsigliata4,
+  categoria_consigliata_5: formData.categoriaConsigliata5,
+};
   const { error } = await supabase
     .from("liturgia_giorno")
     .upsert(datiSupabase);
-
+const { error: errorCategorie } = await supabase
+  .from("categorie_app")
+  .upsert(datiCategorie);
   if (error) {
     console.error("Errore Supabase:", error);
     alert("Errore nel salvataggio su Supabase");
     return;
   }
-
+if (errorCategorie) {
+  console.error("Errore salvataggio categorie Supabase:", errorCategorie);
+  alert("Errore nel salvataggio categorie su Supabase");
+  return;
+}
   setLiturgia(formData);
   localStorage.setItem("liturgia_v2", JSON.stringify(formData));
   alert("Liturgia salvata su Supabase correttamente");
