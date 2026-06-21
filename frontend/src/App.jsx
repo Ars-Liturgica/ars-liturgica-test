@@ -221,7 +221,7 @@ outlineOffset: "-12px",
 </h3>
 
 <p style={{ whiteSpace: "pre-line", marginBottom: "22px" }}>
-  {liturgia.riferimento_vangelo}
+{liturgia.vangelo}
 </p>
             <h3 style={{ color: "#7a0000" }}>
               Una luce sulla Parola
