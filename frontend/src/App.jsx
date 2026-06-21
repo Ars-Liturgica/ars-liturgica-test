@@ -85,7 +85,11 @@ if (errorCategorie) {
       .select("*")
       .eq("id", 1)
       .single();
-
+const { data: categorieSalvate, error: errorCategorieLettura } = await supabase
+  .from("categorie_app")
+  .select("*")
+  .eq("id", 1)
+  .maybeSingle();
     if (error) {
       console.error("Errore lettura Supabase:", error);
       return;
@@ -99,12 +103,12 @@ if (errorCategorie) {
       vangelo: data.riferimento_vangelo,
       riflessione: data.una_luce_sulla_parola,
       linkCei: data.link_cei,
-      categoriaPrincipale: "",
-      categoriaConsigliata1: "",
-      categoriaConsigliata2: "",
-      categoriaConsigliata3: "",
-      categoriaConsigliata4: "",
-      categoriaConsigliata5: "",
+     categoriaPrincipale: categorieSalvate?.categoria_principale || "",
+categoriaConsigliata1: categorieSalvate?.categoria_consigliata_1 || "",
+categoriaConsigliata2: categorieSalvate?.categoria_consigliata_2 || "",
+categoriaConsigliata3: categorieSalvate?.categoria_consigliata_3 || "",
+categoriaConsigliata4: categorieSalvate?.categoria_consigliata_4 || "",
+categoriaConsigliata5: categorieSalvate?.categoria_consigliata_5 || "",
     };
 
     setLiturgia(datiApp);
