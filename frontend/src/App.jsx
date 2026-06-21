@@ -156,7 +156,7 @@ useEffect(() => {
           <h1
             style={{
               color: "#d4af37",
-              fontSize: "42px",
+              fontSize: "54px",
               marginBottom: "5px",
             }}
           >
@@ -167,6 +167,7 @@ useEffect(() => {
             style={{
               color: "#f0d9a7",
               fontStyle: "italic",
+               fontSize: "24px",
             }}
           >
             Al servizio della celebrazione
