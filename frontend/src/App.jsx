@@ -384,7 +384,7 @@ boxShadow: "0 10px 28px rgba(122,0,0,0.10), inset 0 0 0 2px #fff2cf",
     <img
   src={
   categorie.find(
-    (categoria) => categoria.slug === formData.categoriaPrincipale
+   (categoria) => categoria.slug === liturgia.categoriaPrincipale
   )?.image?.src ||
   "/b28bd6bf-f2f6-4aaf-87d5-bdb289c86571.png"
 }
@@ -407,7 +407,7 @@ boxShadow: "0 8px 22px rgba(122,0,0,0.10)"
 />
 
    <h1 style={{ color: "#7a0000", fontSize: "42px" }}>
-  {categorie.find((categoria) => categoria.slug === formData.categoriaPrincipale)?.name || "Seleziona una categoria"}
+ categoria.slug === liturgia.categoriaPrincipale
 </h1>
 
     <p style={{ fontSize: "18px", lineHeight: "1.6", color: "#3b2a20" }}>
@@ -417,7 +417,7 @@ boxShadow: "0 8px 22px rgba(122,0,0,0.10)"
     <a
       href={
   "https://www.genesiartesacra.it/product-category/" +
-  formData.categoriaPrincipale +
+ liturgia.categoriaPrincipale +
   "/"
 }
       target="_blank"
