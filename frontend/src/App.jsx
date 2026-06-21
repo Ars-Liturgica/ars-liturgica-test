@@ -216,6 +216,13 @@ outlineOffset: "-12px",
               borderRadius: "15px",
             }}
           >
+            <h3 style={{ color: "#7a0000", marginBottom: "10px" }}>
+  Vangelo del Giorno
+</h3>
+
+<p style={{ whiteSpace: "pre-line", marginBottom: "22px" }}>
+  {liturgia.riferimento_vangelo}
+</p>
             <h3 style={{ color: "#7a0000" }}>
               Una luce sulla Parola
             </h3>
