@@ -407,7 +407,7 @@ boxShadow: "0 8px 22px rgba(122,0,0,0.10)"
 />
 
    <h1 style={{ color: "#7a0000", fontSize: "42px" }}>
- categoria.slug === liturgia.categoriaPrincipale
+{categorie.find((categoria) => categoria.slug === liturgia.categoriaPrincipale)?.name || "Seleziona una categoria"}
 </h1>
 
     <p style={{ fontSize: "18px", lineHeight: "1.6", color: "#3b2a20" }}>
