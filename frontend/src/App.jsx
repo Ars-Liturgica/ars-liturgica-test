@@ -410,9 +410,7 @@ boxShadow: "0 8px 22px rgba(122,0,0,0.10)"
 {categorie.find((categoria) => categoria.slug === liturgia.categoriaPrincipale)?.name || "Seleziona una categoria"}
 </h1>
 
-    <p style={{ fontSize: "18px", lineHeight: "1.6", color: "#3b2a20" }}>
-      Vesti che esprimono la bellezza del culto e accompagnano il mistero celebrato.
-    </p>
+   
 
     <a
       href={
