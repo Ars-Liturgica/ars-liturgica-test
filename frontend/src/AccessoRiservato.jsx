@@ -24,7 +24,7 @@ export default function AccessoRiservato() {
       >
         <div
           style={{
-            minHeight: "230px",
+            minHeight: "320px",
            backgroundImage: "url('/access-door.png')",
            backgroundColor: "#fffaeb",
             backgroundSize: "contain",
