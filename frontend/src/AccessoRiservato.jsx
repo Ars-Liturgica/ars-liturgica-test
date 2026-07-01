@@ -36,7 +36,7 @@ export default function AccessoRiservato() {
     alt="Accesso Riservato"
     style={{
      width: "520px",
-      maxWidth: "100%",
+     maxWidth: "none",
       height: "auto",
       display: "block",
     }}
