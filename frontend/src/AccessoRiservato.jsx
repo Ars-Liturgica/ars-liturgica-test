@@ -35,7 +35,7 @@ export default function AccessoRiservato() {
     src="/access-door.png"
     alt="Accesso Riservato"
     style={{
-      width: "360px",
+      width: "420px",
       maxWidth: "100%",
       height: "auto",
       display: "block",
