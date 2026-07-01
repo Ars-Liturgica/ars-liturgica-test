@@ -23,15 +23,25 @@ export default function AccessoRiservato() {
         }}
       >
         <div
-          style={{
-            minHeight: "320px",
-           backgroundImage: "url('/access-door.png')",
-           backgroundColor: "#fffaeb",
-            backgroundSize: "contain",
-            backgroundRepeat: "no-repeat",
-            backgroundPosition: "center",
-          }}
-        />
+  style={{
+    minHeight: "320px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "transparent",
+  }}
+>
+  <img
+    src="/access-door.png"
+    alt="Accesso Riservato"
+    style={{
+      width: "360px",
+      maxWidth: "100%",
+      height: "auto",
+      display: "block",
+    }}
+  />
+</div>
 
         <div
           style={{
