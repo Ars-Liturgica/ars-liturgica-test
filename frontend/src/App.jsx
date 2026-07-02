@@ -37,7 +37,7 @@ categoriaConsigliata5: "",
 ],
       };
 });
-
+const [mostraAreaParrocchiale, setMostraAreaParrocchiale] = useState(false);
   const [formData, setFormData] = useState(liturgia);
 
  const salvaModifiche = async () => {
