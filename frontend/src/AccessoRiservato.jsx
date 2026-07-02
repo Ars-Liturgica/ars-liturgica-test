@@ -1,5 +1,5 @@
 import React from "react";
-export default function AccessoRiservato() {
+export default function AccessoRiservato({ onEntra }) {
   return (
     <section
       style={{
@@ -108,7 +108,8 @@ export default function AccessoRiservato() {
           </p>
 
           <button
-            style={{
+  onClick={onEntra}
+  style={{
               background: "linear-gradient(180deg, #8b0000, #5a0000)",
               color: "#ffffff",
               border: "none",
