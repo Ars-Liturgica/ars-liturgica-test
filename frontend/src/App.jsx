@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "./supabaseClient";
 import AccessoRiservato from "./AccessoRiservato";
+import RegistrazioneParroco from "./parrocchia/RegistrazioneParroco";
 export default function App() {
   const [adminMode, setAdminMode] = useState(false);
 const [categorie, setCategorie] = useState([]);
