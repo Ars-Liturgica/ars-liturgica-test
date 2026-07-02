@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { supabase } from "./supabaseClient";
 import AccessoRiservato from "./AccessoRiservato";
 import RegistrazioneParroco from "./parrocchia/RegistrazioneParroco";
+import AreaParrocchiale from "./parrocchia/AreaParrocchiale";
 export default function App() {
   const [adminMode, setAdminMode] = useState(false);
 const [categorie, setCategorie] = useState([]);
@@ -304,7 +305,7 @@ outlineOffset: "-12px",
   />
 </div>
 <AccessoRiservato />
-          
+     <AreaParrocchiale />     
 <section className="mt-8 rounded-3xl border border-[#c9a44c] bg-[#fff8ea] p-5 shadow-lg">
   <div className="text-center mb-4">
     <h2 style={{ color: "#7a0000", textAlign: "center", fontSize: "42px", fontFamily: "serif", marginBottom: "12px" }}>
