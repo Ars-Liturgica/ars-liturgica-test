@@ -4,12 +4,20 @@ export default function RegistrazioneParroco() {
   return (
     <div style={{ maxWidth: "760px", margin: "0 auto" }}>
       <h2 style={{ color: "#0b2f55", textAlign: "center", fontSize: "34px" }}>
-        Registrazione del Parroco
-      </h2>
+  Area Parrocchiale
+</h2>
 
-      <p style={{ textAlign: "center", fontSize: "18px", lineHeight: "1.6" }}>
-        Inserisci i tuoi dati per creare lo spazio digitale della tua comunità.
-      </p>
+<h3 style={{ color: "#0b2f55", textAlign: "center", fontSize: "28px", marginTop: "10px" }}>
+  Attivazione della Parrocchia
+</h3>
+
+<p style={{ textAlign: "center", fontSize: "18px", lineHeight: "1.7", maxWidth: "680px", margin: "0 auto 30px auto" }}>
+  <strong>Benvenuto in Ars Liturgica.</strong>
+  <br /><br />
+  Compila il modulo per richiedere l'attivazione dello spazio digitale della tua Parrocchia.
+  <br /><br />
+  Dopo la verifica dei dati, riceverai via email il tuo <strong>codice personale di attivazione</strong>, valido esclusivamente per il primo accesso e necessario per completare la registrazione.
+</p>
 
       <div style={{ marginTop: "30px" }}>
         <input placeholder="Nome *" style={campo} />
@@ -20,7 +28,7 @@ export default function RegistrazioneParroco() {
         <input placeholder="Password *" type="password" style={campo} />
 
         <button style={bottone}>
-          Registra il parroco
+         Richiedi il codice di attivazione
         </button>
       </div>
     </div>
