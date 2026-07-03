@@ -136,6 +136,13 @@ useEffect(() => {
       console.error("Errore caricamento categorie WooCommerce:", error);
     });
 }, []);
+  if (ambiente === "parrocchia") {
+  return (
+    <AreaParrocchiale
+      tornaHome={() => setAmbiente("home")}
+    />
+  );
+}
   return (
     <div
       style={{
