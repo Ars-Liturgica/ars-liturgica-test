@@ -16,7 +16,7 @@ export default function RegistrazioneParroco() {
   <br /><br />
   Compila il modulo per richiedere l'attivazione dello spazio digitale della tua Parrocchia.
   <br /><br />
-  Dopo la verifica dei dati, riceverai via email il tuo <strong>codice personale di attivazione</strong>, valido esclusivamente per il primo accesso e necessario per completare la registrazione.
+ Dopo l'invio della richiesta, riceverai via email il tuo <strong>codice personale di attivazione</strong>, valido esclusivamente per il primo accesso e necessario per completare l'attivazione della Parrocchia.
 </p>
 
       <div style={{ marginTop: "30px" }}>
@@ -24,8 +24,9 @@ export default function RegistrazioneParroco() {
         <input placeholder="Cognome *" style={campo} />
         <input placeholder="Email *" style={campo} />
         <input placeholder="Telefono" style={campo} />
-        <input placeholder="Nome utente *" style={campo} />
-        <input placeholder="Password *" type="password" style={campo} />
+      <input placeholder="Nome della Parrocchia *" style={campo} />
+<input placeholder="Diocesi" style={campo} />
+<input placeholder="Città" style={campo} />
 
         <button style={bottone}>
          Richiedi il codice di attivazione
