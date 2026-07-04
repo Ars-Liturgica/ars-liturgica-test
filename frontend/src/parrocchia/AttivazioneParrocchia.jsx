@@ -1,5 +1,37 @@
-import React from "react";
+import React, { useState } from "react";
+
+function generaCodiceAttivazione() {
+  const caratteri = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+
+  const generaBlocco = () =>
+    Array.from({ length: 4 }, () =>
+      caratteri[Math.floor(Math.random() * caratteri.length)]
+    ).join("");
+
+  return `ARS-${generaBlocco()}-${generaBlocco()}`;
+}
+
 export default function AttivazioneParrocchia() {
+  const [codiceGenerato] = useState(generaCodiceAttivazione());
+  const [codiceInserito, setCodiceInserito] = useState("");
+  const [messaggio, setMessaggio] = useState("");
+
+  const parrocchia = {
+    id: "PAR-000001",
+    nome: "Parrocchia di prova",
+    emailParroco: "parroco@esempio.it",
+  };
+
+  function attivaParrocchia() {
+    if (codiceInserito.trim().toUpperCase() === codiceGenerato) {
+      setMessaggio(
+        `Parrocchia attivata correttamente: ${parrocchia.nome}`
+      );
+    } else {
+      setMessaggio("Codice non valido. Controlla l'email e riprova.");
+    }
+  }
+
   return (
     <section
       style={{
@@ -16,41 +48,78 @@ export default function AttivazioneParrocchia() {
     >
       <h1>Attivazione della Parrocchia</h1>
 
-<p>
-  Abbiamo inviato il tuo codice personale di attivazione
-  all'indirizzo email indicato.
-  <br /><br />
-  Inseriscilo qui sotto per completare
-  l'attivazione della tua Parrocchia.
-</p>
-      <input
-  placeholder="Codice di attivazione"
-  style={{
-    width: "100%",
-    padding: "14px",
-    marginTop: "24px",
-    marginBottom: "16px",
-    borderRadius: "8px",
-    border: "1px solid #d6a23a",
-    fontSize: "16px"
-  }}
-/>
+      <p>
+        Abbiamo inviato il codice personale di attivazione
+        all'indirizzo email del parroco.
+        <br /><br />
+        Inseriscilo qui sotto per completare
+        l'attivazione della tua Parrocchia.
+      </p>
 
-<button
-  style={{
-    width: "100%",
-    padding: "15px",
-    background: "#0b2f55",
-    color: "#fff8e8",
-    border: "1px solid #d6a23a",
-    borderRadius: "8px",
-    fontSize: "17px",
-    fontWeight: "bold",
-    cursor: "pointer"
-  }}
->
-  Attiva la Parrocchia
-</button>
+      <div
+        style={{
+          margin: "22px 0",
+          padding: "14px",
+          background: "#fff",
+          border: "1px dashed #d6a23a",
+          borderRadius: "10px",
+          fontSize: "14px",
+          color: "#5a0000",
+        }}
+      >
+        <strong>Simulazione email:</strong>
+        <br />
+        Email parroco: {parrocchia.emailParroco}
+        <br />
+        ID Parrocchia: {parrocchia.id}
+        <br />
+        Codice inviato: <strong>{codiceGenerato}</strong>
+      </div>
+
+      <input
+        placeholder="Codice di attivazione"
+        value={codiceInserito}
+        onChange={(e) => setCodiceInserito(e.target.value)}
+        style={{
+          width: "100%",
+          padding: "14px",
+          marginTop: "10px",
+          marginBottom: "16px",
+          borderRadius: "8px",
+          border: "1px solid #d6a23a",
+          fontSize: "16px",
+          textAlign: "center",
+        }}
+      />
+
+      <button
+        onClick={attivaParrocchia}
+        style={{
+          width: "100%",
+          padding: "15px",
+          background: "#0b2f55",
+          color: "#fff8e8",
+          border: "1px solid #d6a23a",
+          borderRadius: "8px",
+          fontSize: "17px",
+          fontWeight: "bold",
+          cursor: "pointer",
+        }}
+      >
+        Attiva la Parrocchia
+      </button>
+
+      {messaggio && (
+        <p
+          style={{
+            marginTop: "22px",
+            fontWeight: "bold",
+          }}
+        >
+          {messaggio}
+        </p>
+      )}
     </section>
   );
 }
+
