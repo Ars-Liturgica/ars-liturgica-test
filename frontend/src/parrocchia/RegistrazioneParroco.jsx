@@ -1,8 +1,10 @@
 import React, { useState } from "react";
-
+import AttivazioneParrocchia from "./AttivazioneParrocchia";
 export default function RegistrazioneParroco() {
   const [mostraAttivazione, setMostraAttivazione] = useState(false);
-  return (
+  return mostraAttivazione ? (
+  <AttivazioneParrocchia />
+) : (
     <div style={{ maxWidth: "760px", margin: "0 auto" }}>
       <h2 style={{ color: "#0b2f55", textAlign: "center", fontSize: "34px" }}>
   Area Parrocchiale
