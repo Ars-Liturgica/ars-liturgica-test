@@ -15,6 +15,7 @@ export default function AttivazioneParrocchia({
   idParrocchia = "PAR-000001",
   nomeParrocchia = "Parrocchia di prova",
   emailParroco = "parroco@esempio.it",
+  onAttivazioneCompletata,
 }) {
   const [codiceGenerato] = useState(generaCodiceAttivazione());
   const [codiceInserito, setCodiceInserito] = useState("");
@@ -24,9 +25,13 @@ export default function AttivazioneParrocchia({
 
   function attivaParrocchia() {
     if (codiceInserito.trim().toUpperCase() === codiceGenerato) {
-      setMessaggio(
-        `Parrocchia attivata correttamente: ${nomeParrocchia}`
-      );
+  setMessaggio(
+    `Parrocchia attivata correttamente: ${nomeParrocchia}`
+  );
+
+  if (onAttivazioneCompletata) {
+    onAttivazioneCompletata();
+  }
     } else {
       setMessaggio("Codice non valido. Controlla l'email e riprova.");
     }
