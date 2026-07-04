@@ -11,21 +11,21 @@ function generaCodiceAttivazione() {
   return `ARS-${generaBlocco()}-${generaBlocco()}`;
 }
 
-export default function AttivazioneParrocchia() {
+export default function AttivazioneParrocchia({
+  idParrocchia = "PAR-000001",
+  nomeParrocchia = "Parrocchia di prova",
+  emailParroco = "parroco@esempio.it",
+}) {
   const [codiceGenerato] = useState(generaCodiceAttivazione());
   const [codiceInserito, setCodiceInserito] = useState("");
   const [messaggio, setMessaggio] = useState("");
 
-  const parrocchia = {
-    id: "PAR-000001",
-    nome: "Parrocchia di prova",
-    emailParroco: "parroco@esempio.it",
-  };
+  
 
   function attivaParrocchia() {
     if (codiceInserito.trim().toUpperCase() === codiceGenerato) {
       setMessaggio(
-        `Parrocchia attivata correttamente: ${parrocchia.nome}`
+        `Parrocchia attivata correttamente: ${nomeParrocchia}`
       );
     } else {
       setMessaggio("Codice non valido. Controlla l'email e riprova.");
@@ -67,13 +67,13 @@ export default function AttivazioneParrocchia() {
           color: "#5a0000",
         }}
       >
-        <strong>Simulazione email:</strong>
-        <br />
-        Email parroco: {parrocchia.emailParroco}
-        <br />
-        ID Parrocchia: {parrocchia.id}
-        <br />
-        Codice inviato: <strong>{codiceGenerato}</strong>
+       <strong>Simulazione email:</strong>
+<br />
+Email parroco: {emailParroco}
+<br />
+ID Parrocchia: {idParrocchia}
+<br />
+Codice inviato: <strong>{codiceGenerato}</strong>
       </div>
 
       <input
