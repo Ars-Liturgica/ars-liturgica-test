@@ -1,6 +1,7 @@
-import React from "react";
+import React, { useState } from "react";
 
 export default function RegistrazioneParroco() {
+  const [mostraAttivazione, setMostraAttivazione] = useState(false);
   return (
     <div style={{ maxWidth: "760px", margin: "0 auto" }}>
       <h2 style={{ color: "#0b2f55", textAlign: "center", fontSize: "34px" }}>
@@ -28,7 +29,10 @@ export default function RegistrazioneParroco() {
 <input placeholder="Diocesi" style={campo} />
 <input placeholder="Città" style={campo} />
 
-        <button style={bottone}>
+       <button
+  style={bottone}
+  onClick={() => setMostraAttivazione(true)}
+>
          Richiedi il codice di attivazione
         </button>
       </div>
