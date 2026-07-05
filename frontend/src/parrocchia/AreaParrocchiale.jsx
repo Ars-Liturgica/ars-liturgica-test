@@ -93,30 +93,10 @@ export default function AreaParrocchiale({ tornaHome }) {
             boxShadow: "0 14px 36px rgba(80, 45, 10, 0.16)",
           }}
         >
-          {fase === "registrazioneParroco" && (
-            <>
-              <RegistrazioneParroco />
-
-              <button
-                onClick={vaiARegistrazioneParrocchia}
-                style={{
-                  width: "100%",
-                  marginTop: "24px",
-                  padding: "15px",
-                  background: "#0b2f55",
-                  color: "#fff8e8",
-                  border: "1px solid #d6a23a",
-                  borderRadius: "8px",
-                  fontSize: "17px",
-                  fontWeight: "bold",
-                  cursor: "pointer",
-                }}
-              >
-                Continua con i dati della Parrocchia
-              </button>
-            </>
-          )}
-
+          {
+{fase === "registrazioneParroco" && (
+  <RegistrazioneParroco />
+)}
           {fase === "registrazioneParrocchia" && (
             <RegistrazioneParrocchia
               onRichiediAttivazione={richiediAttivazione}
