@@ -30,7 +30,9 @@ export default function DashboardParroco() {
       descrizione: "Calendario della parrocchia e calendari personali dei sacerdoti.",
     },
     {
-      icona: "📂",
+      icona: (
+  <i className="fa-solid fa-folder-open icona-dashboard"></i>
+),
       titolo: "Documenti",
       descrizione: "Archivio, modulistica, verbali e materiali utili.",
     },
