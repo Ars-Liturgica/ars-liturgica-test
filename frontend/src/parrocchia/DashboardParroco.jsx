@@ -9,7 +9,9 @@ export default function DashboardParroco() {
       descrizione: "Fedeli iscritti, ruoli e autorizzazioni alle stanze riservate.",
     },
     {
-      icona: "🏠",
+      icona: (
+  <i className="fa-solid fa-building-church icona-dashboard"></i>
+),
       titolo: "Stanze",
       descrizione: "Attivazione, visibilità e gestione delle stanze parrocchiali.",
     },
