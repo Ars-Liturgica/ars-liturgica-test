@@ -2,7 +2,7 @@ import React from "react";
 export default function DashboardParroco() {
   const sezioniGestione = [
     {
-      icona: "👥",
+      icona: <i className="fa-solid fa-users"></i>,
       titolo: "Comunità",
       descrizione: "Fedeli iscritti, ruoli e autorizzazioni alle stanze riservate.",
     },
