@@ -93,8 +93,8 @@ export default function AreaParrocchiale({ tornaHome }) {
             boxShadow: "0 14px 36px rgba(80, 45, 10, 0.16)",
           }}
         >
-          {
-{fase === "registrazioneParroco" && (
+          
+            {fase === "registrazioneParroco" && (
   <RegistrazioneParroco />
 )}
           {fase === "registrazioneParrocchia" && (
