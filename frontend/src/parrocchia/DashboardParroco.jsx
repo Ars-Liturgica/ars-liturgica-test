@@ -37,17 +37,21 @@ export default function DashboardParroco() {
       descrizione: "Archivio, modulistica, verbali e materiali utili.",
     },
     {
-      icona: "💰",
+      <i className="fa-solid fa-hand-holding-heart icona-dashboard"></i>
       titolo: "Progetti e Donazioni",
       descrizione: "Progetti, stanziamenti, raccolte fondi e donazioni online.",
     },
     {
-      icona: "🤝",
+     icona: (
+  <i className="fa-solid fa-user-group icona-dashboard"></i>
+),
       titolo: "Collaboratori",
       descrizione: "Viceparroco, sacerdoti, diaconi e responsabili autorizzati.",
     },
     {
-      icona: "⚙️",
+     icona: (
+  <i className="fa-solid fa-gears icona-dashboard"></i>
+),
       titolo: "Impostazioni",
       descrizione: "Dati della parrocchia, configurazioni e servizi attivi.",
     },
