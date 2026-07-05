@@ -10,7 +10,7 @@ export default function DashboardParroco() {
     },
     {
       icona: (
-  <i className="fa-solid fa-building-church icona-dashboard"></i>
+  <i className="fa-solid fa-church icona-dashboard"></i>
 ),
       titolo: "Stanze",
       descrizione: "Attivazione, visibilità e gestione delle stanze parrocchiali.",
