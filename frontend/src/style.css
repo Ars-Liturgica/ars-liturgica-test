@@ -57,3 +57,52 @@ body { margin: 0; font-family: Georgia, 'Times New Roman', serif; background: #1
   .test-panel { flex-wrap: wrap; }
   .tools-grid { grid-template-columns: repeat(2,1fr); }
 }
+/* Area di Gestione - griglia moduli */
+
+.griglia-gestione {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(260px, 1fr));
+  gap: 24px;
+  margin-top: 32px;
+}
+
+.card-gestione {
+  background: #fffaf0;
+  border: 1px solid #d6a84f;
+  border-radius: 18px;
+  padding: 28px 24px;
+  text-align: center;
+  cursor: pointer;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.06);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card-gestione:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.10);
+}
+
+.icona-gestione {
+  display: block;
+  font-size: 42px;
+  margin-bottom: 12px;
+}
+
+.card-gestione h3 {
+  color: #082b4c;
+  font-size: 24px;
+  margin: 0 0 10px 0;
+}
+
+.card-gestione p {
+  color: #1f2f3d;
+  font-size: 16px;
+  line-height: 1.45;
+  margin: 0;
+}
+
+@media (max-width: 768px) {
+  .griglia-gestione {
+    grid-template-columns: 1fr;
+  }
+}
