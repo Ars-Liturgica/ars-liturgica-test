@@ -23,7 +23,9 @@ export default function DashboardParroco() {
       descrizione: "Messaggi ai fedeli, notifiche e allegati.",
     },
     {
-      icona: "📅",
+      icona: (
+  <i className="fa-solid fa-calendar-days icona-dashboard"></i>
+),
       titolo: "Calendari",
       descrizione: "Calendario della parrocchia e calendari personali dei sacerdoti.",
     },
