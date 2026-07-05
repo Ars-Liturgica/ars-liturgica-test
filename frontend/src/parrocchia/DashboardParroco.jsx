@@ -37,7 +37,9 @@ export default function DashboardParroco() {
       descrizione: "Archivio, modulistica, verbali e materiali utili.",
     },
     {
-      <i className="fa-solid fa-hand-holding-heart icona-dashboard"></i>
+      icona: (
+  <i className="fa-solid fa-hand-holding-heart icona-dashboard"></i>
+),
       titolo: "Progetti e Donazioni",
       descrizione: "Progetti, stanziamenti, raccolte fondi e donazioni online.",
     },
@@ -50,7 +52,7 @@ export default function DashboardParroco() {
     },
     {
      icona: (
-  <i className="fa-solid fa-gears icona-dashboard"></i>
+  <i className="fa-solid fa-gear icona-dashboard"></i>
 ),
       titolo: "Impostazioni",
       descrizione: "Dati della parrocchia, configurazioni e servizi attivi.",
