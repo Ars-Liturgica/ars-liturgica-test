@@ -3,13 +3,7 @@ export default function DashboardParroco() {
   const sezioniGestione = [
     {
       icona: (
-  <i
-    className="fa-solid fa-users"
-    style={{
-      color: "#B68A2E",
-      fontSize: "42px",
-    }}
-  ></i>
+ <i className="fa-solid fa-users icona-dashboard"></i>
 ),
       titolo: "Comunità",
       descrizione: "Fedeli iscritti, ruoli e autorizzazioni alle stanze riservate.",
