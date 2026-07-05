@@ -16,7 +16,9 @@ export default function DashboardParroco() {
       descrizione: "Attivazione, visibilità e gestione delle stanze parrocchiali.",
     },
     {
-      icona: "📢",
+      icona: (
+  <i className="fa-solid fa-bullhorn icona-dashboard"></i>
+),
       titolo: "Avvisi e Comunicazioni",
       descrizione: "Messaggi ai fedeli, notifiche e allegati.",
     },
