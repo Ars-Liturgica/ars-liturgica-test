@@ -95,7 +95,7 @@ export default function AreaParrocchiale({ tornaHome }) {
         >
           
             {fase === "registrazioneParroco" && (
-  <RegistrazioneParroco />
+  <RegistrazioneParroco onAttivazioneCompletata={completaAttivazione} />
 )}
           {fase === "registrazioneParrocchia" && (
             <RegistrazioneParrocchia
