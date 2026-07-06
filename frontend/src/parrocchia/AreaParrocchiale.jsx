@@ -5,8 +5,21 @@ import AttivazioneParrocchia from "./AttivazioneParrocchia";
 import DashboardParroco from "./DashboardParroco";
 
 export default function AreaParrocchiale({ tornaHome }) {
-  const [fase, setFase] = useState("registrazioneParroco");
-  const [datiParrocchia, setDatiParrocchia] = useState(null);
+  const [fase, setFase] = useState(() => {
+  const ruolo = localStorage.getItem("ars_ruolo");
+  const parrocchiaId = localStorage.getItem("ars_parrocchia_id");
+
+  if (ruolo === "parroco" && parrocchiaId) {
+    return "dashboard";
+  }
+
+  return "registrazioneParroco";
+});
+
+const [datiParrocchia, setDatiParrocchia] = useState(null);
+const [nomeParrocchiaAttiva, setNomeParrocchiaAttiva] = useState(
+  localStorage.getItem("ars_nome_parrocchia") || ""
+);
 
   function vaiARegistrazioneParrocchia() {
     setFase("registrazioneParrocchia");
@@ -18,8 +31,9 @@ export default function AreaParrocchiale({ tornaHome }) {
   }
 
   function completaAttivazione() {
-    setFase("dashboard");
-  }
+  setNomeParrocchiaAttiva(localStorage.getItem("ars_nome_parrocchia") || "");
+  setFase("dashboard");
+}
 
   return (
     <div
@@ -47,18 +61,18 @@ export default function AreaParrocchiale({ tornaHome }) {
             Al servizio della celebrazione
           </p>
 
-          {datiParrocchia?.nomeParrocchia && (
-            <p
-              style={{
-                margin: "10px 0 0",
-                fontSize: "18px",
-                color: "#fff8e8",
-                fontWeight: "bold",
-              }}
-            >
-              {datiParrocchia.nomeParrocchia}
-            </p>
-          )}
+         {nomeParrocchiaAttiva && (
+  <p
+    style={{
+      margin: "10px 0 0",
+      fontSize: "18px",
+      color: "#fff8e8",
+      fontWeight: "bold",
+    }}
+  >
+    {nomeParrocchiaAttiva}
+  </p>
+)}
         </div>
 
         <button
