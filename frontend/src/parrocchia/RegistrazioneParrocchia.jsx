@@ -2,17 +2,28 @@ import React, { useState } from "react";
 
 export default function RegistrazioneParrocchia({ onRichiediAttivazione }) {
   const [nomeParrocchia, setNomeParrocchia] = useState("");
+  const [diocesi, setDiocesi] = useState("");
+  const [citta, setCitta] = useState("");
   const [emailParroco, setEmailParroco] = useState("");
+  const [messaggio, setMessaggio] = useState("");
 
   function generaIdParrocchia() {
     return `PAR-${Date.now()}`;
   }
 
   function richiediAttivazione() {
+    if (!nomeParrocchia.trim() || !emailParroco.trim()) {
+      setMessaggio("Inserisci almeno il nome della parrocchia e l'email del parroco.");
+      return;
+    }
+
     const datiParrocchia = {
       idParrocchia: generaIdParrocchia(),
-      nomeParrocchia,
-      emailParroco,
+      nomeParrocchia: nomeParrocchia.trim(),
+      diocesi: diocesi.trim(),
+      citta: citta.trim(),
+      emailParroco: emailParroco.trim(),
+      stato: "in_attivazione",
     };
 
     if (onRichiediAttivazione) {
@@ -37,32 +48,31 @@ export default function RegistrazioneParrocchia({ onRichiediAttivazione }) {
       <h1>Richiesta di Attivazione della Parrocchia</h1>
 
       <input
-        placeholder="Nome della parrocchia"
+        placeholder="Nome della Parrocchia *"
         value={nomeParrocchia}
         onChange={(e) => setNomeParrocchia(e.target.value)}
-        style={{
-          width: "100%",
-          padding: "14px",
-          marginTop: "20px",
-          marginBottom: "14px",
-          borderRadius: "8px",
-          border: "1px solid #d6a23a",
-          fontSize: "16px",
-        }}
+        style={stileInput}
       />
 
       <input
-        placeholder="Email del parroco"
+        placeholder="Diocesi"
+        value={diocesi}
+        onChange={(e) => setDiocesi(e.target.value)}
+        style={stileInput}
+      />
+
+      <input
+        placeholder="Città"
+        value={citta}
+        onChange={(e) => setCitta(e.target.value)}
+        style={stileInput}
+      />
+
+      <input
+        placeholder="Email del parroco *"
         value={emailParroco}
         onChange={(e) => setEmailParroco(e.target.value)}
-        style={{
-          width: "100%",
-          padding: "14px",
-          marginBottom: "18px",
-          borderRadius: "8px",
-          border: "1px solid #d6a23a",
-          fontSize: "16px",
-        }}
+        style={stileInput}
       />
 
       <button
@@ -81,6 +91,28 @@ export default function RegistrazioneParrocchia({ onRichiediAttivazione }) {
       >
         Richiedi il codice di attivazione
       </button>
+
+      {messaggio && (
+        <p
+          style={{
+            marginTop: "18px",
+            fontWeight: "bold",
+          }}
+        >
+          {messaggio}
+        </p>
+      )}
     </section>
   );
 }
+
+const stileInput = {
+  width: "100%",
+  padding: "14px",
+  marginTop: "14px",
+  marginBottom: "14px",
+  borderRadius: "8px",
+  border: "1px solid #d6a23a",
+  fontSize: "16px",
+};
+
