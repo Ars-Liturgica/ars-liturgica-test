@@ -2,8 +2,12 @@ import React, { useState } from "react";
 import AttivazioneParrocchia from "./AttivazioneParrocchia";
 export default function RegistrazioneParroco({ onAttivazioneCompletata }) {
   const [mostraAttivazione, setMostraAttivazione] = useState(false);
-  return mostraAttivazione ? (
-  <AttivazioneParrocchia onAttivazioneCompletata={onAttivazioneCompletata} />
+ return mostraAttivazione ? (
+  <div>
+    <p style={{ color: "#8b0000", textAlign: "center", fontWeight: "bold" }}>
+      ERRORE: Attivazione senza dati parrocchia. Tornare alla registrazione.
+    </p>
+  </div>
 ) : (
     <div style={{ maxWidth: "760px", margin: "0 auto" }}>
       <h2 style={{ color: "#0b2f55", textAlign: "center", fontSize: "34px" }}>
