@@ -126,7 +126,9 @@ const [nomeParrocchiaAttiva, setNomeParrocchiaAttiva] = useState(
             />
           )}
 
-          {fase === "dashboard" && <DashboardParroco />}
+          {fase === "dashboard" && (
+  <DashboardParroco nomeParrocchia={nomeParrocchiaAttiva} />
+)}
         </div>
       </main>
     </div>
