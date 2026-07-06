@@ -4,6 +4,9 @@ export default function RegistrazioneParrocchia({ onRichiediAttivazione }) {
   const [nomeParrocchia, setNomeParrocchia] = useState("");
   const [diocesi, setDiocesi] = useState("");
   const [citta, setCitta] = useState("");
+  const [via, setVia] = useState("");
+const [numeroCivico, setNumeroCivico] = useState("");
+const [cap, setCap] = useState("");
   const [emailParroco, setEmailParroco] = useState("");
   const [messaggio, setMessaggio] = useState("");
 
@@ -20,6 +23,9 @@ export default function RegistrazioneParrocchia({ onRichiediAttivazione }) {
     const datiParrocchia = {
       idParrocchia: generaIdParrocchia(),
       nomeParrocchia: nomeParrocchia.trim(),
+      via: via.trim(),
+numeroCivico: numeroCivico.trim(),
+cap: cap.trim(),
       diocesi: diocesi.trim(),
       citta: citta.trim(),
       emailParroco: emailParroco.trim(),
@@ -67,7 +73,26 @@ export default function RegistrazioneParrocchia({ onRichiediAttivazione }) {
         onChange={(e) => setCitta(e.target.value)}
         style={stileInput}
       />
+<input
+  placeholder="Via / Piazza *"
+  value={via}
+  onChange={(e) => setVia(e.target.value)}
+  style={stileInput}
+/>
 
+<input
+  placeholder="Numero civico *"
+  value={numeroCivico}
+  onChange={(e) => setNumeroCivico(e.target.value)}
+  style={stileInput}
+/>
+
+<input
+  placeholder="CAP *"
+  value={cap}
+  onChange={(e) => setCap(e.target.value)}
+  style={stileInput}
+/>
       <input
         placeholder="Email del parroco *"
         value={emailParroco}
