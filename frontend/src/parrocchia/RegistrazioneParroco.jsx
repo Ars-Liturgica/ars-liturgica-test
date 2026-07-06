@@ -12,23 +12,50 @@ export default function RegistrazioneParroco({ onAttivazioneCompletata }) {
   const [nomeParrocchia, setNomeParrocchia] = useState("");
   const [diocesi, setDiocesi] = useState("");
   const [citta, setCitta] = useState("");
-
+const [provincia, setProvincia] = useState("");
+const [via, setVia] = useState("");
+const [numeroCivico, setNumeroCivico] = useState("");
+const [cap, setCap] = useState("");
+const [telefonoParrocchia, setTelefonoParrocchia] = useState("");
+const [emailParrocchia, setEmailParrocchia] = useState("");
+const [sitoWeb, setSitoWeb] = useState("");
   function richiediCodiceAttivazione() {
-    if (!nome.trim() || !cognome.trim() || !email.trim() || !nomeParrocchia.trim()) {
+    if (
+  !nome.trim() ||
+  !cognome.trim() ||
+  !email.trim() ||
+  !nomeParrocchia.trim() ||
+  !diocesi.trim() ||
+  !citta.trim() ||
+  !provincia.trim() ||
+  !via.trim() ||
+  !numeroCivico.trim() ||
+  !cap.trim()
+) {
       alert("Compila tutti i campi obbligatori.");
       return;
     }
 
-    setDatiParrocchia({
-      idParrocchia: `PAR-${Date.now()}`,
-      nomeParrocchia: nomeParrocchia.trim(),
-      emailParroco: email.trim(),
-      nomeParroco: nome.trim(),
-      cognomeParroco: cognome.trim(),
-      telefono: telefono.trim(),
-      diocesi: diocesi.trim(),
-      citta: citta.trim(),
-    });
+   setDatiParrocchia({
+  idParrocchia: `PAR-${Date.now()}`,
+  nomeParrocchia: nomeParrocchia.trim(),
+
+  emailParroco: email.trim(),
+  nomeParroco: nome.trim(),
+  cognomeParroco: cognome.trim(),
+  telefono: telefono.trim(),
+
+  diocesi: diocesi.trim(),
+  citta: citta.trim(),
+provincia: provincia.trim(),
+  via: via.trim(),
+  numeroCivico: numeroCivico.trim(),
+  cap: cap.trim(),
+
+  telefonoParrocchia: telefonoParrocchia.trim(),
+  emailParrocchia: emailParrocchia.trim(),
+  sitoWeb: sitoWeb.trim(),
+});
 
     setMostraAttivazione(true);
   }
@@ -70,7 +97,13 @@ export default function RegistrazioneParroco({ onAttivazioneCompletata }) {
         <input placeholder="Nome della Parrocchia *" value={nomeParrocchia} onChange={(e) => setNomeParrocchia(e.target.value)} style={campo} />
         <input placeholder="Diocesi" value={diocesi} onChange={(e) => setDiocesi(e.target.value)} style={campo} />
         <input placeholder="Città" value={citta} onChange={(e) => setCitta(e.target.value)} style={campo} />
-
+<input placeholder="Provincia *" value={provincia} onChange={(e) => setProvincia(e.target.value)} style={campo} />
+<input placeholder="Via / Piazza *" value={via} onChange={(e) => setVia(e.target.value)} style={campo} />
+<input placeholder="Numero civico *" value={numeroCivico} onChange={(e) => setNumeroCivico(e.target.value)} style={campo} />
+<input placeholder="CAP *" value={cap} onChange={(e) => setCap(e.target.value)} style={campo} />
+<input placeholder="Telefono della Parrocchia" value={telefonoParrocchia} onChange={(e) => setTelefonoParrocchia(e.target.value)} style={campo} />
+<input placeholder="Email della Parrocchia" value={emailParrocchia} onChange={(e) => setEmailParrocchia(e.target.value)} style={campo} />
+<input placeholder="Sito Web" value={sitoWeb} onChange={(e) => setSitoWeb(e.target.value)} style={campo} />
         <button style={bottone} onClick={richiediCodiceAttivazione}>
           Richiedi il codice di attivazione
         </button>
