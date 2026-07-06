@@ -28,7 +28,10 @@ export default function AttivazioneParrocchia({
   setMessaggio(
     `Parrocchia attivata correttamente: ${nomeParrocchia}`
   );
-
+localStorage.setItem("ars_ruolo", "parroco");
+localStorage.setItem("ars_parrocchia_id", idParrocchia);
+localStorage.setItem("ars_nome_parrocchia", nomeParrocchia);
+localStorage.setItem("ars_email_parroco", emailParroco);
   if (onAttivazioneCompletata) {
     onAttivazioneCompletata();
   }
