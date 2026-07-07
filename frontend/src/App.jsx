@@ -146,7 +146,7 @@ useEffect(() => {
 }
   if (ambiente === "comunita") {
   return (
-    <AccessoComunita />
+    <AccessoComunita tornaHome={() => setAmbiente("home")} />
   );
 }
   return (
