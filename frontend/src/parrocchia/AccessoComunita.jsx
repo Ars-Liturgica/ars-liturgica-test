@@ -43,15 +43,23 @@ function AccessoComunita({ tornaHome }) {
           Al servizio della celebrazione
         </p>
 
-        <h2 style={{ color: "#2f3a4a", marginBottom: "12px" }}>
-          Benvenuto nella tua Comunità
-        </h2>
+     <h2 style={{ color: "#2f3a4a", marginBottom: "12px" }}>
+  Unisciti alla tua Comunità Parrocchiale
+</h2>
 
         <p style={{ color: "#4a4a4a", lineHeight: "1.5", marginBottom: "26px" }}>
-          Inserisci i tuoi dati per cercare la tua parrocchia ed entrare nella
-          comunità parrocchiale.
+       Compila i dati richiesti per individuare la tua parrocchia e iniziare il percorso di accesso alla comunità.
         </p>
-
+<p
+  style={{
+    fontStyle: "italic",
+    color: "#6b5d4a",
+    fontSize: "15px",
+    marginBottom: "24px",
+  }}
+>
+  Ti accompagneremo passo dopo passo fino all'ingresso nella tua comunità.
+</p>
         <form onSubmit={handleRicercaParrocchia}>
           {["Nome", "Cognome", "Email", "Cellulare", "Città", "CAP"].map(
             (campo) => (
