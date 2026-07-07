@@ -4,6 +4,7 @@ import AccessoRiservato from "./AccessoRiservato";
 import RegistrazioneParroco from "./parrocchia/RegistrazioneParroco";
 import AreaParrocchiale from "./parrocchia/AreaParrocchiale";
 import AttivazioneParrocchia from "./parrocchia/AttivazioneParrocchia";
+import AccessoComunita from "./parrocchia/AccessoComunita";
 export default function App() {
   const [adminMode, setAdminMode] = useState(false);
 const [categorie, setCategorie] = useState([]);
@@ -314,8 +315,11 @@ outlineOffset: "-12px",
     }}
   />
 </div>
-  <AccessoRiservato onEntra={() => setAmbiente("parrocchia")} />
-
+  <AccessoRiservato
+  onEntra={() => setAmbiente("parrocchia")}
+  onEntraComunita={() => setAmbiente("comunita")}
+/>
+{ambiente === "comunita" && <AccessoComunita />}
 {ambiente === "parrocchia" && <AttivazioneParrocchia />}
 <section className="mt-8 rounded-3xl border border-[#c9a44c] bg-[#fff8ea] p-5 shadow-lg">
   <div className="text-center mb-4">
