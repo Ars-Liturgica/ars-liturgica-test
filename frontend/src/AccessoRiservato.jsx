@@ -1,5 +1,5 @@
 import React from "react";
-export default function AccessoRiservato({ onEntra }) {
+export default function AccessoRiservato({ onEntra, onEntraComunita }) {
   return (
     <section
       style={{
@@ -125,7 +125,7 @@ export default function AccessoRiservato({ onEntra }) {
             🔒 ENTRA NELLA TUA AREA
           </button>
          <button
-  onClick={onEntra}
+ onClick={onEntraComunita}
   style={{
     marginTop: "16px",
     background: "linear-gradient(180deg, #1f6d3d, #2f8f55)",
