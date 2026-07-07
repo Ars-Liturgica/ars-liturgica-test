@@ -124,6 +124,24 @@ export default function AccessoRiservato({ onEntra }) {
           >
             🔒 ENTRA NELLA TUA AREA
           </button>
+         <button
+  onClick={onEntra}
+  style={{
+    marginTop: "16px",
+    background: "linear-gradient(180deg, #1f6d3d, #2f8f55)",
+    color: "#ffffff",
+    border: "none",
+    borderRadius: "8px",
+    padding: "13px 32px",
+    fontSize: "14px",
+    fontWeight: "700",
+    letterSpacing: "0.4px",
+    cursor: "pointer",
+    boxShadow: "0 3px 8px rgba(0,0,0,0.25)",
+  }}
+>
+  🏛️ UNISCITI ALLA TUA COMUNITÀ PARROCCHIALE
+</button>
         </div>
       </div>
     </section>
