@@ -1,14 +1,14 @@
 import React, { useState } from "react";
 
 function AccessoComunita({ tornaHome }) {
-  const [messaggio, setMessaggio] = useState("");
+ const [messaggio, setMessaggio] = useState("");
+const [parrocchiaTrovata, setParrocchiaTrovata] = useState(false);
 
   const handleRicercaParrocchia = (e) => {
     e.preventDefault();
 
-    setMessaggio(
-      "Dati ricevuti correttamente. Nel prossimo passaggio cercheremo la tua parrocchia tramite città e CAP."
-    );
+setParrocchiaTrovata(true);
+setMessaggio("Abbiamo trovato una parrocchia compatibile con i dati inseriti.");
   };
 
   return (
@@ -127,7 +127,41 @@ function AccessoComunita({ tornaHome }) {
             ✅ {messaggio}
           </div>
         )}
+{parrocchiaTrovata && (
+  <div
+    style={{
+      marginTop: "18px",
+      padding: "18px",
+      borderRadius: "14px",
+      background: "#fffaf0",
+      border: "1px solid #d6b56d",
+      color: "#2f3a4a",
+      lineHeight: "1.5",
+    }}
+  >
+    <strong>Parrocchia trovata:</strong>
+    <br />
+    Parrocchia San Marcellino
 
+    <button
+      type="button"
+      style={{
+        width: "100%",
+        padding: "13px",
+        marginTop: "16px",
+        background: "#8b1e2d",
+        color: "white",
+        border: "none",
+        borderRadius: "12px",
+        fontSize: "15px",
+        fontWeight: "bold",
+        cursor: "pointer",
+      }}
+    >
+      ENTRA NELLA MIA PARROCCHIA
+    </button>
+  </div>
+)}
         <button
           onClick={tornaHome}
           style={{
