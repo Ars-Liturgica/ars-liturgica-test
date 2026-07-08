@@ -54,7 +54,8 @@ const { data: utenteInserito, error: erroreUtente } = await supabase
 
 if (erroreUtente) {
   console.error("Errore salvataggio utente:", erroreUtente);
-  alert("Errore durante il salvataggio dei dati del parroco.");
+alert("Errore: " + erroreUtente.message);
+console.error(erroreUtente);
   return;
 }
    setDatiParrocchia({
