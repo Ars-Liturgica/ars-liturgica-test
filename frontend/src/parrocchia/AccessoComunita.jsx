@@ -1,14 +1,21 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import LaMiaParrocchia from "./LaMiaParrocchia";
 function AccessoComunita({ tornaHome }) {
  const [messaggio, setMessaggio] = useState("");
 const [parrocchiaTrovata, setParrocchiaTrovata] = useState(false);
 const [mostraMiaParrocchia, setMostraMiaParrocchia] = useState(false);
+ const risultatoParrocchiaRef = useRef(null);
   const handleRicercaParrocchia = (e) => {
     e.preventDefault();
 
 setParrocchiaTrovata(true);
 setMessaggio("Abbiamo trovato una parrocchia compatibile con i dati inseriti.");
+   setTimeout(() => {
+  risultatoParrocchiaRef.current?.scrollIntoView({
+    behavior: "smooth",
+    block: "center",
+  });
+}, 100);
   };
 if (mostraMiaParrocchia) {
   return <LaMiaParrocchia />;
@@ -145,7 +152,7 @@ if (mostraMiaParrocchia) {
           </div>
         )}
 {parrocchiaTrovata && (
-  <div
+  <div ref={risultatoParrocchiaRef}
     style={{
       marginTop: "18px",
       padding: "18px",
