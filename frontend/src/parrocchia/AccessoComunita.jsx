@@ -1,16 +1,18 @@
 import React, { useState } from "react";
-
+import LaMiaParrocchia from "./LaMiaParrocchia";
 function AccessoComunita({ tornaHome }) {
  const [messaggio, setMessaggio] = useState("");
 const [parrocchiaTrovata, setParrocchiaTrovata] = useState(false);
-
+const [mostraMiaParrocchia, setMostraMiaParrocchia] = useState(false);
   const handleRicercaParrocchia = (e) => {
     e.preventDefault();
 
 setParrocchiaTrovata(true);
 setMessaggio("Abbiamo trovato una parrocchia compatibile con i dati inseriti.");
   };
-
+if (mostraMiaParrocchia) {
+  return <LaMiaParrocchia />;
+}
   return (
     <div
       style={{
@@ -160,6 +162,7 @@ setMessaggio("Abbiamo trovato una parrocchia compatibile con i dati inseriti.");
 
     <button
       type="button"
+         onClick={() => setMostraMiaParrocchia(true)}
       style={{
         width: "100%",
         padding: "13px",
