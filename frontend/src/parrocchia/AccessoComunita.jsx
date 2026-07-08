@@ -66,8 +66,12 @@ setMessaggio("Abbiamo trovato una parrocchia compatibile con i dati inseriti.");
               <input
                 key={campo}
                 type={campo === "Email" ? "email" : "text"}
-                placeholder={`${campo} *`}
-                required
+             placeholder={
+  campo === "Email" || campo === "Cellulare"
+    ? campo
+    : `${campo} *`
+}
+               required={campo !== "Email" && campo !== "Cellulare"}
                 style={{
                   width: "100%",
                   padding: "13px",
@@ -80,7 +84,18 @@ setMessaggio("Abbiamo trovato una parrocchia compatibile con i dati inseriti.");
               />
             )
           )}
-
+<p
+  style={{
+    fontSize: "13px",
+    color: "#6b5d4a",
+    marginBottom: "18px",
+    fontStyle: "italic",
+    lineHeight: "1.4",
+    textAlign: "center",
+  }}
+>
+  Email e cellulare sono facoltativi. Se li inserisci, la tua parrocchia potrà inviarti avvisi e comunicazioni.
+</p>
           <button
             type="submit"
             style={{
