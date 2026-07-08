@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import AttivazioneParrocchia from "./AttivazioneParrocchia";
-
+import { supabase } from "../supabaseClient";
 export default function RegistrazioneParroco({ onAttivazioneCompletata }) {
   const [mostraAttivazione, setMostraAttivazione] = useState(false);
   const [datiParrocchia, setDatiParrocchia] = useState(null);
@@ -19,7 +19,7 @@ const [cap, setCap] = useState("");
 const [telefonoParrocchia, setTelefonoParrocchia] = useState("");
 const [emailParrocchia, setEmailParrocchia] = useState("");
 const [sitoWeb, setSitoWeb] = useState("");
-  function richiediCodiceAttivazione() {
+ async function richiediCodiceAttivazione() {
     if (
   !nome.trim() ||
   !cognome.trim() ||
@@ -35,7 +35,28 @@ const [sitoWeb, setSitoWeb] = useState("");
       alert("Compila tutti i campi obbligatori.");
       return;
     }
+const { data: utenteInserito, error: erroreUtente } = await supabase
+  .from("utenti")
+  .insert([
+    {
+      nome: nome.trim(),
+      cognome: cognome.trim(),
+      email: email.trim(),
+      telefono: telefono.trim(),
+      citta: citta.trim(),
+      cap: cap.trim(),
+      ruolo: "parroco",
+      parrocchia_id: "",
+    },
+  ])
+  .select()
+  .single();
 
+if (erroreUtente) {
+  console.error("Errore salvataggio utente:", erroreUtente);
+  alert("Errore durante il salvataggio dei dati del parroco.");
+  return;
+}
    setDatiParrocchia({
   idParrocchia: `PAR-${Date.now()}`,
   nomeParrocchia: nomeParrocchia.trim(),
