@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import AttivazioneParrocchia from "./AttivazioneParrocchia";
-import { supabase } from "../supabaseClient";
+
 export default function RegistrazioneParroco({ onAttivazioneCompletata }) {
   const [mostraAttivazione, setMostraAttivazione] = useState(false);
   const [datiParrocchia, setDatiParrocchia] = useState(null);
@@ -19,77 +19,50 @@ const [cap, setCap] = useState("");
 const [telefonoParrocchia, setTelefonoParrocchia] = useState("");
 const [emailParrocchia, setEmailParrocchia] = useState("");
 const [sitoWeb, setSitoWeb] = useState("");
- async function richiediCodiceAttivazione() {
-    if (
-  !nome.trim() ||
-  !cognome.trim() ||
-  !email.trim() ||
-  !nomeParrocchia.trim() ||
-  !diocesi.trim() ||
-  !citta.trim() ||
-  !provincia.trim() ||
-  !via.trim() ||
-  !numeroCivico.trim() ||
-  !cap.trim()
-) {
-      alert("Compila tutti i campi obbligatori.");
-      return;
-    }
-const { data: utenteInserito, error: erroreUtente } = await supabase
-  .from("utenti")
-  .insert([
-    {
-      nome: nome.trim(),
-      cognome: cognome.trim(),
-      email: email.trim(),
-      telefono: telefono.trim(),
-      citta: citta.trim(),
-      cap: cap.trim(),
-      ruolo: "parroco",
-      parrocchia_id: "",
-    },
-  ])
-  .select()
-  .single();
-
-if (erroreUtente) {
-  console.error("Errore salvataggio utente:", erroreUtente);
-alert("Errore: " + erroreUtente.message);
-console.error(erroreUtente);
-  return;
-}
-   setDatiParrocchia({
-  idParrocchia: `PAR-${Date.now()}`,
-  nomeParrocchia: nomeParrocchia.trim(),
-
-  emailParroco: email.trim(),
-  nomeParroco: nome.trim(),
-  cognomeParroco: cognome.trim(),
-  telefono: telefono.trim(),
-
-  diocesi: diocesi.trim(),
-  citta: citta.trim(),
-provincia: provincia.trim(),
-  via: via.trim(),
-  numeroCivico: numeroCivico.trim(),
-  cap: cap.trim(),
-
-  telefonoParrocchia: telefonoParrocchia.trim(),
-  emailParrocchia: emailParrocchia.trim(),
-  sitoWeb: sitoWeb.trim(),
-});
-
-    setMostraAttivazione(true);
+ function richiediCodiceAttivazione() {
+  if (
+    !nome.trim() ||
+    !cognome.trim() ||
+    !email.trim() ||
+    !nomeParrocchia.trim() ||
+    !diocesi.trim() ||
+    !citta.trim() ||
+    !provincia.trim() ||
+    !via.trim() ||
+    !numeroCivico.trim() ||
+    !cap.trim()
+  ) {
+    alert("Compila tutti i campi obbligatori.");
+    return;
   }
 
+  setDatiParrocchia({
+    nome: nome.trim(),
+    cognome: cognome.trim(),
+    email: email.trim(),
+    telefono: telefono.trim(),
+
+    nomeParrocchia: nomeParrocchia.trim(),
+    diocesi: diocesi.trim(),
+    citta: citta.trim(),
+    provincia: provincia.trim(),
+    via: via.trim(),
+    numeroCivico: numeroCivico.trim(),
+    cap: cap.trim(),
+
+    telefonoParrocchia: telefonoParrocchia.trim(),
+    emailParrocchia: emailParrocchia.trim(),
+    sitoWeb: sitoWeb.trim(),
+  });
+
+  setMostraAttivazione(true);
+}
   if (mostraAttivazione && datiParrocchia) {
     return (
       <AttivazioneParrocchia
-        idParrocchia={datiParrocchia.idParrocchia}
-        nomeParrocchia={datiParrocchia.nomeParrocchia}
-        emailParroco={datiParrocchia.emailParroco}
-        onAttivazioneCompletata={onAttivazioneCompletata}
-      />
+  datiParrocchia={datiParrocchia}
+  onAttivazioneCompletata={onAttivazioneCompletata}
+/>
     );
   }
 
