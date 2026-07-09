@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { supabase } from "../supabaseClient";
 
 function generaCodiceAttivazione() {
   const caratteri = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
@@ -12,9 +13,7 @@ function generaCodiceAttivazione() {
 }
 
 export default function AttivazioneParrocchia({
-  idParrocchia = "PAR-000001",
-  nomeParrocchia = "Parrocchia di prova",
-  emailParroco = "parroco@esempio.it",
+  datiParrocchia,
   onAttivazioneCompletata,
 }) {
   const [codiceGenerato] = useState(generaCodiceAttivazione());
