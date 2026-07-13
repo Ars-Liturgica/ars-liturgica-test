@@ -5,6 +5,7 @@ import RegistrazioneParroco from "./parrocchia/RegistrazioneParroco";
 import AreaParrocchiale from "./parrocchia/AreaParrocchiale";
 import AttivazioneParrocchia from "./parrocchia/AttivazioneParrocchia";
 import AccessoComunita from "./parrocchia/AccessoComunita";
+import AdminParrocchie from "./admin/AdminParrocchie";
 export default function App() {
   const [adminMode, setAdminMode] = useState(false);
 const [categorie, setCategorie] = useState([]);
@@ -147,6 +148,13 @@ useEffect(() => {
   if (ambiente === "comunita") {
   return (
     <AccessoComunita tornaHome={() => setAmbiente("home")} />
+  );
+}
+  if (ambiente === "admin-parrocchie") {
+  return (
+    <AdminParrocchie
+      tornaHome={() => setAmbiente("home")}
+    />
   );
 }
   return (
