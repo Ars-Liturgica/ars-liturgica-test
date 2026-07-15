@@ -32,9 +32,9 @@ export default function AccessoSuperAdmin({
     }
 
     if (session?.user?.email) {
-      const autorizzato = await controllaAmministratore(
-        session.user.email
-      );
+ const autorizzato = await controllaAmministratore(
+  session.user.id
+);
 
       if (autorizzato) {
         accessoConsentito();
@@ -42,29 +42,30 @@ export default function AccessoSuperAdmin({
     }
   }
 
-  async function controllaAmministratore(emailUtente) {
-    const { data, error } = await supabase
-      .from("amministratori")
-      .select("*")
-      .eq("email", emailUtente.toLowerCase().trim())
-      .maybeSingle();
+ async function controllaAmministratore(utenteId) {
+  const { data, error } = await supabase
+    .from("amministratori")
+    .select("utente_id")
+    .eq("utente_id", utenteId)
+    .eq("livello", "superadmin")
+    .eq("attivo", true)
+    .maybeSingle();
 
-    if (error) {
-      console.error(
-        "Errore durante il controllo dell'amministratore:",
-        error
-      );
+  if (error) {
+    console.error(
+      "Errore durante il controllo dell'amministratore:",
+      error
+    );
 
-      setErrore(
-        "Non è stato possibile verificare l'autorizzazione amministrativa."
-      );
+    setErrore(
+      "Non è stato possibile verificare l'autorizzazione amministrativa."
+    );
 
-      return false;
-    }
-
-    return Boolean(data);
+    return false;
   }
 
+  return Boolean(data);
+}
   async function inviaOtp() {
     setErrore("");
     setMessaggio("");
@@ -139,9 +140,9 @@ export default function AccessoSuperAdmin({
       return;
     }
 
-    const autorizzato = await controllaAmministratore(
-      emailVerificata
-    );
+  const autorizzato = await controllaAmministratore(
+  utente.id
+);
 
     setVerificaInCorso(false);
 
