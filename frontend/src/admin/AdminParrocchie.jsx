@@ -124,7 +124,27 @@ console.log("DATI PARROCCHIE:", data);
   function stampaElenco() {
     window.print();
   }
+async function eliminaParrocchia(parrocchia) {
+  const conferma = window.confirm(
+    `Vuoi eliminare definitivamente la parrocchia "${parrocchia.nome}"?\n\nQuesta operazione non può essere annullata.`
+  );
 
+  if (!conferma) return;
+
+  const { error } = await supabase.rpc(
+    "elimina_parrocchia_completa",
+    {
+      p_parrocchia_id: parrocchia.id,
+    }
+  );
+
+  if (error) {
+    alert(error.message);
+    return;
+  }
+
+  await caricaParrocchie();
+}
   return (
     <div style={paginaStyle}>
       <style>
@@ -406,7 +426,14 @@ console.log("DATI PARROCCHIE:", data);
                             {formattaData(parrocchia.created_at)}
                           </p>
                         </div>
-
+<button
+  type="button"
+  onClick={() => eliminaParrocchia(parrocchia)}
+  className="non-stampare"
+  style={pulsanteEliminaStyle}
+>
+  Elimina parrocchia
+</button>
                         {parrocchia.sito_web && (
                           <a
                             href={parrocchia.sito_web}
@@ -694,7 +721,16 @@ const datiStyle = {
   fontFamily: "Arial, sans-serif",
   lineHeight: 1.55,
 };
-
+const pulsanteEliminaStyle = {
+  marginTop: "16px",
+  padding: "11px 16px",
+  background: "#8a1f1f",
+  color: "#ffffff",
+  border: "none",
+  borderRadius: "10px",
+  fontWeight: "bold",
+  cursor: "pointer",
+};
 const linkStyle = {
   display: "inline-block",
   marginTop: "14px",
