@@ -41,7 +41,8 @@ export default function AdminParrocchie({ tornaHome }) {
       `)
       .order("diocesi", { ascending: true })
       .order("nome", { ascending: true });
-
+console.log("ERRORE PARROCCHIE:", error);
+console.log("DATI PARROCCHIE:", data);
     if (error) {
       console.error("Errore caricamento parrocchie:", error);
       setErrore(
