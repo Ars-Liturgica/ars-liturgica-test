@@ -9,7 +9,7 @@ export default function AdminParrocchie({ tornaHome }) {
   const [diocesiSelezionata, setDiocesiSelezionata] = useState("tutte");
   const [statoSelezionato, setStatoSelezionato] = useState("tutti");
 
-  useEffect(() => {
+  useEffect(() => { 
     caricaParrocchie();
   }, []);
 
