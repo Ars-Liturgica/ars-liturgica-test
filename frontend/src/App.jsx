@@ -6,6 +6,7 @@ import AreaParrocchiale from "./parrocchia/AreaParrocchiale";
 import AttivazioneParrocchia from "./parrocchia/AttivazioneParrocchia";
 import AccessoComunita from "./parrocchia/AccessoComunita";
 import AdminParrocchie from "./admin/AdminParrocchie";
+import AccessoSuperAdmin from "./admin/AccessoSuperAdmin";
 export default function App() {
   const [adminMode, setAdminMode] = useState(false);
 const [categorie, setCategorie] = useState([]);
@@ -146,8 +147,17 @@ useEffect(() => {
   );
 }
   if (ambiente === "comunita") {
+   
   return (
     <AccessoComunita tornaHome={() => setAmbiente("home")} />
+  );
+}
+  if (ambiente === "superadmin") {
+  return (
+    <AccessoSuperAdmin
+      tornaHome={() => setAmbiente("home")}
+      accessoConsentito={() => setAmbiente("admin-parrocchie")}
+    />
   );
 }
   if (ambiente === "admin-parrocchie") {
@@ -331,6 +341,7 @@ outlineOffset: "-12px",
   <AccessoRiservato
   onEntra={() => setAmbiente("parrocchia")}
   onEntraComunita={() => setAmbiente("comunita")}
+    onEntraSuperAdmin={() => setAmbiente("superadmin")}
 />
 
 <section className="mt-8 rounded-3xl border border-[#c9a44c] bg-[#fff8ea] p-5 shadow-lg">
