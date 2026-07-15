@@ -141,7 +141,7 @@ export default function AccessoSuperAdmin({
     }
 
   const autorizzato = await controllaAmministratore(
-  utente.id
+ data.user.id
 );
 
     setVerificaInCorso(false);
