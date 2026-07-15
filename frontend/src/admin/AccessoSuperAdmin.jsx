@@ -179,7 +179,10 @@ export default function AccessoSuperAdmin({
       >
         <button
           type="button"
-          onClick={tornaHome}
+          onClick={async () => {
+  await supabase.auth.signOut();
+  tornaHome();
+}}
           style={{
             border: "1px solid #b99542",
             background: "transparent",
