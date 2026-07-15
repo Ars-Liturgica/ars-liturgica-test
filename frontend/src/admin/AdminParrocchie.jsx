@@ -182,7 +182,10 @@ console.log("DATI PARROCCHIE:", data);
 
           <button
             type="button"
-            onClick={tornaHome}
+           onClick={async () => {
+  await supabase.auth.signOut();
+  tornaHome();
+}}
             className="non-stampare"
             style={pulsanteHomeStyle}
           >
