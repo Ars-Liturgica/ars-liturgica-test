@@ -1,5 +1,9 @@
 import React from "react";
-export default function AccessoRiservato({ onEntra, onEntraComunita }) {
+export default function AccessoRiservato({
+  onEntra,
+  onEntraComunita,
+  onEntraSuperAdmin,
+}) {
   return (
     <section
       style={{
@@ -143,6 +147,42 @@ export default function AccessoRiservato({ onEntra, onEntraComunita }) {
   🏛️ UNISCITI ALLA TUA COMUNITÀ PARROCCHIALE
 </button>
         </div>
+        <div
+  style={{
+    textAlign: "center",
+    marginTop: "28px",
+    paddingTop: "18px",
+    borderTop: "1px solid #d8c59a",
+  }}
+>
+  <p
+    style={{
+      margin: "0 0 12px",
+      fontSize: "12px",
+      color: "#8a6d3b",
+      letterSpacing: "1px",
+      textTransform: "uppercase",
+    }}
+  >
+    Accesso riservato
+  </p>
+
+  <button
+    onClick={onEntraSuperAdmin}
+    style={{
+      background: "transparent",
+      border: "1px solid #8b0000",
+      color: "#8b0000",
+      padding: "10px 24px",
+      borderRadius: "8px",
+      cursor: "pointer",
+      fontWeight: "bold",
+      fontSize: "14px",
+    }}
+  >
+    Console SuperAdmin
+  </button>
+</div>
       </div>
     </section>
   );
