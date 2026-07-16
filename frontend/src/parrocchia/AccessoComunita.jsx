@@ -1,22 +1,77 @@
 import React, { useState, useRef } from "react";
 import LaMiaParrocchia from "./LaMiaParrocchia";
+import { supabase } from "../supabaseClient";
 function AccessoComunita({ tornaHome }) {
  const [messaggio, setMessaggio] = useState("");
-const [parrocchiaTrovata, setParrocchiaTrovata] = useState(false);
+const [parrocchiaTrovata, setParrocchiaTrovata] = useState(null);
 const [mostraMiaParrocchia, setMostraMiaParrocchia] = useState(false);
- const risultatoParrocchiaRef = useRef(null);
-  const handleRicercaParrocchia = (e) => {
-    e.preventDefault();
+const risultatoParrocchiaRef = useRef(null);
 
-setParrocchiaTrovata(true);
-setMessaggio("Abbiamo trovato una parrocchia compatibile con i dati inseriti.");
-   setTimeout(() => {
-  risultatoParrocchiaRef.current?.scrollIntoView({
-    behavior: "smooth",
-    block: "center",
-  });
-}, 100);
-  };
+const normalizzaTesto = (testo) =>
+  String(testo || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+
+const handleRicercaParrocchia = async (e) => {
+  e.preventDefault();
+
+  setMessaggio("");
+  setParrocchiaTrovata(null);
+
+  const datiModulo = new FormData(e.currentTarget);
+  const cittaInserita = String(datiModulo.get("Città") || "").trim();
+  const capInserito = String(datiModulo.get("CAP") || "").trim();
+
+  try {
+    const { data, error } = await supabase
+      .from("parrocchie")
+      .select("*")
+      .eq("cap", capInserito);
+
+    if (error) {
+      throw error;
+    }
+
+    const parrocchiaCompatibile = (data || []).find((parrocchia) => {
+      const cittaParrocchia =
+        parrocchia.comune ||
+        parrocchia.citta ||
+        parrocchia.localita ||
+        "";
+
+      return (
+        normalizzaTesto(cittaParrocchia) ===
+        normalizzaTesto(cittaInserita)
+      );
+    });
+
+    if (!parrocchiaCompatibile) {
+      setMessaggio(
+        "Non abbiamo trovato alcuna parrocchia compatibile con la città e il CAP inseriti."
+      );
+      return;
+    }
+
+    setParrocchiaTrovata(parrocchiaCompatibile);
+    setMessaggio(
+      "Abbiamo trovato una parrocchia compatibile con i dati inseriti."
+    );
+
+    setTimeout(() => {
+      risultatoParrocchiaRef.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }, 100);
+  } catch (errore) {
+    console.error("Errore durante la ricerca della parrocchia:", errore);
+    setMessaggio(
+      "Non è stato possibile cercare la parrocchia. Riprova tra poco."
+    );
+  }
+};
 if (mostraMiaParrocchia) {
   return <LaMiaParrocchia />;
 }
@@ -74,6 +129,7 @@ if (mostraMiaParrocchia) {
             (campo) => (
               <input
                 key={campo}
+               name={campo}
                 type={campo === "Email" ? "email" : "text"}
              placeholder={
   campo === "Email" || campo === "Cellulare"
@@ -165,7 +221,7 @@ if (mostraMiaParrocchia) {
   >
     <strong>Parrocchia trovata:</strong>
     <br />
-    Parrocchia San Marcellino
+   {parrocchiaTrovata.nome}
 
     <button
       type="button"
