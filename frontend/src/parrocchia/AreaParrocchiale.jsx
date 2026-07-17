@@ -1,26 +1,45 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { supabase } from "../supabaseClient";
 import RegistrazioneParroco from "./RegistrazioneParroco";
 import RegistrazioneParrocchia from "./RegistrazioneParrocchia";
 import AttivazioneParrocchia from "./AttivazioneParrocchia";
 import DashboardParroco from "./DashboardParroco";
-
+import AccessoParroco from "./AccessoParroco";
 export default function AreaParrocchiale({ tornaHome }) {
-  const [fase, setFase] = useState(() => {
-  const ruolo = localStorage.getItem("ars_ruolo");
-  const parrocchiaId = localStorage.getItem("ars_parrocchia_id");
+ const [fase, setFase] = useState("accessoParroco");
 
-  if (ruolo === "parroco" && parrocchiaId) {
-    return "dashboard";
-  }
-
-  return "registrazioneParroco";
-});
 
 const [datiParrocchia, setDatiParrocchia] = useState(null);
 const [nomeParrocchiaAttiva, setNomeParrocchiaAttiva] = useState(
   localStorage.getItem("ars_nome_parrocchia") || ""
 );
+useEffect(() => {
+  async function controllaSessione() {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
 
+    if (!session) {
+      return;
+    }
+
+    const { data } = await supabase
+      .from("utenti_parrocchie")
+      .select("parrocchia_id, ruolo")
+      .eq("utente_id", session.user.id)
+      .eq("stato", "attivo")
+      .single();
+
+    if (data) {
+      localStorage.setItem("ars_parrocchia_id", data.parrocchia_id);
+      localStorage.setItem("ars_ruolo", data.ruolo);
+
+      setFase("dashboard");
+    }
+  }
+
+  controllaSessione();
+}, []);
   function vaiARegistrazioneParrocchia() {
     setFase("registrazioneParrocchia");
   }
@@ -108,8 +127,10 @@ const [nomeParrocchiaAttiva, setNomeParrocchiaAttiva] = useState(
           }}
         >
           
-            {fase === "registrazioneParroco" && (
-  <RegistrazioneParroco onAttivazioneCompletata={completaAttivazione} />
+            {fase === "accessoParroco" && (
+  <AccessoParroco
+    onAccessoCompletato={() => window.location.reload()}
+  />
 )}
           {fase === "registrazioneParrocchia" && (
             <RegistrazioneParrocchia
