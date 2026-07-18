@@ -1,7 +1,18 @@
-import React from "react";
+import React, { useState } from "react";
 import "./BachecaAvvisi.css";
+import NuovoAvviso from "./NuovoAvviso";
 
 export default function BachecaAvvisi() {
+  const [mostraNuovoAvviso, setMostraNuovoAvviso] = useState(false);
+
+  if (mostraNuovoAvviso) {
+    return (
+      <NuovoAvviso
+        tornaAllaBacheca={() => setMostraNuovoAvviso(false)}
+      />
+    );
+  }
+
   return (
     <div className="bacheca-avvisi">
       <header className="bacheca-header">
@@ -14,7 +25,11 @@ export default function BachecaAvvisi() {
           </p>
         </div>
 
-        <button className="btn-nuovo-avviso" type="button">
+        <button
+          className="btn-nuovo-avviso"
+          type="button"
+          onClick={() => setMostraNuovoAvviso(true)}
+        >
           <span className="simbolo-aggiungi">+</span>
           Nuovo Avviso
         </button>
