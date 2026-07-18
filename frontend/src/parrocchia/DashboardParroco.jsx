@@ -1,5 +1,35 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { supabase } from "../supabaseClient";
 export default function DashboardParroco() {
+  const [nomeParrocchia, setNomeParrocchia] = useState("");
+
+useEffect(() => {
+  async function caricaParrocchia() {
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session) return;
+
+    const { data: collegamento } = await supabase
+      .from("utenti_parrocchie")
+      .select("parrocchia_id")
+      .eq("utente_id", session.user.id)
+      .single();
+
+    if (!collegamento) return;
+
+    const { data: parrocchia } = await supabase
+      .from("parrocchie")
+      .select("nome")
+      .eq("id", collegamento.parrocchia_id)
+      .single();
+
+    if (parrocchia) {
+      setNomeParrocchia(parrocchia.nome);
+    }
+  }
+
+  caricaParrocchia();
+}, []);
   const sezioniGestione = [
     {
       icona: (
@@ -68,7 +98,7 @@ export default function DashboardParroco() {
 
   return (
     <div className="dashboard-parroco">
-      <h2>Area di Gestione</h2>
+     <h2>{nomeParrocchia || "Area di Gestione"}</h2>
       <p>Strumenti riservati alla gestione della parrocchia.</p>
 
       <div className="griglia-gestione">
