@@ -41,14 +41,19 @@
 }
 
 .bacheca-contenuto {
-  border: 10px solid #8b5a2b;
-  border-radius: 18px;
-  padding: 28px;
   min-height: 420px;
+  padding: 34px;
+  border: 5px solid #7a4b27;
+  border-radius: 8px;
   background:
-    linear-gradient(rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.08)),
-    #c89d6c;
-  box-shadow: 0 12px 30px rgba(63, 42, 23, 0.18);
+    radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.08), transparent 28%),
+    radial-gradient(circle at 75% 65%, rgba(92, 54, 24, 0.08), transparent 34%),
+    #caa578;
+  box-shadow:
+    0 0 0 8px #a56c3d,
+    0 0 0 11px #6f421f,
+    0 14px 30px rgba(49, 32, 18, 0.22),
+    inset 0 0 24px rgba(92, 56, 27, 0.12);
 }
 
 .bacheca-vuota {
