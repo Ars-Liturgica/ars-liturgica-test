@@ -1,8 +1,9 @@
+import BachecaAvvisi from "./stanze/BachecaAvvisi/BachecaAvvisi";
 import React, { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient";
 export default function DashboardParroco() {
   const [nomeParrocchia, setNomeParrocchia] = useState("");
-
+const [stanzaAperta, setStanzaAperta] = useState(null);
 useEffect(() => {
   async function caricaParrocchia() {
     const { data: { session } } = await supabase.auth.getSession();
@@ -51,6 +52,7 @@ useEffect(() => {
   ),
   titolo: "Bacheca Avvisi",
   descrizione: "Avvisi ufficiali e informazioni pratiche rivolte alla comunità.",
+     stanza: "bacheca-avvisi",
 },
 {
   icona: (
@@ -95,7 +97,11 @@ useEffect(() => {
       descrizione: "Dati della parrocchia, configurazioni e servizi attivi.",
     },
   ];
-
+if (stanzaAperta === "bacheca-avvisi") {
+  return (
+    <BachecaAvvisi />
+  );
+}
   return (
     <div className="dashboard-parroco">
      <h2>{nomeParrocchia || "Area di Gestione"}</h2>
@@ -103,7 +109,11 @@ useEffect(() => {
 
       <div className="griglia-gestione">
         {sezioniGestione.map((sezione) => (
-          <button className="card-gestione" key={sezione.titolo}>
+          <button
+  className="card-gestione"
+  key={sezione.titolo}
+ onClick={() => sezione.stanza && setStanzaAperta(sezione.stanza)}
+>
             <span className="icona-gestione">{sezione.icona}</span>
             <h3>{sezione.titolo}</h3>
             <p>{sezione.descrizione}</p>
