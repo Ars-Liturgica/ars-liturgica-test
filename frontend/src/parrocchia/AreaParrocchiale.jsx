@@ -40,6 +40,37 @@ useEffect(() => {
 
   controllaSessione();
 }, []);
+
+ async function completaAccessoParroco() {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+
+  if (!session) {
+    return;
+  }
+
+  const { data, error } = await supabase
+    .from("utenti_parrocchie")
+    .select("parrocchia_id, ruolo")
+    .eq("utente_id", session.user.id)
+    .eq("stato", "attivo")
+    .single();
+
+  if (error || !data) {
+    console.error("Errore nel recupero della parrocchia:", error);
+    return;
+  }
+
+  localStorage.setItem("ars_parrocchia_id", data.parrocchia_id);
+  localStorage.setItem("ars_ruolo", data.ruolo);
+
+  setNomeParrocchiaAttiva(
+    localStorage.getItem("ars_nome_parrocchia") || ""
+  );
+
+  setFase("dashboard");
+}
   function vaiARegistrazioneParrocchia() {
     setFase("registrazioneParrocchia");
   }
@@ -129,7 +160,7 @@ useEffect(() => {
           
             {fase === "accessoParroco" && (
   <AccessoParroco
-    onAccessoCompletato={() => window.location.reload()}
+   onAccessoCompletato={completaAccessoParroco}
   />
 )}
           {fase === "registrazioneParrocchia" && (
