@@ -37,7 +37,7 @@ export default function NuovoAvviso({ tornaAllaBacheca }) {
   const [titolo, setTitolo] = useState("");
   const [testo, setTesto] = useState("");
   const [categoria, setCategoria] = useState("");
-
+const [categoriaPersonalizzata, setCategoriaPersonalizzata] = useState("");
   const [immagine, setImmagine] = useState(null);
   const [allegato, setAllegato] = useState(null);
 
@@ -161,7 +161,23 @@ export default function NuovoAvviso({ tornaAllaBacheca }) {
                 ))}
               </select>
             </div>
+{categoria === "Altro" && (
+  <div className="campo-avviso">
+    <label htmlFor="categoria-personalizzata">
+      Nome della nuova categoria
+    </label>
 
+    <input
+      id="categoria-personalizzata"
+      type="text"
+      placeholder="Es. Volontari Festa Patronale"
+      value={categoriaPersonalizzata}
+      onChange={(event) =>
+        setCategoriaPersonalizzata(event.target.value)
+      }
+    />
+  </div>
+)}
             <div className="campo-avviso">
               <label htmlFor="titolo-avviso">
                 Titolo dell’avviso
