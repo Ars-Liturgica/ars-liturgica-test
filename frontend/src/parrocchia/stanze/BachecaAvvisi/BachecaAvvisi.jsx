@@ -1,173 +1,77 @@
-{mostraAnteprima && (
-  <aside className="anteprima-avviso">
-    <article className="foglio-ufficiale">
-      <header className="foglio-intestazione">
-        <p className="foglio-sovratitolo">Parrocchia</p>
+import React, { useState } from "react";
+import "./BachecaAvvisi.css";
+import NuovoAvviso from "./NuovoAvviso";
 
-        <div
-          className="foglio-simbolo-chiesa"
-          aria-hidden="true"
+export default function BachecaAvvisi() {
+  const [mostraNuovoAvviso, setMostraNuovoAvviso] = useState(false);
+
+  if (mostraNuovoAvviso) {
+    return (
+      <NuovoAvviso
+        tornaAllaBacheca={() => setMostraNuovoAvviso(false)}
+      />
+    );
+  }
+
+  return (
+    <div className="bacheca-avvisi">
+      <header className="bacheca-header">
+        <div className="bacheca-intestazione">
+          <h1>Bacheca Avvisi</h1>
+
+          <p>
+            Pubblica e gestisci gli avvisi destinati alla comunità
+            parrocchiale.
+          </p>
+        </div>
+
+        <button
+          className="btn-nuovo-avviso"
+          type="button"
+          onClick={() => setMostraNuovoAvviso(true)}
         >
-          <svg viewBox="0 0 120 90">
-            <path d="M60 7v16" />
-            <path d="M52 15h16" />
-            <path d="M18 78h84" />
-            <path d="M24 78V43l36-24 36 24v35" />
-            <path d="M34 78V50h16v28" />
-            <path d="M70 78V50h16v28" />
-            <path d="M52 78V52c0-8 16-8 16 0v26" />
-            <path d="M24 43h72" />
-          </svg>
-        </div>
-
-        <h1 className="foglio-nome-parrocchia">
-          {localStorage.getItem("ars_nome_parrocchia") ||
-            "Nome della Parrocchia"}
-        </h1>
-
-        <p className="foglio-localita">
-          Comunicazione alla comunità parrocchiale
-        </p>
-
-        <div
-          className="foglio-separatore foglio-separatore-croce"
-          aria-hidden="true"
-        >
-          <span />
-          <strong>✝</strong>
-          <span />
-        </div>
-
-        <p className="foglio-tipo-documento">
-          Avviso Ufficiale
-        </p>
-
-        <div className="foglio-dati-documento">
-          <div>
-            <span>Data</span>
-            <strong>
-              {new Intl.DateTimeFormat("it-IT").format(
-                new Date()
-              )}
-            </strong>
-          </div>
-
-          <div>
-            <span>Pubblicazione</span>
-            <strong>
-              {pubblicazione === "subito"
-                ? "Immediata"
-                : dataPubblicazione
-                  ? new Intl.DateTimeFormat("it-IT").format(
-                      new Date(
-                        `${dataPubblicazione}T12:00:00`
-                      )
-                    )
-                  : "Da definire"}
-            </strong>
-          </div>
-        </div>
+          <span className="simbolo-aggiungi">＋</span>
+          Nuovo Avviso
+        </button>
       </header>
 
-      <main className="foglio-corpo">
-        {(categoria ||
-          categoriaPersonalizzata.trim()) && (
-          <p className="foglio-categoria">
-            {categoria === "Altro"
-              ? categoriaPersonalizzata ||
-                "Categoria personalizzata"
-              : categoria}
-          </p>
-        )}
+      <section className="cornice-legno">
+        <div className="cornice-modanatura">
+          <div className="cornice-bordo-interno">
+            <div className="pannello-sughero">
+              <div className="bacheca-vuota">
+                <div
+                  className="puntina"
+                  aria-hidden="true"
+                />
 
-        <h2 className="foglio-titolo">
-          {titolo || "Titolo dell’avviso"}
-        </h2>
+                <div className="foglio-avviso">
+                  <div
+                    className="icona-avviso"
+                    aria-hidden="true"
+                  >
+                    📌
+                  </div>
 
-        <div className="foglio-ornamento" aria-hidden="true">
-          <span />
-          <strong>◆</strong>
-          <span />
-        </div>
+                  <h2>Nessun avviso presente</h2>
 
-        <div className="foglio-testo">
-          {testo
-            ? testo.split("\n").map((riga, indice) => (
-                <p key={`${indice}-${riga}`}>
-                  {riga || "\u00A0"}
-                </p>
-              ))
-            : (
-              <p>
-                Il testo dell’avviso comparirà qui.
-              </p>
-            )}
-        </div>
+                  <p>
+                    Gli avvisi pubblicati dal parroco compariranno qui.
+                  </p>
 
-        {immagine && (
-          <div className="foglio-allegato">
-            <span>Immagine o locandina</span>
-            <strong>{immagine.name}</strong>
+                  <button
+                    type="button"
+                    className="btn-crea-primo-avviso"
+                    onClick={() => setMostraNuovoAvviso(true)}
+                  >
+                    Crea il primo avviso
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
-        )}
-
-        {allegato && (
-          <div className="foglio-allegato">
-            <span>Documento allegato</span>
-            <strong>{allegato.name}</strong>
-          </div>
-        )}
-
-        <div className="foglio-firma">
-          <p>
-            {firma === "parroco"
-              ? "Il Parroco"
-              : firma === "nessuna"
-                ? ""
-                : localStorage.getItem(
-                    "ars_nome_parrocchia"
-                  ) || "La Parrocchia"}
-          </p>
         </div>
-      </main>
-
-      <footer className="foglio-piede">
-        <div
-          className="foglio-separatore foglio-separatore-finale"
-          aria-hidden="true"
-        >
-          <span />
-          <strong>✦</strong>
-          <span />
-        </div>
-
-        <p>
-          {localStorage.getItem("ars_nome_parrocchia") ||
-            "Nome della Parrocchia"}
-        </p>
-
-        <div className="foglio-informazioni-finali">
-          <span>
-            Destinazioni:{" "}
-            {destinazioni.length > 0
-              ? destinazioni.join(" · ")
-              : "da definire"}
-          </span>
-
-          <span>
-            Scadenza:{" "}
-            {tipoScadenza === "nessuna"
-              ? "nessuna"
-              : dataScadenza
-                ? new Intl.DateTimeFormat("it-IT").format(
-                    new Date(
-                      `${dataScadenza}T12:00:00`
-                    )
-                  )
-                : "da definire"}
-          </span>
-        </div>
-      </footer>
-    </article>
-  </aside>
-)}
+      </section>
+    </div>
+  );
+}
