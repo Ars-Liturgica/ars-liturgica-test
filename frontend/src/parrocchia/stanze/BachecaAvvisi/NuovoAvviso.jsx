@@ -615,13 +615,16 @@ const [categoriaPersonalizzata, setCategoriaPersonalizzata] = useState("");
             </button>
           </div>
         </div>
-
         {mostraAnteprima && (
           <aside className="anteprima-avviso">
-            <div className="foglio-ufficiale">
-              <header className="carta-intestata">
+            <article className="foglio-ufficiale">
+              <header className="foglio-intestazione">
+                <p className="foglio-sovratitolo">
+                  Ars Liturgica
+                </p>
+
                 <div
-                  className="simbolo-chiesa-oro"
+                  className="foglio-simbolo-chiesa"
                   aria-hidden="true"
                 >
                   <svg viewBox="0 0 120 90">
@@ -636,71 +639,145 @@ const [categoriaPersonalizzata, setCategoriaPersonalizzata] = useState("");
                   </svg>
                 </div>
 
-                <p className="nome-parrocchia-avviso">
-                  Parrocchia
+                <h2 className="foglio-nome-parrocchia">
+                  {localStorage.getItem("ars_nome_parrocchia") ||
+                    "Nome della Parrocchia"}
+                </h2>
+
+                <p className="foglio-localita">
+                  Avviso alla comunità parrocchiale
                 </p>
 
-                <p className="diocesi-avviso">
-                  Diocesi
+                <div className="foglio-separatore">
+                  <span />
+                  <strong>✦</strong>
+                  <span />
+                </div>
+
+                <p className="foglio-tipo-documento">
+                  Avviso parrocchiale
                 </p>
 
-                <div className="linea-intestata" />
+                <div className="foglio-dati-documento">
+                  <div>
+                    <span>Pubblicazione</span>
+
+                    <strong>
+                      {pubblicazione === "subito"
+                        ? new Date().toLocaleDateString("it-IT")
+                        : dataPubblicazione
+                        ? new Date(
+                            `${dataPubblicazione}T00:00:00`
+                          ).toLocaleDateString("it-IT")
+                        : "Da definire"}
+                    </strong>
+                  </div>
+
+                  <div>
+                    <span>Scadenza</span>
+
+                    <strong>
+                      {tipoScadenza === "nessuna"
+                        ? "Nessuna scadenza"
+                        : dataScadenza
+                        ? new Date(
+                            `${dataScadenza}T00:00:00`
+                          ).toLocaleDateString("it-IT")
+                        : "Da definire"}
+                    </strong>
+                  </div>
+                </div>
               </header>
 
-              <main className="corpo-anteprima-avviso">
-                {categoria && (
-                  <p className="categoria-anteprima">
-                    {categoria}
+              <main className="foglio-corpo">
+                {(categoria || categoriaPersonalizzata) && (
+                  <p className="foglio-categoria">
+                    {categoria === "Altro"
+                      ? categoriaPersonalizzata || "Altro"
+                      : categoria}
                   </p>
                 )}
 
-                <h2>
+                <h1 className="foglio-titolo">
                   {titolo || "Titolo dell’avviso"}
-                </h2>
+                </h1>
 
-                <div className="testo-anteprima">
-                  {testo
-                    ? testo
-                        .split("\n")
-                        .map((riga, indice) => (
-                          <p key={`${riga}-${indice}`}>
-                            {riga || "\u00A0"}
-                          </p>
-                        ))
-                    : "Il testo dell’avviso comparirà qui."}
+                <div className="foglio-ornamento">
+                  <span />
+                  <strong>◆</strong>
+                  <span />
+                </div>
+
+                <div className="foglio-testo">
+                  {testo ? (
+                    testo.split("\n").map((riga, indice) => (
+                      <p key={indice}>
+                        {riga || "\u00A0"}
+                      </p>
+                    ))
+                  ) : (
+                    <p>
+                      Il testo dell’avviso comparirà qui.
+                    </p>
+                  )}
                 </div>
 
                 {immagine && (
-                  <p className="allegato-anteprima">
-                    Immagine: {immagine.name}
-                  </p>
+                  <div className="foglio-allegato">
+                    <span>Immagine o locandina</span>
+                    <strong>{immagine.name}</strong>
+                  </div>
                 )}
 
                 {allegato && (
-                  <p className="allegato-anteprima">
-                    Allegato PDF: {allegato.name}
-                  </p>
+                  <div className="foglio-allegato">
+                    <span>Allegato PDF</span>
+                    <strong>{allegato.name}</strong>
+                  </div>
+                )}
+
+                {firma !== "nessuna" && (
+                  <div className="foglio-firma">
+                    <p>
+                      {firma === "parroco"
+                        ? "Il Parroco"
+                        : localStorage.getItem(
+                            "ars_nome_parrocchia"
+                          ) || "La Parrocchia"}
+                    </p>
+                  </div>
                 )}
               </main>
 
-              <footer className="piede-anteprima-avviso">
-                <p>
-                  Pubblicazione:{" "}
-                  {pubblicazione === "subito"
-                    ? "immediata"
-                    : dataPubblicazione || "da definire"}
-                </p>
+              <footer className="foglio-piede">
+                <div className="foglio-separatore foglio-separatore-finale">
+                  <span />
+                  <strong>✦</strong>
+                  <span />
+                </div>
 
                 <p>
-                  Scadenza:{" "}
-                  {tipoScadenza === "nessuna"
-                    ? "nessuna"
-                    : dataScadenza || "da definire"}
+                  Comunicazione ufficiale della comunità
+                  parrocchiale
                 </p>
+
+                <div className="foglio-informazioni-finali">
+                  <span>
+                    Destinazioni:{" "}
+                    {destinazioni.join(", ")}
+                  </span>
+
+                  <span>
+                    Importanza:{" "}
+                    {priorita.charAt(0).toUpperCase() +
+                      priorita.slice(1)}
+                  </span>
+                </div>
               </footer>
-            </div>
+            </article>
           </aside>
         )}
+       
       </div>
     </div>
   );
