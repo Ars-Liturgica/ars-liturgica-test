@@ -743,7 +743,7 @@ const [categoriaPersonalizzata, setCategoriaPersonalizzata] = useState("");
                     <p>
                       {firma === "parroco"
                         ? "Il Parroco"
-                       : nomeParrocchia || "La Parrocchia"
+                       : nomeParrocchia || "La Parrocchia"}
                     </p>
                   </div>
                 )}
