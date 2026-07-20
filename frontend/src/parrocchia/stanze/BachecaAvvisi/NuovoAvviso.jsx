@@ -31,7 +31,10 @@ const stanzeDisponibili = [
   "Pellegrinaggi",
 ];
 
-export default function NuovoAvviso({ tornaAllaBacheca }) {
+export default function NuovoAvviso({
+  nomeParrocchia,
+  tornaAllaBacheca,
+}) {
   const oggi = new Date().toISOString().split("T")[0];
 
   const [titolo, setTitolo] = useState("");
@@ -640,8 +643,7 @@ const [categoriaPersonalizzata, setCategoriaPersonalizzata] = useState("");
                 </div>
 
                 <h2 className="foglio-nome-parrocchia">
-                  {localStorage.getItem("ars_nome_parrocchia") ||
-                    "Nome della Parrocchia"}
+                  {nomeParrocchia || "Nome della Parrocchia"}
                 </h2>
 
                 <p className="foglio-localita">
@@ -741,9 +743,7 @@ const [categoriaPersonalizzata, setCategoriaPersonalizzata] = useState("");
                     <p>
                       {firma === "parroco"
                         ? "Il Parroco"
-                        : localStorage.getItem(
-                            "ars_nome_parrocchia"
-                          ) || "La Parrocchia"}
+                       : nomeParrocchia || "La Parrocchia"
                     </p>
                   </div>
                 )}
