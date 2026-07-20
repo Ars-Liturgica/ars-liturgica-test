@@ -2,14 +2,15 @@ import React, { useState } from "react";
 import "./BachecaAvvisi.css";
 import NuovoAvviso from "./NuovoAvviso";
 
-export default function BachecaAvvisi() {
+export default function BachecaAvvisi({ nomeParrocchia }) {
   const [mostraNuovoAvviso, setMostraNuovoAvviso] = useState(false);
 
   if (mostraNuovoAvviso) {
     return (
       <NuovoAvviso
-        tornaAllaBacheca={() => setMostraNuovoAvviso(false)}
-      />
+  nomeParrocchia={nomeParrocchia}
+  tornaAllaBacheca={() => setMostraNuovoAvviso(false)}
+/>
     );
   }
 
