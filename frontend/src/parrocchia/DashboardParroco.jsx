@@ -99,7 +99,7 @@ useEffect(() => {
   ];
 if (stanzaAperta === "bacheca-avvisi") {
   return (
-    <BachecaAvvisi />
+    <BachecaAvvisi nomeParrocchia={nomeParrocchia} />
   );
 }
   return (
