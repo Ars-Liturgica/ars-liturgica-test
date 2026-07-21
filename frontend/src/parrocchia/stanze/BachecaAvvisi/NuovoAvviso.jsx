@@ -59,7 +59,9 @@ const [categoriaPersonalizzata, setCategoriaPersonalizzata] = useState("");
 
   const [priorita, setPriorita] = useState("normale");
   const [destinatari, setDestinatari] = useState("tutti");
-  const [firma, setFirma] = useState("parrocchia");
+  const [firma, setFirma] = useState("parroco");
+const [firmaAltroNome, setFirmaAltroNome] = useState("");
+const [firmaAltroRuolo, setFirmaAltroRuolo] = useState("");
 
   const [mostraAnteprima, setMostraAnteprima] = useState(false);
 
@@ -550,30 +552,69 @@ const [categoriaPersonalizzata, setCategoriaPersonalizzata] = useState("");
               </div>
 
               <div className="campo-avviso">
-                <label htmlFor="firma-avviso">
-                  Firma
-                </label>
+  <label htmlFor="firma-avviso">
+    Firma
+  </label>
 
-                <select
-                  id="firma-avviso"
-                  value={firma}
-                  onChange={(event) =>
-                    setFirma(event.target.value)
-                  }
-                >
-                  <option value="parrocchia">
-                    Nome della Parrocchia
-                  </option>
+  <select
+    id="firma-avviso"
+    value={firma}
+    onChange={(event) =>
+      setFirma(event.target.value)
+    }
+  >
+    <option value="parroco">
+      Parroco
+    </option>
 
-                  <option value="parroco">
-                    Nome del Parroco
-                  </option>
+    <option value="viceparroco">
+      Viceparroco
+    </option>
 
-                  <option value="nessuna">
-                    Nessuna firma personale
-                  </option>
-                </select>
-              </div>
+    <option value="segreteria">
+      Segreteria Parrocchiale
+    </option>
+
+    <option value="altro">
+      Altro...
+    </option>
+  </select>
+</div>
+              {firma === "altro" && (
+  <>
+    <div className="campo-avviso">
+      <label htmlFor="firma-altro-nome">
+        Nome
+      </label>
+
+      <input
+        id="firma-altro-nome"
+        type="text"
+        placeholder="Nome di chi firma"
+        value={firmaAltroNome}
+        onChange={(event) =>
+          setFirmaAltroNome(event.target.value)
+        }
+      />
+    </div>
+
+    <div className="campo-avviso">
+      <label htmlFor="firma-altro-ruolo">
+        Ruolo
+      </label>
+
+      <input
+        id="firma-altro-ruolo"
+        type="text"
+        placeholder="Ruolo di chi firma"
+        value={firmaAltroRuolo}
+        onChange={(event) =>
+          setFirmaAltroRuolo(event.target.value)
+        }
+      />
+    </div>
+  </>
+)}
             </div>
           </section>
 
@@ -738,15 +779,31 @@ const [categoriaPersonalizzata, setCategoriaPersonalizzata] = useState("");
                   </div>
                 )}
 
-                {firma !== "nessuna" && (
-                  <div className="foglio-firma">
-                    <p>
-                      {firma === "parroco"
-                        ? "Il Parroco"
-                       : nomeParrocchia || "La Parrocchia"}
-                    </p>
-                  </div>
-                )}
+               <div className="foglio-firma">
+  {firma === "parroco" && (
+    <p>Parroco</p>
+  )}
+
+  {firma === "viceparroco" && (
+    <p>Viceparroco</p>
+  )}
+
+  {firma === "segreteria" && (
+    <p>Segreteria Parrocchiale</p>
+  )}
+
+  {firma === "altro" && (
+    <>
+      {firmaAltroNome.trim() && (
+        <p>{firmaAltroNome}</p>
+      )}
+
+      {firmaAltroRuolo.trim() && (
+        <p>{firmaAltroRuolo}</p>
+      )}
+    </>
+  )}
+</div>
               </main>
 
               <footer className="foglio-piede">
