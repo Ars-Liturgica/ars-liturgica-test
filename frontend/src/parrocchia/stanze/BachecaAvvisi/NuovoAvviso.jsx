@@ -105,6 +105,7 @@ const [firmaAltroRuolo, setFirmaAltroRuolo] = useState("");
 
   return (
     <div className="nuovo-avviso">
+      {!mostraAnteprima && (
       <header className="nuovo-avviso-header">
         <div>
           <p className="nuovo-avviso-sezione">
@@ -127,9 +128,10 @@ const [firmaAltroRuolo, setFirmaAltroRuolo] = useState("");
           ← Torna alla Bacheca
         </button>
       </header>
-
+)}
       <div className="nuovo-avviso-layout">
-        <div className="nuovo-avviso-modulo">
+{!mostraAnteprima && (
+  <div className="nuovo-avviso-modulo">
           <section className="sezione-avviso">
             <div className="titolo-sezione-avviso">
               <span>1</span>
@@ -659,6 +661,7 @@ const [firmaAltroRuolo, setFirmaAltroRuolo] = useState("");
             </button>
           </div>
         </div>
+  )}
         {mostraAnteprima && (
           <aside className="anteprima-avviso">
             <article className="foglio-ufficiale">
