@@ -674,16 +674,35 @@ const [firmaAltroRuolo, setFirmaAltroRuolo] = useState("");
                   className="foglio-simbolo-chiesa"
                   aria-hidden="true"
                 >
-                  <svg viewBox="0 0 120 90">
-                    <path d="M60 7v16" />
-                    <path d="M52 15h16" />
-                    <path d="M18 78h84" />
-                    <path d="M24 78V43l36-24 36 24v35" />
-                    <path d="M34 78V50h16v28" />
-                    <path d="M70 78V50h16v28" />
-                    <path d="M52 78V52c0-8 16-8 16 0v26" />
-                    <path d="M24 43h72" />
-                  </svg>
+                  <svg viewBox="0 0 120 92">
+  {/* Croce */}
+  <path d="M60 5V18" />
+  <path d="M54 11H66" />
+
+  {/* Tetto */}
+  <path d="M22 44L60 20L98 44" />
+
+  {/* Facciata */}
+  <path d="M32 44V82" />
+  <path d="M88 44V82" />
+
+  {/* Basamento */}
+  <path d="M18 82H102" />
+
+  {/* Portale */}
+  <path d="M52 82V58C52 52 56 48 60 48C64 48 68 52 68 58V82" />
+
+  {/* Rosone */}
+  <circle cx="60" cy="35" r="5" />
+
+  {/* Finestre */}
+  <path d="M41 70V56" />
+  <path d="M79 70V56" />
+
+  {/* Navate */}
+  <path d="M18 82V58L32 44" />
+  <path d="M102 82V58L88 44" />
+</svg>
                 </div>
 
                 <h2 className="foglio-nome-parrocchia">
