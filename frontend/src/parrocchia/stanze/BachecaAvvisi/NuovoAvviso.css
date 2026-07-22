@@ -378,15 +378,20 @@
 }
 
 .foglio-ufficiale {
+  position: relative;
+  isolation: isolate;
+
   width: 100%;
   min-height: 900px;
-  padding: 46px 48px 36px;
+  padding: 54px 56px 44px;
+
   display: flex;
   flex-direction: column;
+
   background:
     linear-gradient(
-      rgba(255, 253, 248, 0.97),
-      rgba(255, 253, 248, 0.97)
+      rgba(255, 253, 248, 0.98),
+      rgba(255, 253, 248, 0.98)
     ),
     repeating-linear-gradient(
       0deg,
@@ -395,12 +400,56 @@
       transparent 1px,
       transparent 5px
     );
-  border: 1px solid #d8c49a;
-  border-radius: 4px;
+
+  border: 2px solid #b98221;
+  border-radius: 2px;
+
   box-shadow:
     0 24px 55px rgba(27, 42, 55, 0.18),
-    inset 0 0 0 1px rgba(255, 255, 255, 0.8);
+    inset 0 0 0 5px #fffdf8,
+    inset 0 0 0 6px rgba(185, 130, 33, 0.55);
+
   color: #20394d;
+}
+
+/* Seconda linea interna della cornice */
+.foglio-ufficiale::before {
+  content: "";
+  position: absolute;
+  inset: 15px;
+  z-index: -1;
+
+  border: 1px solid rgba(185, 130, 33, 0.75);
+  pointer-events: none;
+}
+
+/* Decorazioni geometriche nei quattro angoli */
+.foglio-ufficiale::after {
+  content: "";
+  position: absolute;
+  inset: 23px;
+  z-index: -1;
+
+  background:
+    linear-gradient(#b98221, #b98221) left top / 38px 2px no-repeat,
+    linear-gradient(#b98221, #b98221) left top / 2px 38px no-repeat,
+
+    linear-gradient(#b98221, #b98221) right top / 38px 2px no-repeat,
+    linear-gradient(#b98221, #b98221) right top / 2px 38px no-repeat,
+
+    linear-gradient(#b98221, #b98221) left bottom / 38px 2px no-repeat,
+    linear-gradient(#b98221, #b98221) left bottom / 2px 38px no-repeat,
+
+    linear-gradient(#b98221, #b98221) right bottom / 38px 2px no-repeat,
+    linear-gradient(#b98221, #b98221) right bottom / 2px 38px no-repeat;
+
+  pointer-events: none;
+}
+
+/* Mantiene tutti i contenuti sopra la cornice decorativa */
+.foglio-ufficiale > * {
+  position: relative;
+  z-index: 1;
 }
 
 .foglio-intestazione {
