@@ -665,6 +665,95 @@ const [firmaAltroRuolo, setFirmaAltroRuolo] = useState("");
         {mostraAnteprima && (
           <aside className="anteprima-avviso">
             <article className="foglio-ufficiale">
+             <svg
+  className="foglio-cornice-svg"
+  viewBox="0 0 1000 1414"
+  preserveAspectRatio="none"
+  aria-hidden="true"
+>
+  {/* Doppia cornice */}
+  <rect
+    className="cornice-linea-esterna"
+    x="12"
+    y="12"
+    width="976"
+    height="1390"
+  />
+
+  <rect
+    className="cornice-linea-interna"
+    x="27"
+    y="27"
+    width="946"
+    height="1360"
+  />
+
+  {/* Angolo ornamentale di base: alto a sinistra */}
+  <g className="cornice-fregio">
+    <path d="M27 122V67C27 45 45 27 67 27H122" />
+
+    <path d="M27 88C46 88 58 75 58 56C58 39 71 27 89 27" />
+
+    <path d="M58 56C42 54 32 43 35 30C38 17 54 13 63 21C72 29 68 42 59 45C51 47 45 42 47 35" />
+
+    <path d="M59 58C74 63 84 75 84 91" />
+
+    <path d="M66 63C77 57 89 60 96 70C84 72 73 70 66 63" />
+
+    <path d="M47 76C40 88 39 101 44 113" />
+  </g>
+
+  {/* Alto a destra */}
+  <g transform="translate(1000 0) scale(-1 1)">
+    <g className="cornice-fregio">
+      <path d="M27 122V67C27 45 45 27 67 27H122" />
+
+      <path d="M27 88C46 88 58 75 58 56C58 39 71 27 89 27" />
+
+      <path d="M58 56C42 54 32 43 35 30C38 17 54 13 63 21C72 29 68 42 59 45C51 47 45 42 47 35" />
+
+      <path d="M59 58C74 63 84 75 84 91" />
+
+      <path d="M66 63C77 57 89 60 96 70C84 72 73 70 66 63" />
+
+      <path d="M47 76C40 88 39 101 44 113" />
+    </g>
+  </g>
+
+  {/* Basso a destra */}
+  <g transform="translate(1000 1414) scale(-1 -1)">
+    <g className="cornice-fregio">
+      <path d="M27 122V67C27 45 45 27 67 27H122" />
+
+      <path d="M27 88C46 88 58 75 58 56C58 39 71 27 89 27" />
+
+      <path d="M58 56C42 54 32 43 35 30C38 17 54 13 63 21C72 29 68 42 59 45C51 47 45 42 47 35" />
+
+      <path d="M59 58C74 63 84 75 84 91" />
+
+      <path d="M66 63C77 57 89 60 96 70C84 72 73 70 66 63" />
+
+      <path d="M47 76C40 88 39 101 44 113" />
+    </g>
+  </g>
+
+  {/* Basso a sinistra */}
+  <g transform="translate(0 1414) scale(1 -1)">
+    <g className="cornice-fregio">
+      <path d="M27 122V67C27 45 45 27 67 27H122" />
+
+      <path d="M27 88C46 88 58 75 58 56C58 39 71 27 89 27" />
+
+      <path d="M58 56C42 54 32 43 35 30C38 17 54 13 63 21C72 29 68 42 59 45C51 47 45 42 47 35" />
+
+      <path d="M59 58C74 63 84 75 84 91" />
+
+      <path d="M66 63C77 57 89 60 96 70C84 72 73 70 66 63" />
+
+      <path d="M47 76C40 88 39 101 44 113" />
+    </g>
+  </g>
+</svg>
               <header className="foglio-intestazione">
                 <p className="foglio-sovratitolo">
                   Ars Liturgica
