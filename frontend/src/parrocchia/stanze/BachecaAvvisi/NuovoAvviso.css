@@ -424,28 +424,22 @@
 }
 
 /* Decorazioni geometriche nei quattro angoli */
-.foglio-ufficiale::after {
-  content: "";
-  position: absolute;
-  inset: 23px;
-  z-index: -1;
-
-  background:
-    linear-gradient(#b98221, #b98221) left top / 38px 2px no-repeat,
-    linear-gradient(#b98221, #b98221) left top / 2px 38px no-repeat,
-
-    linear-gradient(#b98221, #b98221) right top / 38px 2px no-repeat,
-    linear-gradient(#b98221, #b98221) right top / 2px 38px no-repeat,
-
-    linear-gradient(#b98221, #b98221) left bottom / 38px 2px no-repeat,
-    linear-gradient(#b98221, #b98221) left bottom / 2px 38px no-repeat,
-
-    linear-gradient(#b98221, #b98221) right bottom / 38px 2px no-repeat,
-    linear-gradient(#b98221, #b98221) right bottom / 2px 38px no-repeat;
-
-  pointer-events: none;
+.foglio-simbolo-chiesa {
+  width: 88px;
+  margin: 2px auto 12px;
 }
 
+.foglio-simbolo-chiesa svg {
+  display: block;
+  width: 100%;
+  height: auto;
+
+  fill: none;
+  stroke: #ae791c;
+  stroke-width: 2.15;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
 /* Mantiene tutti i contenuti sopra la cornice decorativa */
 .foglio-ufficiale > * {
   position: relative;
