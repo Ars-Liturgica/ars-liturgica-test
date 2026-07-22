@@ -401,26 +401,46 @@
       transparent 5px
     );
 
-  border: 2px solid #b98221;
-  border-radius: 2px;
+ border: none;
+border-radius: 2px;
 
-  box-shadow:
-    0 24px 55px rgba(27, 42, 55, 0.18),
-    inset 0 0 0 5px #fffdf8,
-    inset 0 0 0 6px rgba(185, 130, 33, 0.55);
+box-shadow: 0 24px 55px rgba(27, 42, 55, 0.18);
 
   color: #20394d;
 }
-
-/* Seconda linea interna della cornice */
-.foglio-ufficiale::before {
-  content: "";
+/* Cornice vettoriale completa del Foglio Ufficiale */
+.foglio-cornice-svg {
   position: absolute;
-  inset: 15px;
-  z-index: -1;
-
-  border: 1px solid rgba(185, 130, 33, 0.75);
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  overflow: hidden;
   pointer-events: none;
+  z-index: 0;
+}
+
+.cornice-linea-esterna,
+.cornice-linea-interna,
+.cornice-fregio path {
+  fill: none;
+  stroke: #b98221;
+  vector-effect: non-scaling-stroke;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.cornice-linea-esterna {
+  stroke-width: 2;
+}
+
+.cornice-linea-interna {
+  stroke-width: 1;
+  opacity: 0.78;
+}
+
+.cornice-fregio path {
+  stroke-width: 1.55;
 }
 
 /* Decorazioni geometriche nei quattro angoli */
@@ -445,7 +465,10 @@
   position: relative;
   z-index: 1;
 }
-
+.foglio-ufficiale > .foglio-cornice-svg {
+  position: absolute;
+  z-index: 0;
+}
 .foglio-intestazione {
   text-align: center;
 }
