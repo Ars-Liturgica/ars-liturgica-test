@@ -662,207 +662,210 @@ const [firmaAltroRuolo, setFirmaAltroRuolo] = useState("");
           </div>
         </div>
   )}
-        {mostraAnteprima && (
-          <aside className="anteprima-avviso">
-            <article className="foglio-ufficiale">
-   <img
-  src={corniceAvviso}
-  className="foglio-cornice-svg"
-  alt=""
-  aria-hidden="true"
-/>
-              <header className="foglio-intestazione">
-                <p className="foglio-sovratitolo">
-                  Ars Liturgica
-                </p>
+      {mostraAnteprima && (
+  <aside className="anteprima-avviso">
+    <div className="documento-avviso">
+      <article className="pagina-avviso">
+        <img
+          src={corniceAvviso}
+          className="foglio-cornice-svg"
+          alt=""
+          aria-hidden="true"
+        />
 
-                <div
-                  className="foglio-simbolo-chiesa"
-                  aria-hidden="true"
-                >
-                  <svg viewBox="0 0 120 92">
-  {/* Croce */}
-  <path d="M60 5V18" />
-  <path d="M54 11H66" />
+        <div className="pagina-contenuto">
+          <header className="foglio-intestazione">
+            <p className="foglio-sovratitolo">
+              Ars Liturgica
+            </p>
 
-  {/* Tetto */}
-  <path d="M22 44L60 20L98 44" />
+            <div
+              className="foglio-simbolo-chiesa"
+              aria-hidden="true"
+            >
+              <svg viewBox="0 0 120 92">
+                {/* Croce */}
+                <path d="M60 5V18" />
+                <path d="M54 11H66" />
 
-  {/* Facciata */}
-  <path d="M32 44V82" />
-  <path d="M88 44V82" />
+                {/* Tetto */}
+                <path d="M22 44L60 20L98 44" />
 
-  {/* Basamento */}
-  <path d="M18 82H102" />
+                {/* Facciata */}
+                <path d="M32 44V82" />
+                <path d="M88 44V82" />
 
-  {/* Portale */}
-  <path d="M52 82V58C52 52 56 48 60 48C64 48 68 52 68 58V82" />
+                {/* Basamento */}
+                <path d="M18 82H102" />
 
-  {/* Rosone */}
-  <circle cx="60" cy="35" r="5" />
+                {/* Portale */}
+                <path d="M52 82V58C52 52 56 48 60 48C64 48 68 52 68 58V82" />
 
-  {/* Finestre */}
-  <path d="M41 70V56" />
-  <path d="M79 70V56" />
+                {/* Rosone */}
+                <circle cx="60" cy="35" r="5" />
 
-  {/* Navate */}
-  <path d="M18 82V58L32 44" />
-  <path d="M102 82V58L88 44" />
-</svg>
-                </div>
+                {/* Finestre */}
+                <path d="M41 70V56" />
+                <path d="M79 70V56" />
 
-                <h2 className="foglio-nome-parrocchia">
-                  {nomeParrocchia || "Nome della Parrocchia"}
-                </h2>
+                {/* Navate */}
+                <path d="M18 82V58L32 44" />
+                <path d="M102 82V58L88 44" />
+              </svg>
+            </div>
 
-                <p className="foglio-localita">
-                  Avviso alla comunità parrocchiale
-                </p>
+            <h2 className="foglio-nome-parrocchia">
+              {nomeParrocchia || "Nome della Parrocchia"}
+            </h2>
 
-                <div className="foglio-separatore">
-                  <span />
-                  <strong>✦</strong>
-                  <span />
-                </div>
+            <p className="foglio-localita">
+              Avviso alla comunità parrocchiale
+            </p>
 
-                <p className="foglio-tipo-documento">
-                  Avviso parrocchiale
-                </p>
+            <div className="foglio-separatore">
+              <span />
+              <strong>✦</strong>
+              <span />
+            </div>
 
-                <div className="foglio-dati-documento">
-                  <div>
-                    <span>Pubblicazione</span>
+            <p className="foglio-tipo-documento">
+              Avviso parrocchiale
+            </p>
 
-                    <strong>
-                      {pubblicazione === "subito"
-                        ? new Date().toLocaleDateString("it-IT")
-                        : dataPubblicazione
-                        ? new Date(
-                            `${dataPubblicazione}T00:00:00`
-                          ).toLocaleDateString("it-IT")
-                        : "Da definire"}
-                    </strong>
-                  </div>
+            <div className="foglio-dati-documento">
+              <div>
+                <span>Pubblicazione</span>
 
-                  <div>
-                    <span>Scadenza</span>
+                <strong>
+                  {pubblicazione === "subito"
+                    ? new Date().toLocaleDateString("it-IT")
+                    : dataPubblicazione
+                    ? new Date(
+                        `${dataPubblicazione}T00:00:00`
+                      ).toLocaleDateString("it-IT")
+                    : "Da definire"}
+                </strong>
+              </div>
 
-                    <strong>
-                      {tipoScadenza === "nessuna"
-                        ? "Nessuna scadenza"
-                        : dataScadenza
-                        ? new Date(
-                            `${dataScadenza}T00:00:00`
-                          ).toLocaleDateString("it-IT")
-                        : "Da definire"}
-                    </strong>
-                  </div>
-                </div>
-              </header>
+              <div>
+                <span>Scadenza</span>
 
-              <main className="foglio-corpo">
-                {(categoria || categoriaPersonalizzata) && (
-                  <p className="foglio-categoria">
-                    {categoria === "Altro"
-                      ? categoriaPersonalizzata || "Altro"
-                      : categoria}
+                <strong>
+                  {tipoScadenza === "nessuna"
+                    ? "Nessuna scadenza"
+                    : dataScadenza
+                    ? new Date(
+                        `${dataScadenza}T00:00:00`
+                      ).toLocaleDateString("it-IT")
+                    : "Da definire"}
+                </strong>
+              </div>
+            </div>
+          </header>
+
+          <main className="foglio-corpo">
+            {(categoria || categoriaPersonalizzata) && (
+              <p className="foglio-categoria">
+                {categoria === "Altro"
+                  ? categoriaPersonalizzata || "Altro"
+                  : categoria}
+              </p>
+            )}
+
+            <h1 className="foglio-titolo">
+              {titolo || "Titolo dell’avviso"}
+            </h1>
+
+            <div className="foglio-ornamento">
+              <span />
+              <strong>◆</strong>
+              <span />
+            </div>
+
+            <div className="foglio-testo">
+              {testo ? (
+                testo.split("\n").map((riga, indice) => (
+                  <p key={indice}>
+                    {riga || "\u00A0"}
                   </p>
-                )}
-
-                <h1 className="foglio-titolo">
-                  {titolo || "Titolo dell’avviso"}
-                </h1>
-
-                <div className="foglio-ornamento">
-                  <span />
-                  <strong>◆</strong>
-                  <span />
-                </div>
-
-                <div className="foglio-testo">
-                  {testo ? (
-                    testo.split("\n").map((riga, indice) => (
-                      <p key={indice}>
-                        {riga || "\u00A0"}
-                      </p>
-                    ))
-                  ) : (
-                    <p>
-                      Il testo dell’avviso comparirà qui.
-                    </p>
-                  )}
-                </div>
-
-                {immagine && (
-                  <div className="foglio-allegato">
-                    <span>Immagine o locandina</span>
-                    <strong>{immagine.name}</strong>
-                  </div>
-                )}
-
-                {allegato && (
-                  <div className="foglio-allegato">
-                    <span>Allegato PDF</span>
-                    <strong>{allegato.name}</strong>
-                  </div>
-                )}
-
-               <div className="foglio-firma">
-  {firma === "parroco" && (
-    <p>Parroco</p>
-  )}
-
-  {firma === "viceparroco" && (
-    <p>Viceparroco</p>
-  )}
-
-  {firma === "segreteria" && (
-    <p>Segreteria Parrocchiale</p>
-  )}
-
-  {firma === "altro" && (
-    <>
-      {firmaAltroNome.trim() && (
-        <p>{firmaAltroNome}</p>
-      )}
-
-      {firmaAltroRuolo.trim() && (
-        <p>{firmaAltroRuolo}</p>
-      )}
-    </>
-  )}
-</div>
-              </main>
-
-              <footer className="foglio-piede">
-                <div className="foglio-separatore foglio-separatore-finale">
-                  <span />
-                  <strong>✦</strong>
-                  <span />
-                </div>
-
+                ))
+              ) : (
                 <p>
-                  Comunicazione ufficiale della comunità
-                  parrocchiale
+                  Il testo dell’avviso comparirà qui.
                 </p>
+              )}
+            </div>
 
-                <div className="foglio-informazioni-finali">
-                  <span>
-                    Destinazioni:{" "}
-                    {destinazioni.join(", ")}
-                  </span>
+            {immagine && (
+              <div className="foglio-allegato">
+                <span>Immagine o locandina</span>
+                <strong>{immagine.name}</strong>
+              </div>
+            )}
 
-                  <span>
-                    Importanza:{" "}
-                    {priorita.charAt(0).toUpperCase() +
-                      priorita.slice(1)}
-                  </span>
-                </div>
-              </footer>
-            </article>
-          </aside>
-        )}
-       
+            {allegato && (
+              <div className="foglio-allegato">
+                <span>Allegato PDF</span>
+                <strong>{allegato.name}</strong>
+              </div>
+            )}
+
+            <div className="foglio-firma">
+              {firma === "parroco" && (
+                <p>Parroco</p>
+              )}
+
+              {firma === "viceparroco" && (
+                <p>Viceparroco</p>
+              )}
+
+              {firma === "segreteria" && (
+                <p>Segreteria Parrocchiale</p>
+              )}
+
+              {firma === "altro" && (
+                <>
+                  {firmaAltroNome.trim() && (
+                    <p>{firmaAltroNome}</p>
+                  )}
+
+                  {firmaAltroRuolo.trim() && (
+                    <p>{firmaAltroRuolo}</p>
+                  )}
+                </>
+              )}
+            </div>
+          </main>
+
+          <footer className="foglio-piede">
+            <div className="foglio-separatore foglio-separatore-finale">
+              <span />
+              <strong>✦</strong>
+              <span />
+            </div>
+
+            <p>
+              Comunicazione ufficiale della comunità parrocchiale
+            </p>
+
+            <div className="foglio-informazioni-finali">
+              <span>
+                Destinazioni:{" "}
+                {destinazioni.join(", ")}
+              </span>
+
+              <span>
+                Importanza:{" "}
+                {priorita.charAt(0).toUpperCase() +
+                  priorita.slice(1)}
+              </span>
+            </div>
+          </footer>
+        </div>
+      </article>
+    </div>
+  </aside>
+)}
       </div>
     </div>
   );
