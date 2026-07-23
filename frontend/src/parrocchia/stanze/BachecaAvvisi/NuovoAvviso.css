@@ -373,22 +373,29 @@
 }
 
 .anteprima-avviso {
-  position: sticky;
-  top: 24px;
+  position: static;
+  width: 100%;
 }
 
-.foglio-ufficiale {
+.nuovo-avviso-layout:has(.anteprima-avviso) {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.documento-avviso {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+  overflow-x: auto;
+  padding: 12px 0 28px;
+}
+
+.pagina-avviso {
   position: relative;
   isolation: isolate;
-
-width: 100%;
-min-height: 1123px;
-padding: 62px 64px 52px;
-overflow: visible;
-
-  display: flex;
-  flex-direction: column;
-
+  flex: 0 0 auto;
+  width: 210mm;
+  height: 297mm;
+  overflow: hidden;
   background:
     linear-gradient(
       rgba(255, 253, 248, 0.98),
@@ -401,83 +408,42 @@ overflow: visible;
       transparent 1px,
       transparent 5px
     );
-
- border: none;
-border-radius: 2px;
-
-box-shadow: 0 24px 55px rgba(27, 42, 55, 0.18);
-
+  border: none;
+  border-radius: 2px;
+  box-shadow: 0 24px 55px rgba(27, 42, 55, 0.18);
   color: #20394d;
 }
-/* Cornice vettoriale completa del Foglio Ufficiale */
+
 .foglio-cornice-svg {
   position: absolute;
   inset: 0;
+  z-index: 0;
   width: 100%;
   height: 100%;
   display: block;
-object-fit: contain;
+  object-fit: fill;
   pointer-events: none;
-  z-index: 0;
 }
 
-.cornice-linea-esterna,
-.cornice-linea-interna,
-.cornice-fregio path {
-  fill: none;
-  stroke: #b98221;
-  vector-effect: non-scaling-stroke;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
-.cornice-linea-esterna {
-  stroke-width: 2;
-}
-
-.cornice-linea-interna {
-  stroke-width: 1;
-  opacity: 0.78;
-}
-
-.cornice-fregio path {
-  stroke-width: 1.55;
-}
-
-/* Decorazioni geometriche nei quattro angoli */
-.foglio-simbolo-chiesa {
-  width: 88px;
-  margin: 2px auto 12px;
-}
-
-.foglio-simbolo-chiesa svg {
-  display: block;
-  width: 100%;
-  height: auto;
-
-  fill: none;
-  stroke: #ae791c;
-  stroke-width: 2.15;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-/* Mantiene tutti i contenuti sopra la cornice decorativa */
-.foglio-ufficiale > * {
+.pagina-contenuto {
   position: relative;
   z-index: 1;
+  width: 100%;
+  height: 100%;
+  padding: 16mm 17mm 14mm;
+  display: flex;
+  flex-direction: column;
 }
-.foglio-ufficiale > .foglio-cornice-svg {
-  position: absolute;
-  z-index: 0;
-}
+
 .foglio-intestazione {
+  flex: 0 0 auto;
   text-align: center;
 }
 
 .foglio-sovratitolo {
-  margin: 0 0 7px;
+  margin: 0 0 5px;
   font-family: Georgia, "Times New Roman", serif;
-  font-size: 0.78rem;
+  font-size: 0.72rem;
   font-weight: 700;
   letter-spacing: 0.22em;
   text-transform: uppercase;
@@ -485,11 +451,12 @@ object-fit: contain;
 }
 
 .foglio-simbolo-chiesa {
-  width: 66px;
-  margin: 0 auto 8px;
+  width: 58px;
+  margin: 0 auto 6px;
 }
 
 .foglio-simbolo-chiesa svg {
+  display: block;
   width: 100%;
   height: auto;
   fill: none;
@@ -502,17 +469,18 @@ object-fit: contain;
 .foglio-nome-parrocchia {
   margin: 0;
   font-family: Georgia, "Times New Roman", serif;
-  font-size: clamp(1.55rem, 3vw, 2.1rem);
-  line-height: 1.15;
+  font-size: 1.8rem;
+  line-height: 1.12;
   letter-spacing: 0.025em;
   text-transform: uppercase;
   color: #183a55;
+  overflow-wrap: anywhere;
 }
 
 .foglio-localita {
-  margin: 8px 0 20px;
+  margin: 6px 0 14px;
   font-family: Georgia, "Times New Roman", serif;
-  font-size: 0.95rem;
+  font-size: 0.88rem;
   font-style: italic;
   color: #777168;
 }
@@ -538,14 +506,14 @@ object-fit: contain;
 .foglio-separatore strong {
   color: #a97016;
   font-family: Georgia, "Times New Roman", serif;
-  font-size: 1rem;
+  font-size: 0.9rem;
   font-weight: 400;
 }
 
 .foglio-tipo-documento {
-  margin: 22px 0 18px;
+  margin: 14px 0 12px;
   font-family: Georgia, "Times New Roman", serif;
-  font-size: 1.05rem;
+  font-size: 0.92rem;
   font-weight: 700;
   letter-spacing: 0.2em;
   text-transform: uppercase;
@@ -553,7 +521,7 @@ object-fit: contain;
 }
 
 .foglio-dati-documento {
-  padding: 13px 0;
+  padding: 10px 0;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   border-top: 1px solid #d8c9a7;
@@ -563,7 +531,7 @@ object-fit: contain;
 .foglio-dati-documento > div {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
 }
 
 .foglio-dati-documento > div:first-child {
@@ -571,7 +539,7 @@ object-fit: contain;
 }
 
 .foglio-dati-documento span {
-  font-size: 0.69rem;
+  font-size: 0.62rem;
   font-weight: 700;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -580,24 +548,27 @@ object-fit: contain;
 
 .foglio-dati-documento strong {
   font-family: Georgia, "Times New Roman", serif;
-  font-size: 0.92rem;
+  font-size: 0.82rem;
   font-weight: 400;
   color: #445661;
 }
 
 .foglio-corpo {
-  flex: 1;
-  padding-top: 36px;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding-top: 24px;
+  display: flex;
+  flex-direction: column;
 }
 
 .foglio-categoria {
   width: fit-content;
   max-width: 100%;
-  margin: 0 auto 15px;
-  padding: 6px 16px;
+  margin: 0 auto 11px;
+  padding: 5px 14px;
   border-top: 1px solid #c49339;
   border-bottom: 1px solid #c49339;
-  font-size: 0.72rem;
+  font-size: 0.66rem;
   font-weight: 700;
   letter-spacing: 0.16em;
   text-align: center;
@@ -610,15 +581,15 @@ object-fit: contain;
   margin: 0;
   text-align: center;
   font-family: Georgia, "Times New Roman", serif;
-  font-size: clamp(1.8rem, 4vw, 2.7rem);
-  line-height: 1.18;
+  font-size: 2.15rem;
+  line-height: 1.16;
   color: #173851;
   overflow-wrap: anywhere;
 }
 
 .foglio-ornamento {
   width: 72%;
-  margin: 20px auto 30px;
+  margin: 15px auto 20px;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -632,34 +603,34 @@ object-fit: contain;
 
 .foglio-ornamento strong {
   color: #af791c;
-  font-size: 0.63rem;
+  font-size: 0.58rem;
 }
 
 .foglio-testo {
   font-family: Georgia, "Times New Roman", serif;
-  font-size: 1.05rem;
-  line-height: 1.82;
+  font-size: 0.96rem;
+  line-height: 1.62;
   color: #2d414f;
   overflow-wrap: anywhere;
 }
 
 .foglio-testo p {
-  margin: 0 0 15px;
+  margin: 0 0 11px;
 }
 
 .foglio-allegato {
-  margin-top: 22px;
-  padding: 13px 15px;
+  margin-top: 15px;
+  padding: 10px 13px;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 3px;
   border-left: 3px solid #b77b16;
   background: rgba(247, 238, 217, 0.65);
   overflow-wrap: anywhere;
 }
 
 .foglio-allegato span {
-  font-size: 0.72rem;
+  font-size: 0.65rem;
   font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -668,12 +639,13 @@ object-fit: contain;
 
 .foglio-allegato strong {
   color: #4d5458;
-  font-size: 0.9rem;
+  font-size: 0.82rem;
 }
 
 .foglio-firma {
-  min-height: 90px;
-  margin-top: 46px;
+  min-height: 62px;
+  margin-top: auto;
+  padding-top: 24px;
   display: flex;
   flex-direction: column;
   align-items: flex-end;
@@ -681,7 +653,7 @@ object-fit: contain;
 }
 
 .foglio-firma p {
-  width: 48%;
+  width: 44%;
   margin: 0;
   font-family: Georgia, "Times New Roman", serif;
   text-align: center;
@@ -689,74 +661,84 @@ object-fit: contain;
 }
 
 .foglio-firma p:first-child {
-  padding-top: 12px;
-  border-top: 1px solid #bda66f;
   font-size: 1rem;
   font-weight: 700;
-  font-style: normal;
+  color: #263f50;
 }
 
 .foglio-firma p + p {
-  margin-top: 4px;
-  font-size: 0.88rem;
+  margin-top: 3px;
+  font-size: 0.78rem;
   font-style: italic;
-}
-
-.foglio-firma p:empty {
-  display: none;
+  color: #777168;
 }
 
 .foglio-piede {
-  margin-top: 36px;
+  flex: 0 0 auto;
+  padding-top: 12px;
   text-align: center;
 }
 
 .foglio-separatore-finale {
-  margin-bottom: 16px;
+  margin-bottom: 8px;
 }
 
 .foglio-piede > p {
-  margin: 0 0 9px;
+  margin: 0;
   font-family: Georgia, "Times New Roman", serif;
-  font-size: 0.92rem;
-  font-weight: 700;
-  color: #26445a;
+  font-size: 0.7rem;
+  font-style: italic;
+  letter-spacing: 0.035em;
+  color: #777168;
 }
 
 .foglio-informazioni-finali {
+  margin-top: 7px;
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  font-size: 0.72rem;
-  line-height: 1.45;
-  color: #7b7a74;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 5px 18px;
+  font-size: 0.58rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #936b25;
+}
+
+.foglio-informazioni-finali span {
   overflow-wrap: anywhere;
 }
 
-@media (max-width: 1120px) {
-  .nuovo-avviso-layout:has(.anteprima-avviso) {
-    grid-template-columns: 1fr;
+@media (max-width: 1100px) {
+  .nuovo-avviso {
+    padding: 30px 20px 55px;
   }
 
-  .anteprima-avviso {
-    position: static;
+  .nuovo-avviso-header {
+    padding: 26px;
   }
 
-  .foglio-ufficiale {
-    max-width: 760px;
-    margin: 0 auto;
+  .allegati-avviso,
+  .griglia-impostazioni {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pagina-avviso {
+    transform-origin: top center;
   }
 }
 
 @media (max-width: 760px) {
   .nuovo-avviso {
-    padding: 22px 14px 50px;
+    padding: 20px 12px 42px;
   }
 
   .nuovo-avviso-header {
-    padding: 24px 20px;
+    padding: 22px 20px;
     flex-direction: column;
     align-items: stretch;
+    gap: 20px;
   }
 
   .btn-torna-bacheca {
@@ -768,11 +750,26 @@ object-fit: contain;
     border-radius: 17px;
   }
 
+  .titolo-sezione-avviso {
+    gap: 13px;
+  }
+
+  .titolo-sezione-avviso > span {
+    width: 36px;
+    height: 36px;
+    flex-basis: 36px;
+    font-size: 1rem;
+  }
+
+  .titolo-sezione-avviso h2 {
+    font-size: 1.4rem;
+  }
+
   .allegati-avviso,
   .griglia-impostazioni,
   .griglia-destinazioni,
   .riga-data-ora {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .azioni-nuovo-avviso {
@@ -784,71 +781,66 @@ object-fit: contain;
     width: 100%;
   }
 
-  .foglio-ufficiale {
-    min-height: auto;
-    padding: 30px 23px;
-  }
-
-  .foglio-dati-documento {
-    grid-template-columns: 1fr;
-  }
-
-  .foglio-dati-documento > div {
-    padding: 9px 0;
-  }
-
-  .foglio-dati-documento > div:first-child {
-    border-right: none;
-    border-bottom: 1px solid #d8c9a7;
-  }
-
-  .foglio-firma {
-    justify-content: center;
-  }
-
-  .foglio-firma p {
-    width: 72%;
+  .documento-avviso {
+    justify-content: flex-start;
   }
 }
 
 @media print {
+  @page {
+    size: A4 portrait;
+    margin: 0;
+  }
+
+  html,
+  body {
+    width: 210mm;
+    height: 297mm;
+    margin: 0;
+    padding: 0;
+    background: #ffffff;
+  }
+
   body * {
-    visibility: hidden !important;
+    visibility: hidden;
   }
 
   .anteprima-avviso,
   .anteprima-avviso * {
-    visibility: visible !important;
+    visibility: visible;
   }
 
   .anteprima-avviso {
     position: absolute;
     inset: 0;
-    width: 100%;
+    width: 210mm;
+    height: 297mm;
     margin: 0;
+    padding: 0;
   }
 
-  .foglio-ufficiale {
-    width: 100%;
-    min-height: 100vh;
+  .documento-avviso {
+    width: 210mm;
+    height: 297mm;
     margin: 0;
-    padding: 18mm 16mm;
-    border: none;
+    padding: 0;
+    display: block;
+    overflow: visible;
+  }
+
+  .pagina-avviso {
+    width: 210mm;
+    height: 297mm;
+    margin: 0;
+    border: 0;
     border-radius: 0;
     box-shadow: none;
-    background: #fff;
-    break-inside: avoid;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
   }
 
-  .foglio-titolo,
-  .foglio-testo,
-  .foglio-allegato,
-  .foglio-firma {
-    break-inside: avoid;
-  }
-
-  @page {
-    size: A4;
-    margin: 0;
+  .foglio-cornice-svg {
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
   }
 }
