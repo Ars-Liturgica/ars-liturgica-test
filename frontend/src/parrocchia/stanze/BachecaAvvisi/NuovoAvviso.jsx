@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import "./NuovoAvviso.css";
-import corniceAvviso from "../../../cornice-avviso.svg";
+
 const categorie = [
   "Celebrazione",
   "Catechesi",
@@ -666,12 +666,7 @@ const [firmaAltroRuolo, setFirmaAltroRuolo] = useState("");
   <aside className="anteprima-avviso">
     <div className="documento-avviso">
       <article className="pagina-avviso">
-        <img
-          src={corniceAvviso}
-          className="foglio-cornice-svg"
-          alt=""
-          aria-hidden="true"
-        />
+       
 
         <div className="pagina-contenuto">
           <header className="foglio-intestazione">
