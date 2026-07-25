@@ -651,7 +651,28 @@ const [firmaAltroRuolo, setFirmaAltroRuolo] = useState("");
                 ? "Chiudi anteprima"
                 : "Anteprima"}
             </button>
-
+<button
+  type="button"
+  className="btn-stampa-avviso"
+  onClick={() =>
+    window.alert(
+      "La funzione Stampa verrà collegata al Motore Documentale."
+    )
+  }
+>
+  Stampa
+</button>
+            <button
+  type="button"
+  className="btn-pdf-avviso"
+  onClick={() =>
+    window.alert(
+      "La funzione PDF verrà collegata al Motore Documentale."
+    )
+  }
+>
+  PDF
+</button>
             <button
               type="button"
               className="btn-pubblica-avviso"
@@ -858,6 +879,47 @@ const [firmaAltroRuolo, setFirmaAltroRuolo] = useState("");
           </footer>
         </div>
       </article>
+      <div className="azioni-anteprima-avviso">
+
+  <button
+    type="button"
+    className="btn-anteprima-avviso"
+    onClick={() => setMostraAnteprima(false)}
+  >
+    ← Torna al documento
+  </button>
+<button
+  type="button"
+  className="btn-stampa-avviso"
+  onClick={() =>
+    window.alert(
+      "La funzione Stampa verrà collegata al Motore Documentale."
+    )
+  }
+>
+  Stampa
+</button>
+
+<button
+  type="button"
+  className="btn-pdf-avviso"
+  onClick={() =>
+    window.alert(
+      "La funzione PDF verrà collegata al Motore Documentale."
+    )
+  }
+>
+  PDF
+</button>
+
+<button
+  type="button"
+  className="btn-pubblica-avviso"
+  onClick={gestisciPubblicazione}
+>
+  Pubblica
+</button>
+</div>
     </div>
   </aside>
 )}
