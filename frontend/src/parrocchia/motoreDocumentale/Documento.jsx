@@ -3,16 +3,20 @@
 DOCUMENTO
 Modello unico utilizzato da tutto Ars Liturgica.
 
-Le Stanze preparano i dati.
-Il Motore Documentale gestisce:
-- bozze;
+Il Documento contiene esclusivamente dati e stato.
+
+Non gestisce:
+- pulsanti;
 - anteprima;
+- impaginazione;
 - stampa;
 - PDF;
-- affissione in bacheca;
-- invio email;
-- condivisione WhatsApp;
+- bacheca;
+- email;
+- WhatsApp;
 - archiviazione.
+
+Queste operazioni appartengono al Motore Documentale.
 =========================================================
 */
 
@@ -21,6 +25,8 @@ export const STATI_DOCUMENTO = {
   IN_ESSERE: "in_essere",
   SCADUTO: "scaduto",
 };
+
+const STATI_CONSENTITI = Object.values(STATI_DOCUMENTO);
 
 export function creaDocumento({
   id = null,
@@ -35,8 +41,7 @@ export function creaDocumento({
   dataPubblicazione = null,
   dataScadenza = null,
   senzaScadenza = false,
-  affissoInBacheca = false,
-  pdfUrl = null,
+  metadati = {},
 } = {}) {
   if (!tipo) {
     throw new Error("Il tipo del documento è obbligatorio.");
@@ -44,6 +49,10 @@ export function creaDocumento({
 
   if (!parrocchiaId) {
     throw new Error("La parrocchia del documento è obbligatoria.");
+  }
+
+  if (!STATI_CONSENTITI.includes(stato)) {
+    throw new Error(`Stato del documento non valido: ${stato}`);
   }
 
   return {
@@ -59,12 +68,21 @@ export function creaDocumento({
     dataPubblicazione,
     dataScadenza,
     senzaScadenza,
-    affissoInBacheca,
-    pdfUrl,
+    metadati,
   };
 }
 
 export function aggiornaDocumento(documento, modifiche = {}) {
+  if (!documento) {
+    throw new Error("Il documento da aggiornare non è stato fornito.");
+  }
+
+  const nuovoStato = modifiche.stato ?? documento.stato;
+
+  if (!STATI_CONSENTITI.includes(nuovoStato)) {
+    throw new Error(`Stato del documento non valido: ${nuovoStato}`);
+  }
+
   return {
     ...documento,
     ...modifiche,
@@ -72,85 +90,46 @@ export function aggiornaDocumento(documento, modifiche = {}) {
   };
 }
 
-export function salvaComeBozza(documento) {
-  return aggiornaDocumento(documento, {
-    stato: STATI_DOCUMENTO.BOZZA,
-    affissoInBacheca: false,
-    dataPubblicazione: null,
-  });
-}
-
-export function affiggiInBacheca(documento) {
-  if (!documento.titolo.trim()) {
-    throw new Error("Inserire il titolo prima di affiggere il documento.");
-  }
-
-  if (!documento.contenuto.trim()) {
-    throw new Error("Inserire il contenuto prima di affiggere il documento.");
+export function cambiaStatoDocumento(documento, nuovoStato) {
+  if (!STATI_CONSENTITI.includes(nuovoStato)) {
+    throw new Error(`Stato del documento non valido: ${nuovoStato}`);
   }
 
   return aggiornaDocumento(documento, {
-    stato: STATI_DOCUMENTO.IN_ESSERE,
-    affissoInBacheca: true,
-    dataPubblicazione: new Date().toISOString(),
-  });
-}
-
-export function ritiraDallaBacheca(documento) {
-  return aggiornaDocumento(documento, {
-    affissoInBacheca: false,
-  });
-}
-
-export function segnaComeScaduto(documento) {
-  return aggiornaDocumento(documento, {
-    stato: STATI_DOCUMENTO.SCADUTO,
-    affissoInBacheca: false,
+    stato: nuovoStato,
   });
 }
 
 export function documentoScaduto(documento, dataCorrente = new Date()) {
+  if (!documento) {
+    return false;
+  }
+
   if (documento.senzaScadenza || !documento.dataScadenza) {
     return false;
   }
 
-  return new Date(documento.dataScadenza) < dataCorrente;
+  const scadenza = new Date(documento.dataScadenza);
+
+  if (Number.isNaN(scadenza.getTime())) {
+    return false;
+  }
+
+  return scadenza < dataCorrente;
 }
 
-export function azioniDisponibili(documento) {
-  const azioniComuni = [
-    "anteprima",
-    "stampa",
-    "crea_pdf",
-    "invia_email",
-    "condividi_whatsapp",
-  ];
-
-  if (documento.stato === STATI_DOCUMENTO.BOZZA) {
-    return [
-      "salva_bozza",
-      ...azioniComuni,
-      "affiggi_in_bacheca",
-      "elimina",
-    ];
+export function aggiornaStatoPerScadenza(
+  documento,
+  dataCorrente = new Date()
+) {
+  if (!documentoScaduto(documento, dataCorrente)) {
+    return documento;
   }
 
-  if (documento.stato === STATI_DOCUMENTO.IN_ESSERE) {
-    return [
-      "modifica",
-      ...azioniComuni,
-      "ritira_dalla_bacheca",
-      "segna_scaduto",
-    ];
-  }
-
-  return [
-    "visualizza",
-    ...azioniComuni,
-    "duplica",
-    "ripubblica",
-    "elimina",
-  ];
+  return cambiaStatoDocumento(
+    documento,
+    STATI_DOCUMENTO.SCADUTO
+  );
 }
 
 export default creaDocumento;
