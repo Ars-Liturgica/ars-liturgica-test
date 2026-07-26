@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useRef, useState } from "react";
 import "./NuovoAvviso.css";
 
 const categorie = [
@@ -64,7 +64,7 @@ const [firmaAltroNome, setFirmaAltroNome] = useState("");
 const [firmaAltroRuolo, setFirmaAltroRuolo] = useState("");
 
   const [mostraAnteprima, setMostraAnteprima] = useState(false);
-
+const riferimentoPaginaAvviso = useRef(null);
   function cambiaDestinazione(nomeStanza) {
     setDestinazioni((destinazioniAttuali) => {
       if (destinazioniAttuali.includes(nomeStanza)) {
