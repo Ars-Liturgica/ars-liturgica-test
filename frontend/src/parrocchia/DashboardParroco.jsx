@@ -2,7 +2,7 @@ import BachecaAvvisi from "./stanze/BachecaAvvisi/BachecaAvvisi";
 import React, { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient";
 export default function DashboardParroco() {
-  const [nomeParrocchia, setNomeParrocchia] = useState("");
+ const [parrocchia, setParrocchia] = useState(null);
 const [stanzaAperta, setStanzaAperta] = useState(null);
 useEffect(() => {
   async function caricaParrocchia() {
@@ -18,15 +18,15 @@ useEffect(() => {
 
     if (!collegamento) return;
 
-    const { data: parrocchia } = await supabase
-      .from("parrocchie")
-      .select("nome")
-      .eq("id", collegamento.parrocchia_id)
-      .single();
+  const { data: parrocchiaCaricata } = await supabase
+  .from("parrocchie")
+  .select("id, nome")
+  .eq("id", collegamento.parrocchia_id)
+  .single();
 
-    if (parrocchia) {
-      setNomeParrocchia(parrocchia.nome);
-    }
+if (parrocchiaCaricata) {
+  setParrocchia(parrocchiaCaricata);
+}
   }
 
   caricaParrocchia();
@@ -99,12 +99,12 @@ useEffect(() => {
   ];
 if (stanzaAperta === "bacheca-avvisi") {
   return (
-    <BachecaAvvisi nomeParrocchia={nomeParrocchia} />
+   <BachecaAvvisi parrocchia={parrocchia} /> 
   );
 }
   return (
     <div className="dashboard-parroco">
-     <h2>{nomeParrocchia || "Area di Gestione"}</h2>
+     <h2>{parrocchia?.nome || "Area di Gestione"}</h2>
       <p>Strumenti riservati alla gestione della parrocchia.</p>
 
       <div className="griglia-gestione">
