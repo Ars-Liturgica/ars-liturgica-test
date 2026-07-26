@@ -1,6 +1,6 @@
-import React, { useRef, useState } from "react";
+import React, { useMemo, useRef, useState } from "react";
 import "./NuovoAvviso.css";
-
+import { creaDocumento } from "../../motoreDocumentale/Documento";
 const categorie = [
   "Celebrazione",
   "Catechesi",
@@ -65,6 +65,53 @@ const [firmaAltroRuolo, setFirmaAltroRuolo] = useState("");
 
   const [mostraAnteprima, setMostraAnteprima] = useState(false);
 const riferimentoPaginaAvviso = useRef(null);
+parrocchiaId,
+    const documentoAvviso = useMemo(() => {
+      if (!parrocchiaId) {
+  return null;
+}
+  return creaDocumento({
+    tipo: "avviso",
+
+   parrocchiaId,
+
+    titolo,
+    contenuto: testo,
+    firma,
+
+    dataScadenza:
+      tipoScadenza === "nessuna"
+        ? null
+        : dataScadenza || null,
+
+    senzaScadenza:
+      tipoScadenza === "nessuna",
+
+    metadati: {
+      categoria:
+        categoria === "Altro"
+          ? categoriaPersonalizzata
+          : categoria,
+
+      destinatari,
+      destinazioni,
+      priorita,
+     
+    },
+  });
+}, [
+  titolo,
+  testo,
+  firma,
+  tipoScadenza,
+  dataScadenza,
+  categoria,
+  categoriaPersonalizzata,
+  destinatari,
+  destinazioni,
+  priorita,
+  parrocchiaId,
+]);
   function cambiaDestinazione(nomeStanza) {
     setDestinazioni((destinazioniAttuali) => {
       if (destinazioniAttuali.includes(nomeStanza)) {
