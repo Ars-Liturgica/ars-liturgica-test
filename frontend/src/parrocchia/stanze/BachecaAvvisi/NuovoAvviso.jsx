@@ -32,6 +32,7 @@ const stanzeDisponibili = [
 ];
 
 export default function NuovoAvviso({
+  parrocchia,
   nomeParrocchia,
   tornaAllaBacheca,
 }) {
@@ -65,7 +66,7 @@ const [firmaAltroRuolo, setFirmaAltroRuolo] = useState("");
 
   const [mostraAnteprima, setMostraAnteprima] = useState(false);
 const riferimentoPaginaAvviso = useRef(null);
-parrocchiaId,
+const parrocchiaId = parrocchia?.id || null;
     const documentoAvviso = useMemo(() => {
       if (!parrocchiaId) {
   return null;
