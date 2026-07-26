@@ -390,7 +390,15 @@
     overflow-x: auto;
     padding: 12px 0 28px;
 }
-
+.azioni-anteprima-avviso {
+  width: 100%;
+  margin-top: 24px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
 .pagina-avviso {
   position: relative;
   isolation: isolate;
