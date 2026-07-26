@@ -192,26 +192,26 @@ export default function MotoreDocumentale({
     );
   }
 
-  async function stampaDocumento() {
-    await eseguiAzione(
-      AZIONI_DOCUMENTO.STAMPA,
-      async () => {
-        controllaDocumentoPerPubblicazione(
-          documento
-        );
+ async function stampaDocumento() {
+  await eseguiAzione(
+    AZIONI_DOCUMENTO.STAMPA,
+    async () => {
+      controllaDocumentoPerPubblicazione(
+        documento
+      );
 
-        if (typeof onStampa === "function") {
-          await onStampa(documento);
-        } else {
-          window.print();
-        }
-
-        setMessaggio(
-          "Documento inviato alla stampa."
-        );
+      if (typeof onStampa !== "function") {
+        azioneNonConfigurata("Stampa");
       }
-    );
-  }
+
+      await onStampa(documento);
+
+      setMessaggio(
+        "Documento preparato per la stampa."
+      );
+    }
+  );
+}
 
   async function creaPdf() {
     await eseguiAzione(
