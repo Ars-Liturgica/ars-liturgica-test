@@ -686,7 +686,10 @@ const riferimentoPaginaAvviso = useRef(null);
       {mostraAnteprima && (
   <aside className="anteprima-avviso">
     <div className="documento-avviso">
-      <article className="pagina-avviso">
+      <article
+  ref={riferimentoPaginaAvviso}
+  className="pagina-avviso"
+>
        
 
         <div className="pagina-contenuto">
