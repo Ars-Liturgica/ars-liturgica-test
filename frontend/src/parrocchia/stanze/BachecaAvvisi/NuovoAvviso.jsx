@@ -1,6 +1,7 @@
 import React, { useMemo, useRef, useState } from "react";
 import "./NuovoAvviso.css";
 import { creaDocumento } from "../../motoreDocumentale/Documento";
+
 const categorie = [
   "Celebrazione",
   "Catechesi",
