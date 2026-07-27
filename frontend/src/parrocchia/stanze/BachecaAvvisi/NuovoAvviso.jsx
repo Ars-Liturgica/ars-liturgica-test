@@ -1,7 +1,10 @@
 import React, { useMemo, useRef, useState } from "react";
 import "./NuovoAvviso.css";
 import { creaDocumento } from "../../motoreDocumentale/Documento";
-
+import {
+  preparaStampaDocumento,
+  scaricaPdfDocumento,
+} from "../../motoreDocumentale/MotoreDocumentale";
 const categorie = [
   "Celebrazione",
   "Catechesi",
@@ -153,7 +156,69 @@ const parrocchiaId = parrocchia?.id || null;
   }
 
 
+async function ottieniPaginaAvviso() {
+  if (riferimentoPaginaAvviso.current) {
+    return riferimentoPaginaAvviso.current;
+  }
 
+  setMostraAnteprima(true);
+
+  await new Promise((resolve) => {
+    requestAnimationFrame(() => {
+      requestAnimationFrame(resolve);
+    });
+  });
+
+  if (!riferimentoPaginaAvviso.current) {
+    throw new Error(
+      "Non è stato possibile preparare la pagina A4."
+    );
+  }
+
+  return riferimentoPaginaAvviso.current;
+}
+
+async function gestisciStampaDalMotore() {
+  try {
+    const elementoDom = await ottieniPaginaAvviso();
+
+    await preparaStampaDocumento({
+      documento: documentoAvviso,
+      elementoDom,
+    });
+  } catch (error) {
+    console.error(
+      "Errore durante la preparazione della stampa:",
+      error
+    );
+
+    window.alert(
+      error?.message ||
+        "Non è stato possibile preparare la stampa."
+    );
+  }
+}
+
+async function gestisciPdfDalMotore() {
+  try {
+    const elementoDom = await ottieniPaginaAvviso();
+
+    await scaricaPdfDocumento({
+      documento: documentoAvviso,
+      elementoDom,
+    });
+  } catch (error) {
+    console.error(
+      "Errore durante la creazione del PDF:",
+      error
+    );
+
+    window.alert(
+      error?.message ||
+        "Non è stato possibile creare il PDF."
+    );
+  }
+}
 
 
   return (
@@ -707,22 +772,14 @@ const parrocchiaId = parrocchia?.id || null;
 <button
   type="button"
   className="btn-stampa-avviso"
-  onClick={() =>
-    window.alert(
-      "La funzione Stampa verrà collegata al Motore Documentale."
-    )
-  }
+  onClick={gestisciStampaDalMotore}
 >
   Stampa
 </button>
             <button
   type="button"
   className="btn-pdf-avviso"
-  onClick={() =>
-    window.alert(
-      "La funzione PDF verrà collegata al Motore Documentale."
-    )
-  }
+onClick={gestisciPdfDalMotore}
 >
   PDF
 </button>
@@ -947,11 +1004,7 @@ const parrocchiaId = parrocchia?.id || null;
 <button
   type="button"
   className="btn-stampa-avviso"
-  onClick={() =>
-    window.alert(
-      "La funzione Stampa verrà collegata al Motore Documentale."
-    )
-  }
+onClick={gestisciStampaDalMotore}
 >
   Stampa
 </button>
@@ -959,11 +1012,7 @@ const parrocchiaId = parrocchia?.id || null;
 <button
   type="button"
   className="btn-pdf-avviso"
-  onClick={() =>
-    window.alert(
-      "La funzione PDF verrà collegata al Motore Documentale."
-    )
-  }
+  onClick={gestisciPdfDalMotore}
 >
   PDF
 </button>
