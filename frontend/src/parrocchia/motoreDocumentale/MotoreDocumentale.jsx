@@ -1,11 +1,137 @@
 import React, { useMemo, useState } from "react";
-
+import html2pdf from "html2pdf.js";
 import {
   STATI_DOCUMENTO,
   aggiornaDocumento,
   cambiaStatoDocumento,
 } from "./Documento";
+function pulisciNomeFile(testo = "documento") {
+  return testo
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "") || "documento";
+}
 
+function creaNomeFilePdf(documento) {
+  const titolo = pulisciNomeFile(documento?.titolo);
+  const data = new Date().toISOString().split("T")[0];
+
+  return `${titolo}-${data}.pdf`;
+}
+
+function controllaElementoDocumento(elementoDom) {
+  if (!(elementoDom instanceof HTMLElement)) {
+    throw new Error(
+      "La pagina grafica del documento non è disponibile."
+    );
+  }
+}
+
+function opzioniPdf(documento) {
+  return {
+    margin: 0,
+
+    filename: creaNomeFilePdf(documento),
+
+    image: {
+      type: "jpeg",
+      quality: 0.98,
+    },
+
+    html2canvas: {
+      scale: 2,
+      useCORS: true,
+      logging: false,
+      backgroundColor: null,
+    },
+
+    jsPDF: {
+      unit: "mm",
+      format: "a4",
+      orientation: "portrait",
+    },
+  };
+}
+
+export async function generaPdfDocumento({
+  documento,
+  elementoDom,
+}) {
+  controllaDocumentoPerPubblicazione(documento);
+  controllaElementoDocumento(elementoDom);
+
+  const lavorazione = html2pdf()
+    .set(opzioniPdf(documento))
+    .from(elementoDom)
+    .toPdf();
+
+  const pdf = await lavorazione.get("pdf");
+  const blob = pdf.output("blob");
+
+  return {
+    blob,
+    nomeFile: creaNomeFilePdf(documento),
+  };
+}
+
+export async function scaricaPdfDocumento({
+  documento,
+  elementoDom,
+}) {
+  controllaDocumentoPerPubblicazione(documento);
+  controllaElementoDocumento(elementoDom);
+
+  await html2pdf()
+    .set(opzioniPdf(documento))
+    .from(elementoDom)
+    .save();
+}
+
+export async function preparaStampaDocumento({
+  documento,
+  elementoDom,
+}) {
+  const finestraPdf = window.open("", "_blank");
+
+  if (!finestraPdf) {
+    throw new Error(
+      "Il browser ha bloccato l'apertura del PDF. Consenti l'apertura delle finestre per Ars Liturgica."
+    );
+  }
+
+  try {
+    finestraPdf.document.write(`
+      <!doctype html>
+      <html lang="it">
+        <head>
+          <title>Preparazione del documento</title>
+        </head>
+        <body style="font-family: Arial, sans-serif; padding: 30px;">
+          Preparazione del PDF in corso...
+        </body>
+      </html>
+    `);
+
+    const { blob } = await generaPdfDocumento({
+      documento,
+      elementoDom,
+    });
+
+    const urlPdf = URL.createObjectURL(blob);
+
+    finestraPdf.location.replace(urlPdf);
+
+    window.setTimeout(() => {
+      URL.revokeObjectURL(urlPdf);
+    }, 60000);
+  } catch (error) {
+    finestraPdf.close();
+    throw error;
+  }
+}
 /*
 =========================================================
 MOTORE DOCUMENTALE
