@@ -846,14 +846,21 @@ background: rgba(255, 255, 252, 0.42);
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }
-  .pagina-avviso,
-.pagina-contenuto,
-.foglio-corpo,
-.foglio-testo,
-.foglio-allegato,
-.foglio-intestazione,
-.foglio-piede {
-  background: #ffffff !important;
+ .pagina-avviso,
+.pagina-avviso *,
+.pagina-avviso::before,
+.pagina-avviso::after,
+.pagina-avviso *::before,
+.pagina-avviso *::after {
+  background: transparent !important;
+  background-color: transparent !important;
   background-image: none !important;
+}
+
+html,
+body,
+.documento-avviso,
+.pagina-avviso {
+  background: #ffffff !important;
 }
 }
