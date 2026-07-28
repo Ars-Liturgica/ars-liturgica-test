@@ -90,47 +90,92 @@ export async function scaricaPdfDocumento({
     .save();
 }
 
+
 export async function preparaStampaDocumento({
   documento,
   elementoDom,
 }) {
-  const finestraPdf = window.open("", "_blank");
+  controllaDocumentoPerPubblicazione(documento);
+  controllaElementoDocumento(elementoDom);
 
-  if (!finestraPdf) {
+  const finestraStampa = window.open("", "_blank");
+
+  if (!finestraStampa) {
     throw new Error(
-      "Il browser ha bloccato l'apertura del PDF. Consenti l'apertura delle finestre per Ars Liturgica."
+      "Il browser ha bloccato la finestra di stampa. Consenti l'apertura delle finestre per Ars Liturgica."
     );
   }
 
-  try {
-    finestraPdf.document.write(`
-      <!doctype html>
-      <html lang="it">
-        <head>
-          <title>Preparazione del documento</title>
-        </head>
-        <body style="font-family: Arial, sans-serif; padding: 30px;">
-          Preparazione del PDF in corso...
-        </body>
-      </html>
-    `);
+  const stiliPagina = Array.from(
+    document.querySelectorAll(
+      'link[rel="stylesheet"], style'
+    )
+  )
+    .map((elemento) => {
+      if (
+        elemento.tagName === "LINK" &&
+        elemento.href
+      ) {
+        return `<link rel="stylesheet" href="${elemento.href}">`;
+      }
 
-    const { blob } = await generaPdfDocumento({
-      documento,
-      elementoDom,
-    });
+      return elemento.outerHTML;
+    })
+    .join("\n");
 
-    const urlPdf = URL.createObjectURL(blob);
+  finestraStampa.document.open();
 
-    finestraPdf.location.replace(urlPdf);
+  finestraStampa.document.write(`
+    <!doctype html>
+    <html lang="it">
+      <head>
+        <meta charset="UTF-8" />
+        <title>${documento.titolo}</title>
 
-    window.setTimeout(() => {
-      URL.revokeObjectURL(urlPdf);
-    }, 60000);
-  } catch (error) {
-    finestraPdf.close();
-    throw error;
-  }
+        ${stiliPagina}
+
+        <style>
+          html,
+          body {
+            margin: 0;
+            padding: 0;
+          }
+
+          body {
+            display: flex;
+            justify-content: center;
+          }
+        </style>
+      </head>
+
+      <body>
+        ${elementoDom.outerHTML}
+      </body>
+    </html>
+  `);
+
+  finestraStampa.document.close();
+
+  finestraStampa.addEventListener(
+    "afterprint",
+    () => {
+      finestraStampa.close();
+    },
+    { once: true }
+  );
+
+  finestraStampa.addEventListener(
+    "load",
+    async () => {
+      if (finestraStampa.document.fonts?.ready) {
+        await finestraStampa.document.fonts.ready;
+      }
+
+      finestraStampa.focus();
+      finestraStampa.print();
+    },
+    { once: true }
+  );
 }
 /*
 =========================================================
