@@ -828,18 +828,17 @@ background: rgba(255, 255, 252, 0.42);
     margin: 0;
     padding: 14px;
     overflow: hidden;
-    border: 2px solid #d6a23a;
+  border: 3px solid #9a650f;
     border-radius: 0;
     box-shadow: none;
-    background: linear-gradient(
-      135deg,
-      #fff6df 0%,
-      #f8e8c5 100%
-    ) !important;
+ background: #ffffff !important;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }
-
+.pagina-contenuto {
+  border: 2px solid #b78020;
+  background: #ffffff !important;
+}
   .pagina-contenuto,
   .foglio-simbolo-chiesa svg,
   .foglio-separatore span,
