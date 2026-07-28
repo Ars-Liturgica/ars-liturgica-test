@@ -808,23 +808,10 @@ background: rgba(255, 255, 252, 0.42);
   }
 
   body * {
-    visibility: hidden;
-  }
+  visibility: visible;
+}
 
-  .anteprima-avviso,
-  .anteprima-avviso * {
-    visibility: visible;
-  }
 
-  .anteprima-avviso {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 210mm;
-    height: 297mm;
-    margin: 0;
-    padding: 0;
-  }
 
   .documento-avviso {
     width: 210mm;
