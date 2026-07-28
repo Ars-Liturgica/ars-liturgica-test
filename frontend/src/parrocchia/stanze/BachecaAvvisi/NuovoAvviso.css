@@ -846,4 +846,14 @@ background: rgba(255, 255, 252, 0.42);
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }
+  .pagina-avviso,
+.pagina-contenuto,
+.foglio-corpo,
+.foglio-testo,
+.foglio-allegato,
+.foglio-intestazione,
+.foglio-piede {
+  background: #ffffff !important;
+  background-image: none !important;
+}
 }
