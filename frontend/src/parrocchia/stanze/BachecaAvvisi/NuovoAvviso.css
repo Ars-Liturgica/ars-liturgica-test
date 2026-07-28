@@ -836,7 +836,7 @@ background: rgba(255, 255, 252, 0.42);
     -webkit-print-color-adjust: exact;
   }
 .pagina-contenuto {
-  border: 2px solid #b78020;
+  border: 4px double #7a4a00 !important;
   background: #ffffff !important;
 }
   .pagina-contenuto,
