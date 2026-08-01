@@ -1,9 +1,15 @@
 import React, { useMemo, useRef, useState } from "react";
 import "./NuovoAvviso.css";
-import { creaDocumento } from "../../motoreDocumentale/Documento";
+import {
+  creaDocumento,
+  aggiornaDocumento,
+  STATI_DOCUMENTO,
+} from "../../motoreDocumentale/Documento";
+
 import {
   preparaStampaDocumento,
   scaricaPdfDocumento,
+  salvaDocumentoInArchivio,
 } from "../../motoreDocumentale/MotoreDocumentale";
 const categorie = [
   "Celebrazione",
@@ -69,15 +75,17 @@ const [firmaAltroNome, setFirmaAltroNome] = useState("");
 const [firmaAltroRuolo, setFirmaAltroRuolo] = useState("");
 
   const [mostraAnteprima, setMostraAnteprima] = useState(false);
+  const [documentoSalvatoId, setDocumentoSalvatoId] =
+  useState(null);
 const riferimentoPaginaAvviso = useRef(null);
 const parrocchiaId = parrocchia?.id || null;
     const documentoAvviso = useMemo(() => {
       if (!parrocchiaId) {
   return null;
 }
-  return creaDocumento({
-    tipo: "avviso",
-
+return creaDocumento({
+  id: documentoSalvatoId,
+  tipo: "avviso",
    parrocchiaId,
 
     titolo,
@@ -114,8 +122,9 @@ const parrocchiaId = parrocchia?.id || null;
   categoriaPersonalizzata,
   destinatari,
   destinazioni,
-  priorita,
+   priorita,
   parrocchiaId,
+  documentoSalvatoId,
 ]);
   function cambiaDestinazione(nomeStanza) {
     setDestinazioni((destinazioniAttuali) => {
@@ -149,11 +158,40 @@ const parrocchiaId = parrocchia?.id || null;
     );
   }
 
-  function salvaBozza() {
+ async function salvaBozza() {
+  try {
+    const documentoBozza = aggiornaDocumento(
+      documentoAvviso,
+      {
+        stato: STATI_DOCUMENTO.BOZZA,
+        dataPubblicazione: null,
+      }
+    );
+
+    const documentoSalvato =
+      await salvaDocumentoInArchivio(
+        documentoBozza
+      );
+
+    setDocumentoSalvatoId(
+      documentoSalvato.id
+    );
+
     window.alert(
-      "La funzione Salva bozza verrà collegata al database."
+      "Bozza salvata correttamente."
+    );
+  } catch (error) {
+    console.error(
+      "Errore durante il salvataggio della bozza:",
+      error
+    );
+
+    window.alert(
+      error?.message ||
+        "Non è stato possibile salvare la bozza."
     );
   }
+}
 
 
 async function ottieniPaginaAvviso() {
