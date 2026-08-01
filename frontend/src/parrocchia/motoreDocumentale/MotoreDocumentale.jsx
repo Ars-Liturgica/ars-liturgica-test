@@ -1,10 +1,108 @@
 import React, { useMemo, useState } from "react";
 import html2pdf from "html2pdf.js";
+import { supabase } from "../../supabaseClient";
 import {
   STATI_DOCUMENTO,
   aggiornaDocumento,
   cambiaStatoDocumento,
 } from "./Documento";
+
+function preparaRecordDocumento(documento) {
+  if (!documento) {
+    throw new Error(
+      "Nessun documento disponibile per il salvataggio."
+    );
+  }
+
+  const metadati = documento.metadati || {};
+
+  const stanzaOrigine =
+    metadati.stanzaOrigine ||
+    (documento.tipo === "avviso"
+      ? "bacheca_avvisi"
+      : documento.tipo);
+
+  return {
+    parrocchia_id: documento.parrocchiaId,
+    tipo: documento.tipo,
+    stanza_origine: stanzaOrigine,
+
+    titolo: documento.titolo || "",
+    contenuto: documento.contenuto || "",
+    stato: documento.stato,
+
+    categoria: metadati.categoria || null,
+
+    firma_tipo: documento.firma || null,
+    firma_nome: metadati.firmaNome || null,
+    firma_ruolo: metadati.firmaRuolo || null,
+
+    destinatari:
+      metadati.destinatari || "tutti",
+
+    destinazioni: Array.isArray(
+      metadati.destinazioni
+    )
+      ? metadati.destinazioni
+      : [],
+
+    priorita: metadati.priorita || "normale",
+
+    data_pubblicazione:
+      documento.dataPubblicazione || null,
+
+    data_scadenza:
+      documento.dataScadenza || null,
+
+    senza_scadenza:
+      Boolean(documento.senzaScadenza),
+
+    azione_scadenza:
+      metadati.azioneScadenza || "archivia",
+
+    metadati,
+  };
+}
+
+export async function salvaDocumentoInArchivio(
+  documento
+) {
+  const record = preparaRecordDocumento(documento);
+
+  let risultato;
+
+  if (documento.id) {
+    risultato = await supabase
+      .from("documenti")
+      .update(record)
+      .eq("id", documento.id)
+      .select()
+      .single();
+  } else {
+    risultato = await supabase
+      .from("documenti")
+      .insert(record)
+      .select()
+      .single();
+  }
+
+  const { data, error } = risultato;
+
+  if (error) {
+    throw new Error(
+      `Errore nel salvataggio del documento: ${error.message}`
+    );
+  }
+
+  return {
+    ...documento,
+    id: data.id,
+    dataCreazione: data.created_at,
+    dataAggiornamento: data.updated_at,
+    dataPubblicazione: data.data_pubblicazione,
+    dataScadenza: data.data_scadenza,
+  };
+}
 function pulisciNomeFile(testo = "documento") {
   return testo
     .trim()
