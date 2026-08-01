@@ -790,6 +790,15 @@ background: rgba(255, 255, 252, 0.42);
   }
 }
 
+.pagina-avviso,
+.pagina-avviso *,
+.pagina-avviso::before,
+.pagina-avviso::after,
+.pagina-avviso *::before,
+.pagina-avviso *::after {
+  box-sizing: border-box;
+}
+
 @media print {
   @page {
     size: A4 portrait;
@@ -804,14 +813,8 @@ background: rgba(255, 255, 252, 0.42);
     min-height: 297mm;
     margin: 0 !important;
     padding: 0 !important;
-    background: #ffffff !important;
+    background: transparent !important;
   }
-
-  body * {
-  visibility: visible;
-}
-
-
 
   .documento-avviso {
     width: 210mm;
@@ -820,6 +823,7 @@ background: rgba(255, 255, 252, 0.42);
     padding: 0;
     display: block;
     overflow: hidden;
+    background: transparent !important;
   }
 
   .pagina-avviso {
@@ -828,17 +832,26 @@ background: rgba(255, 255, 252, 0.42);
     margin: 0;
     padding: 14px;
     overflow: hidden;
-  border: 3px solid #9a650f;
+    border: 3px solid #9a650f;
     border-radius: 0;
     box-shadow: none;
- background: #ffffff !important;
+    background: transparent !important;
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }
-.pagina-contenuto {
-  border: 4px double #7a4a00 !important;
-  background: #ffffff !important;
-}
+
+  .pagina-contenuto {
+    width: 100%;
+    height: 100%;
+    border: 4px double #7a4a00 !important;
+    background: transparent !important;
+  }
+
+  .foglio-testo,
+  .foglio-allegato {
+    background: transparent !important;
+  }
+
   .pagina-contenuto,
   .foglio-simbolo-chiesa svg,
   .foglio-separatore span,
@@ -846,21 +859,4 @@ background: rgba(255, 255, 252, 0.42);
     print-color-adjust: exact;
     -webkit-print-color-adjust: exact;
   }
- .pagina-avviso,
-.pagina-avviso *,
-.pagina-avviso::before,
-.pagina-avviso::after,
-.pagina-avviso *::before,
-.pagina-avviso *::after {
-  background: transparent !important;
-  background-color: transparent !important;
-  background-image: none !important;
-}
-
-html,
-body,
-.documento-avviso,
-.pagina-avviso {
-  background: #ffffff !important;
-}
 }
