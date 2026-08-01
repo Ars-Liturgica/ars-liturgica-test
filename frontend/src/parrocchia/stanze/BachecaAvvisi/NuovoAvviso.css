@@ -847,10 +847,15 @@ background: rgba(255, 255, 252, 0.42);
     background: transparent !important;
   }
 
-  .foglio-testo,
-  .foglio-allegato {
-    background: transparent !important;
-  }
+  .foglio-testo {
+  background: transparent !important;
+  border: 3px double #7a4a00 !important;
+  border-radius: 10px;
+}
+
+.foglio-allegato {
+  background: transparent !important;
+}
 
   .pagina-contenuto,
   .foglio-simbolo-chiesa svg,
