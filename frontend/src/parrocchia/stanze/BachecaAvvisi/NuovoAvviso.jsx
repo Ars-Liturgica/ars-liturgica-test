@@ -101,21 +101,36 @@ return creaDocumento({
       tipoScadenza === "nessuna",
 
     metadati: {
-      categoria:
-        categoria === "Altro"
-          ? categoriaPersonalizzata
-          : categoria,
+  stanzaOrigine: "bacheca_avvisi",
 
-      destinatari,
-      destinazioni,
-      priorita,
-     
-    },
+  categoria:
+    categoria === "Altro"
+      ? categoriaPersonalizzata
+      : categoria,
+
+  destinatari,
+  destinazioni,
+  priorita,
+  azioneScadenza,
+
+  firmaNome:
+    firma === "altro"
+      ? firmaAltroNome.trim() || null
+      : null,
+
+  firmaRuolo:
+    firma === "altro"
+      ? firmaAltroRuolo.trim() || null
+      : null,
+},
   });
 }, [
   titolo,
   testo,
   firma,
+      firmaAltroNome,
+firmaAltroRuolo,
+azioneScadenza,
   tipoScadenza,
   dataScadenza,
   categoria,
