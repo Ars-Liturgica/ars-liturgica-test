@@ -472,3 +472,22 @@
     text-align: left;
   }
 }
+.testo-avviso-bacheca,
+.testo-avviso-bacheca p {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+@media (min-width: 701px) {
+  .elenco-avvisi {
+    grid-template-columns: repeat(
+      auto-fit,
+      minmax(280px, 310px)
+    );
+    justify-content: center;
+  }
+
+  .foglio-avviso-pubblicato {
+    max-width: 310px;
+  }
+}
