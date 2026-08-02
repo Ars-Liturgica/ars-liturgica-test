@@ -153,26 +153,74 @@ azioneScadenza,
     });
   }
 
-  function gestisciPubblicazione() {
-    if (!titolo.trim() || !testo.trim()) {
-      window.alert(
-        "Inserisci almeno il titolo e il testo dell’avviso."
-      );
-      return;
-    }
-
-    if (destinazioni.length === 0) {
-      window.alert(
-        "Seleziona almeno una destinazione per l’avviso."
-      );
-      return;
-    }
-
+async function gestisciPubblicazione() {
+  if (!titolo.trim() || !testo.trim()) {
     window.alert(
-      "La struttura dell’avviso è pronta. Nel prossimo passaggio collegheremo il salvataggio a Supabase."
+      "Inserisci almeno il titolo e il testo dell’avviso."
     );
+    return;
   }
 
+  if (destinazioni.length === 0) {
+    window.alert(
+      "Seleziona almeno una destinazione per l’avviso."
+    );
+    return;
+  }
+
+  if (
+    pubblicazione === "programmata" &&
+    !dataPubblicazione
+  ) {
+    window.alert(
+      "Inserisci la data di pubblicazione dell’avviso."
+    );
+    return;
+  }
+
+  try {
+    const dataEffettivaPubblicazione =
+      pubblicazione === "subito"
+        ? new Date().toISOString()
+        : new Date(
+            `${dataPubblicazione}T${
+              oraPubblicazione || "00:00"
+            }:00`
+          ).toISOString();
+
+    const documentoDaPubblicare =
+      aggiornaDocumento(documentoAvviso, {
+        stato: STATI_DOCUMENTO.IN_ESSERE,
+        dataPubblicazione:
+          dataEffettivaPubblicazione,
+      });
+
+    const documentoSalvato =
+      await salvaDocumentoInArchivio(
+        documentoDaPubblicare
+      );
+
+    setDocumentoSalvatoId(
+      documentoSalvato.id
+    );
+
+    window.alert(
+      pubblicazione === "subito"
+        ? "Avviso pubblicato correttamente."
+        : "Pubblicazione dell’avviso programmata correttamente."
+    );
+  } catch (error) {
+    console.error(
+      "Errore durante la pubblicazione dell’avviso:",
+      error
+    );
+
+    window.alert(
+      error?.message ||
+        "Non è stato possibile pubblicare l’avviso."
+    );
+  }
+}
  async function salvaBozza() {
   try {
     const documentoBozza = aggiornaDocumento(
