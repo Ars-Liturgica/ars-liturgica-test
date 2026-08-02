@@ -103,6 +103,69 @@ export async function salvaDocumentoInArchivio(
     dataScadenza: data.data_scadenza,
   };
 }
+export async function leggiDocumentiInArchivio({
+  parrocchiaId,
+  tipo = null,
+  stato = null,
+  destinazione = null,
+  pubblicatiFinoA = null,
+} = {}) {
+  if (!parrocchiaId) {
+    throw new Error(
+      "La parrocchia non è disponibile."
+    );
+  }
+
+  let richiesta = supabase
+    .from("documenti")
+    .select("*")
+    .eq("parrocchia_id", parrocchiaId);
+
+  if (tipo) {
+    richiesta = richiesta.eq(
+      "tipo",
+      tipo
+    );
+  }
+
+  if (stato) {
+    richiesta = richiesta.eq(
+      "stato",
+      stato
+    );
+  }
+
+  if (destinazione) {
+    richiesta = richiesta.contains(
+      "destinazioni",
+      [destinazione]
+    );
+  }
+
+  if (pubblicatiFinoA) {
+    richiesta = richiesta.lte(
+      "data_pubblicazione",
+      pubblicatiFinoA
+    );
+  }
+
+  const { data, error } = await richiesta
+    .order("data_pubblicazione", {
+      ascending: false,
+      nullsFirst: false,
+    })
+    .order("created_at", {
+      ascending: false,
+    });
+
+  if (error) {
+    throw new Error(
+      `Errore nella lettura dei documenti: ${error.message}`
+    );
+  }
+
+  return data || [];
+}
 function pulisciNomeFile(testo = "documento") {
   return testo
     .trim()
