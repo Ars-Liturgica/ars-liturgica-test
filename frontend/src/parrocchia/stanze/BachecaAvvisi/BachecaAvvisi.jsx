@@ -47,6 +47,8 @@ export default function BachecaAvvisi({
   ] = useState(false);
 
   const [avvisi, setAvvisi] = useState([]);
+  const [avvisoAperto, setAvvisoAperto] =
+  useState(null);
   const [caricamento, setCaricamento] =
     useState(true);
   const [errore, setErrore] = useState("");
@@ -236,61 +238,118 @@ export default function BachecaAvvisi({
                 avvisi.length > 0 && (
                   <div className="elenco-avvisi">
                     {avvisi.map((avviso) => (
-                      <article
-                        key={avviso.id}
-                        className={`foglio-avviso foglio-avviso-pubblicato priorita-${
-                          avviso.priorita ||
-                          "normale"
-                        }`}
-                      >
-                        <div
-                          className="puntina puntina-avviso"
-                          aria-hidden="true"
-                        />
+  <article
+    key={avviso.id}
+    className={`foglio-avviso foglio-avviso-pubblicato priorita-${
+      avviso.priorita || "normale"
+    }`}
+    role="button"
+    tabIndex={0}
+    aria-label={`Apri l'avviso ${avviso.titolo}`}
+    onClick={() =>
+      setAvvisoAperto(avviso)
+    }
+    onKeyDown={(event) => {
+      if (
+        event.key === "Enter" ||
+        event.key === " "
+      ) {
+        event.preventDefault();
+        setAvvisoAperto(avviso);
+      }
+    }}
+  >
+    <div
+      className="puntina puntina-avviso"
+      aria-hidden="true"
+    />
 
-                        {avviso.categoria && (
-                          <p className="categoria-avviso-bacheca">
-                            {avviso.categoria}
-                          </p>
-                        )}
+    {avviso.categoria && (
+      <p className="categoria-avviso-bacheca">
+        {avviso.categoria}
+      </p>
+    )}
 
-                        <h2>{avviso.titolo}</h2>
+    <h2>{avviso.titolo}</h2>
 
-                        <div className="testo-avviso-bacheca">
-                          {avviso.contenuto
-                            .split("\n")
-                            .map(
-                              (
-                                riga,
-                                indice
-                              ) => (
-                                <p key={indice}>
-                                  {riga ||
-                                    "\u00A0"}
-                                </p>
-                              )
-                            )}
-                        </div>
+    <footer className="dati-avviso-bacheca">
+      <span>
+        {formattaData(
+          avviso.data_pubblicazione
+        )}
+      </span>
 
-                        <footer className="dati-avviso-bacheca">
-                          <span>
-                            {formattaData(
-                              avviso.data_pubblicazione
-                            )}
-                          </span>
-
-                          <strong>
-                            {formattaFirma(avviso)}
-                          </strong>
-                        </footer>
-                      </article>
-                    ))}
+      <strong>Apri avviso</strong>
+    </footer>
+  </article>
+))}
                   </div>
                 )}
             </div>
           </div>
         </div>
       </section>
+            {avvisoAperto && (
+        <div
+          className="sfondo-dettaglio-avviso"
+          onClick={() =>
+            setAvvisoAperto(null)
+          }
+        >
+          <section
+            className="dettaglio-avviso"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="titolo-avviso-aperto"
+            onClick={(event) =>
+              event.stopPropagation()
+            }
+          >
+            <button
+              type="button"
+              className="btn-chiudi-avviso"
+              aria-label="Chiudi avviso"
+              onClick={() =>
+                setAvvisoAperto(null)
+              }
+            >
+              ×
+            </button>
+
+            {avvisoAperto.categoria && (
+              <p className="categoria-avviso-bacheca">
+                {avvisoAperto.categoria}
+              </p>
+            )}
+
+            <h2 id="titolo-avviso-aperto">
+              {avvisoAperto.titolo}
+            </h2>
+
+            <div className="testo-avviso-bacheca">
+              {(avvisoAperto.contenuto || "")
+                .split("\n")
+                .map((riga, indice) => (
+                  <p key={indice}>
+                    {riga || "\u00A0"}
+                  </p>
+                ))}
+            </div>
+
+            <footer className="dati-avviso-bacheca">
+              <span>
+                {formattaData(
+                  avvisoAperto.data_pubblicazione
+                )}
+              </span>
+
+              <strong>
+                {formattaFirma(avvisoAperto)}
+              </strong>
+            </footer>
+          </section>
+        </div>
+      )}
     </div>
   );
 }
