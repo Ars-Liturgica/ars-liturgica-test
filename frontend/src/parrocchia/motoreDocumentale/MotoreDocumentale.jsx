@@ -166,6 +166,32 @@ export async function leggiDocumentiInArchivio({
 
   return data || [];
 }
+export async function eliminaDocumentoDaArchivio({
+  documentoId,
+  parrocchiaId,
+}) {
+  if (!documentoId) {
+    throw new Error("Il documento da eliminare non è disponibile.");
+  }
+
+  if (!parrocchiaId) {
+    throw new Error("La parrocchia non è disponibile.");
+  }
+
+  const { error } = await supabase
+    .from("documenti")
+    .delete()
+    .eq("id", documentoId)
+    .eq("parrocchia_id", parrocchiaId);
+
+  if (error) {
+    throw new Error(
+      `Errore durante l'eliminazione del documento: ${error.message}`
+    );
+  }
+
+  return true;
+}
 function pulisciNomeFile(testo = "documento") {
   return testo
     .trim()
