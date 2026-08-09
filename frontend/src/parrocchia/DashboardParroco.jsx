@@ -1,4 +1,5 @@
 import BachecaAvvisi from "./stanze/BachecaAvvisi/BachecaAvvisi";
+import ArchivioDocumenti from "./stanze/ArchivioDocumenti/ArchivioDocumenti";
 import React, { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient";
 export default function DashboardParroco() {
@@ -74,6 +75,7 @@ if (parrocchiaCaricata) {
 ),
       titolo: "Documenti",
       descrizione: "Archivio, modulistica, verbali e materiali utili.",
+     stanza: "archivio-documenti",
     },
     {
       icona: (
@@ -102,11 +104,16 @@ if (stanzaAperta === "bacheca-avvisi") {
    <BachecaAvvisi parrocchia={parrocchia} /> 
   );
 }
+ if (stanzaAperta === "archivio-documenti") {
+  return (
+    <ArchivioDocumenti parrocchia={parrocchia} />
+  );
+}
   return (
     <div className="dashboard-parroco">
      <h2>{parrocchia?.nome || "Area di Gestione"}</h2>
       <p>Strumenti riservati alla gestione della parrocchia.</p>
-
+     
       <div className="griglia-gestione">
         {sezioniGestione.map((sezione) => (
           <button
