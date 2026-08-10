@@ -106,7 +106,10 @@ if (stanzaAperta === "bacheca-avvisi") {
 }
  if (stanzaAperta === "archivio-documenti") {
   return (
-    <ArchivioDocumenti parrocchia={parrocchia} />
+    <ArchivioDocumenti
+      parrocchiaId={parrocchia?.id}
+      tornaDashboard={() => setStanzaAperta(null)}
+    />
   );
 }
   return (
