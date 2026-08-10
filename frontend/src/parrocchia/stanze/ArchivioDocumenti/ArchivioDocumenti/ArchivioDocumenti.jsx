@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   eliminaDocumentoDaArchivio,
   leggiDocumentiInArchivio,
-} from "../../motoreDocumentale/MotoreDocumentale";
+} from "../../../motoreDocumentale/MotoreDocumentale";
 
 import "./ArchivioDocumenti.css";
 
