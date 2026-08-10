@@ -1,5 +1,5 @@
 import BachecaAvvisi from "./stanze/BachecaAvvisi/BachecaAvvisi";
-import ArchivioDocumenti from "./stanze/ArchivioDocumenti/ArchivioDocumenti";
+import ArchivioDocumenti from "./stanze/ArchivioDocumenti/ArchivioDocumenti/ArchivioDocumenti";
 import React, { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient";
 export default function DashboardParroco() {
