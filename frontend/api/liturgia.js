@@ -1,41 +1,47 @@
 export default async function handler(req, res) {
-  const { data } = req.query;
-
-  const giorno =
-    data || new Date().toISOString().slice(0, 10).replaceAll("-", "");
-
-  const url = `https://www.chiesacattolica.it/la-liturgia-del-giorno/?data-liturgia=${giorno}`;
-
   try {
+    const oggi = new Date();
+
+    const anno =
+      req.query.anno ||
+      oggi.toLocaleDateString("en-CA", {
+        timeZone: "Europe/Rome",
+        year: "numeric",
+      });
+
+    const url =
+      `https://litcal.johnromanodorazio.com:443/api/v5/calendar/roman/nation/IT/${anno}` +
+      `?locale=it_IT`;
+
     const risposta = await fetch(url, {
       headers: {
-        "User-Agent": "Ars Liturgica App",
+        Accept: "application/json",
+        "User-Agent": "Ars Liturgica",
       },
     });
 
     if (!risposta.ok) {
-      return res.status(500).json({
+      return res.status(502).json({
         errore: true,
-        messaggio: "Fonte CEI non raggiungibile",
-        link: url,
+        messaggio: "Calendario liturgico non raggiungibile",
+        statusFonte: risposta.status,
+        fonte: url,
       });
     }
 
-    const html = await risposta.text();
+    const calendario = await risposta.json();
 
     return res.status(200).json({
       errore: false,
-      data: giorno,
-      fonte: "Chiesa Cattolica / CEI",
-      link: url,
-      html,
+      anno: Number(anno),
+      fonte: "Liturgical Calendar API",
+      calendario,
     });
   } catch (error) {
     return res.status(500).json({
       errore: true,
-      messaggio: "Errore nel collegamento alla fonte CEI",
+      messaggio: "Errore nel recupero del calendario liturgico",
       dettaglio: error.message,
-      link: url,
     });
   }
 }
