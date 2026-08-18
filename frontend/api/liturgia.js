@@ -10,7 +10,7 @@ export default async function handler(req, res) {
       });
 
     const url =
-      `https://litcal.johnromanodorazio.com:443/api/v5/calendar/roman/nation/IT/${anno}` +
+    `https://litcal.johnromanodorazio.com:443/api/v5/calendar/nation/IT/${anno}` +
       `?locale=it_IT`;
 
     const risposta = await fetch(url, {
