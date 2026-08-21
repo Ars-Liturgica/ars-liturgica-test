@@ -15,6 +15,7 @@ const [categorie, setCategorie] = useState([]);
   tempo: "",
   colore: "",
   vangelo: "",
+   testoVangelo: "",
   riflessione: "",
   linkCei: "",
   santo: "",
@@ -27,7 +28,7 @@ const [categorie, setCategorie] = useState([]);
   prodotti: [],
 });
 const [ambiente, setAmbiente] = useState("home");
-  
+  const [mostraVangelo, setMostraVangelo] = useState(false);
 
   const [formData, setFormData] = useState(liturgia);
 
@@ -127,6 +128,7 @@ if (errorCategorie) {
           : "",
         santo: celebrazione,
         vangelo: datiLiturgia.vangelo || "",
+        testoVangelo: datiLiturgia.testoVangelo || "",
         riflessione: datiSalvati?.una_luce_sulla_parola || "",
         linkCei: datiSalvati?.link_cei || "",
         categoriaPrincipale:
@@ -304,6 +306,59 @@ outlineOffset: "-12px",
 <p style={{ whiteSpace: "pre-line", marginBottom: "22px" }}>
 {liturgia.vangelo}
 </p>
+            {liturgia.testoVangelo && (
+  <button
+    onClick={() => setMostraVangelo(true)}
+    style={{
+      background: "#7a0000",
+      color: "white",
+      border: "none",
+      borderRadius: "10px",
+      padding: "10px 18px",
+      marginBottom: "22px",
+      cursor: "pointer",
+      fontFamily: "Georgia, serif",
+      fontSize: "16px",
+    }}
+  >
+    ✦ Leggi il Vangelo di oggi ✦
+  </button>
+)}
+            {mostraVangelo && liturgia.testoVangelo && (
+  <div
+    style={{
+      background: "#fffaf0",
+      border: "1px solid #d8b45a",
+      borderRadius: "12px",
+      padding: "20px",
+      marginBottom: "24px",
+      lineHeight: "1.6",
+    }}
+  >
+    <h3 style={{ color: "#7a0000", marginTop: 0 }}>
+      Vangelo del Giorno
+    </h3>
+
+    <p style={{ whiteSpace: "pre-line" }}>
+      {liturgia.testoVangelo}
+    </p>
+
+    <button
+      onClick={() => setMostraVangelo(false)}
+      style={{
+        background: "#7a0000",
+        color: "white",
+        border: "none",
+        borderRadius: "8px",
+        padding: "8px 16px",
+        cursor: "pointer",
+        fontFamily: "Georgia, serif",
+      }}
+    >
+      Chiudi
+    </button>
+  </div>
+)}
             <h3 style={{ color: "#7a0000" }}>
               Una luce sulla Parola
             </h3>
