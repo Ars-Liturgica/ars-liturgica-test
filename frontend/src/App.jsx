@@ -10,36 +10,21 @@ import AccessoSuperAdmin from "./admin/AccessoSuperAdmin";
 export default function App() {
   const [adminMode, setAdminMode] = useState(false);
 const [categorie, setCategorie] = useState([]);
- const [liturgia, setLiturgia] = useState(() => {
-  const saved = localStorage.getItem("liturgia_v2");
-  return saved
-    ? JSON.parse(saved)
-    : {
-    data: "27 Maggio 2026",
-    tempo: "Tempo Ordinario",
-    colore: "Verde",
-    vangelo: "Dal Vangelo secondo Giovanni (Gv 17,1-11a)",
-    riflessione:
-      
-      "Cristo prega il Padre per i suoi discepoli e li affida al Suo amore.",
-    linkCei: "",
-    santo: "Sant'Agostino di Canterbury",
-      categoriaPrincipale: "",
-categoriaConsigliata1: "",
-categoriaConsigliata2: "",
-categoriaConsigliata3: "",
-categoriaConsigliata4: "",
-categoriaConsigliata5: "",
-    prodotti: [
-  {
-    nome: "Astuccio porta-Viatico",
-    prezzo: "€ 0,00",
-    nota: "Selezione liturgica del momento",
-    link: "",
-    immagine: "",
-  },
-],
-      };
+ const [liturgia, setLiturgia] = useState({
+  data: "",
+  tempo: "",
+  colore: "",
+  vangelo: "",
+  riflessione: "",
+  linkCei: "",
+  santo: "",
+  categoriaPrincipale: "",
+  categoriaConsigliata1: "",
+  categoriaConsigliata2: "",
+  categoriaConsigliata3: "",
+  categoriaConsigliata4: "",
+  categoriaConsigliata5: "",
+  prodotti: [],
 });
 const [ambiente, setAmbiente] = useState("home");
   
