@@ -87,46 +87,86 @@ if (errorCategorie) {
   alert("Liturgia salvata su Supabase correttamente");
   setAdminMode(false);
    };
-   useEffect(() => {
+  useEffect(() => {
   async function caricaLiturgia() {
-    const { data, error } = await supabase
-      .from("liturgia_giorno")
-      .select("*")
-      .eq("id", 1)
-      .single();
-const { data: categorieSalvate, error: errorCategorieLettura } = await supabase
-  .from("categorie_app")
-  .select("*")
-  .eq("id", 1)
-  .maybeSingle();
-    if (error) {
-      console.error("Errore lettura Supabase:", error);
-      return;
+    try {
+      // Dati automatici della Liturgia del Giorno
+      const risposta = await fetch("/api/liturgia");
+
+      if (!risposta.ok) {
+        throw new Error("Errore nel collegamento alla fonte liturgica");
+      }
+
+      const datiLiturgia = await risposta.json();
+
+      if (datiLiturgia.errore) {
+        throw new Error(
+          datiLiturgia.messaggio || "Errore nel recupero della liturgia"
+        );
+      }
+
+      // Conserviamo da Supabase soltanto i contenuti gestiti da Ars
+      const { data: datiSalvati } = await supabase
+        .from("liturgia_giorno")
+        .select("una_luce_sulla_parola, link_cei")
+        .eq("id", 1)
+        .maybeSingle();
+
+      const { data: categorieSalvate } = await supabase
+        .from("categorie_app")
+        .select("*")
+        .eq("id", 1)
+        .maybeSingle();
+
+      const dataFormattata = datiLiturgia.data
+        ? new Date(datiLiturgia.data + "T12:00:00").toLocaleDateString(
+            "it-IT",
+            {
+              day: "numeric",
+              month: "long",
+              year: "numeric",
+            }
+          )
+        : "";
+
+      const celebrazione = datiLiturgia.celebrazione || "";
+
+      const datiApp = {
+        data: dataFormattata,
+        tempo: celebrazione.includes("Tempo Ordinario")
+          ? "Tempo Ordinario"
+          : celebrazione,
+        colore: datiLiturgia.colore
+          ? datiLiturgia.colore.charAt(0).toUpperCase() +
+            datiLiturgia.colore.slice(1)
+          : "",
+        santo: celebrazione,
+        vangelo: datiLiturgia.vangelo || "",
+        riflessione: datiSalvati?.una_luce_sulla_parola || "",
+        linkCei: datiSalvati?.link_cei || "",
+        categoriaPrincipale:
+          categorieSalvate?.categoria_principale || "",
+        categoriaConsigliata1:
+          categorieSalvate?.categoria_consigliata_1 || "",
+        categoriaConsigliata2:
+          categorieSalvate?.categoria_consigliata_2 || "",
+        categoriaConsigliata3:
+          categorieSalvate?.categoria_consigliata_3 || "",
+        categoriaConsigliata4:
+          categorieSalvate?.categoria_consigliata_4 || "",
+        categoriaConsigliata5:
+          categorieSalvate?.categoria_consigliata_5 || "",
+      };
+
+      setLiturgia(datiApp);
+      setFormData(datiApp);
+    } catch (error) {
+      console.error("Errore caricamento Liturgia del Giorno:", error);
     }
-
-    const datiApp = {
-      data: data.data,
-      tempo: data.tempo_liturgico,
-      colore: data.colore_liturgico,
-      santo: data.memoria_santo,
-      vangelo: data.riferimento_vangelo,
-      riflessione: data.una_luce_sulla_parola,
-      linkCei: data.link_cei,
-     categoriaPrincipale: categorieSalvate?.categoria_principale || "",
-categoriaConsigliata1: categorieSalvate?.categoria_consigliata_1 || "",
-categoriaConsigliata2: categorieSalvate?.categoria_consigliata_2 || "",
-categoriaConsigliata3: categorieSalvate?.categoria_consigliata_3 || "",
-categoriaConsigliata4: categorieSalvate?.categoria_consigliata_4 || "",
-categoriaConsigliata5: categorieSalvate?.categoria_consigliata_5 || "",
-    };
-
-    setLiturgia(datiApp);
-    setFormData(datiApp);
   }
 
   caricaLiturgia();
 }, []);
-
 useEffect(() => {
   fetch("/api/categorie")
     .then((res) => res.json())
