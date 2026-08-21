@@ -28,7 +28,6 @@ export default async function handler(req, res) {
       colore: dati.colore,
       vangelo: dati.letture?.vangelo?.riferimento || "",
       testoVangelo: dati.letture?.vangelo?.testo || "",
-      datiCompleti: dati,
     });
   } catch (error) {
     return res.status(500).json({
