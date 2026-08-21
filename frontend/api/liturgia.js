@@ -1,46 +1,39 @@
 export default async function handler(req, res) {
   try {
-    const oggi = new Date();
-
-    const anno =
-      req.query.anno ||
-      oggi.toLocaleDateString("en-CA", {
-        timeZone: "Europe/Rome",
-        year: "numeric",
-      });
-
-    const url =
-    `https://litcal.johnromanodorazio.com:443/api/v5/calendar/nation/IT/${anno}` +
-      `?locale=it_IT`;
-
-    const risposta = await fetch(url, {
-      headers: {
-        Accept: "application/json",
-        "User-Agent": "Ars Liturgica",
-      },
-    });
+    const risposta = await fetch(
+      "https://parolaviva.art/api/v1/letture/oggi",
+      {
+        headers: {
+          Accept: "application/json",
+          "User-Agent": "Ars Liturgica",
+        },
+      }
+    );
 
     if (!risposta.ok) {
       return res.status(502).json({
         errore: true,
-        messaggio: "Calendario liturgico non raggiungibile",
+        messaggio: "Fonte liturgica non raggiungibile",
         statusFonte: risposta.status,
-        fonte: url,
       });
     }
 
-    const calendario = await risposta.json();
+    const dati = await risposta.json();
 
     return res.status(200).json({
       errore: false,
-      anno: Number(anno),
-      fonte: "Liturgical Calendar API",
-      calendario,
+      fonte: "Parola Viva",
+      data: dati.data,
+      celebrazione: dati.celebrazione,
+      colore: dati.colore,
+      vangelo: dati.letture?.vangelo?.riferimento || "",
+      testoVangelo: dati.letture?.vangelo?.testo || "",
+      datiCompleti: dati,
     });
   } catch (error) {
     return res.status(500).json({
       errore: true,
-      messaggio: "Errore nel recupero del calendario liturgico",
+      messaggio: "Errore nel recupero della liturgia",
       dettaglio: error.message,
     });
   }
