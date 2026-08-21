@@ -289,6 +289,25 @@ outlineOffset: "-12px",
           <p style={{ margin: "0 0 10px 0" }}>
             <strong>Memoria del Giorno:</strong> {liturgia.santo}
           </p>
+   <div
+  style={{
+    marginTop: "28px",
+    textAlign: "center",
+  }}
+>
+  <img
+    src="/vangelo-del-giorno.png"
+    alt="Vangelo del Giorno"
+    style={{
+      width: "100%",
+      maxWidth: "360px",
+      height: "auto",
+      borderRadius: "14px",
+      display: "block",
+      margin: "0 auto",
+    }}
+  />
+</div>
 </div>
 <div>
           <div
