@@ -5,6 +5,7 @@ import RegistrazioneParroco from "./parrocchia/RegistrazioneParroco";
 import AreaParrocchiale from "./parrocchia/AreaParrocchiale";
 import AttivazioneParrocchia from "./parrocchia/AttivazioneParrocchia";
 import AccessoComunita from "./parrocchia/AccessoComunita";
+import AreaPersonaleParroco from "./parrocchia/AreaPersonaleParroco";
 import AdminParrocchie from "./admin/AdminParrocchie";
 import AccessoSuperAdmin from "./admin/AccessoSuperAdmin";
 export default function App() {
@@ -177,6 +178,14 @@ useEffect(() => {
    
   return (
     <AccessoComunita tornaHome={() => setAmbiente("home")} />
+  );
+}
+  if (ambiente === "area-personale") {
+  return (
+    <AreaPersonaleParroco
+      tornaHome={() => setAmbiente("home")}
+      entraParrocchia={() => setAmbiente("parrocchia")}
+    />
   );
 }
   if (ambiente === "superadmin") {
@@ -442,6 +451,7 @@ outlineOffset: "-12px",
   <AccessoRiservato
   onEntra={() => setAmbiente("parrocchia")}
   onEntraComunita={() => setAmbiente("comunita")}
+    onEntraAreaPersonale={() => setAmbiente("area-personale")}
     onEntraSuperAdmin={() => setAmbiente("superadmin")}
 />
 
