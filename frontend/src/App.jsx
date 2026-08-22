@@ -13,6 +13,7 @@ const [categorie, setCategorie] = useState([]);
  const [liturgia, setLiturgia] = useState({
   data: "",
   tempo: "",
+   giornoLiturgico: "",
   colore: "",
   vangelo: "",
    testoVangelo: "",
@@ -119,14 +120,13 @@ if (errorCategorie) {
 
       const datiApp = {
         data: dataFormattata,
-        tempo: celebrazione.includes("Tempo Ordinario")
-          ? "Tempo Ordinario"
-          : celebrazione,
-        colore: datiLiturgia.colore
-          ? datiLiturgia.colore.charAt(0).toUpperCase() +
-            datiLiturgia.colore.slice(1)
-          : "",
-        santo: celebrazione,
+tempo: datiLiturgia.tempo || "",
+giornoLiturgico: datiLiturgia.giornoLiturgico || "",
+colore: datiLiturgia.colore
+  ? datiLiturgia.colore.charAt(0).toUpperCase() +
+    datiLiturgia.colore.slice(1)
+  : "",
+santo: celebrazione,
         vangelo: datiLiturgia.vangelo || "",
         testoVangelo: datiLiturgia.testoVangelo || "",
         riflessione: datiSalvati?.una_luce_sulla_parola || "",
@@ -281,7 +281,9 @@ outlineOffset: "-12px",
           <p style={{ margin: "0 0 10px 0" }}>
             <strong>Tempo Liturgico:</strong> {liturgia.tempo}
           </p>
-
+<p style={{ margin: "0 0 10px 0" }}>
+  <strong>Giorno Liturgico:</strong> {liturgia.giornoLiturgico}
+</p>
           <p style={{ margin: "0 0 10px 0" }}>
             <strong>Colore Liturgico:</strong> {liturgia.colore}
           </p>
