@@ -2,6 +2,7 @@ import React from "react";
 export default function AccessoRiservato({
   onEntra,
   onEntraComunita,
+  onEntraAreaPersonale,
   onEntraSuperAdmin,
 }) {
   return (
@@ -145,6 +146,24 @@ export default function AccessoRiservato({
   }}
 >
   🏛️ UNISCITI ALLA TUA COMUNITÀ PARROCCHIALE
+</button>
+          <button
+  onClick={onEntraAreaPersonale}
+  style={{
+    marginTop: "16px",
+    background: "linear-gradient(180deg, #0b2f55, #061d35)",
+    color: "#ffffff",
+    border: "1px solid #d6a23a",
+    borderRadius: "8px",
+    padding: "13px 32px",
+    fontSize: "14px",
+    fontWeight: "700",
+    letterSpacing: "0.4px",
+    cursor: "pointer",
+    boxShadow: "0 3px 8px rgba(0,0,0,0.25)",
+  }}
+>
+  👤 AREA PERSONALE
 </button>
         </div>
         <div
