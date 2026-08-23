@@ -1,5 +1,5 @@
 import React, { useState, useRef } from "react";
-import LaMiaParrocchia from "./LaMiaParrocchia";
+import DashboardFedele from "./DashboardFedele";
 import { supabase } from "../supabaseClient";
 function AccessoComunita({ tornaHome }) {
  const [messaggio, setMessaggio] = useState("");
@@ -141,7 +141,7 @@ localStorage.setItem("ars_nome_parrocchia", parrocchiaSelezionata.nome);
   }
 };
 if (mostraMiaParrocchia) {
-  return <LaMiaParrocchia />;
+ return <DashboardFedele />;
 }
   return (
     <div
