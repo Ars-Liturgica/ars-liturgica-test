@@ -4,21 +4,14 @@ import NuovoAvviso from "./NuovoAvviso";
 import { leggiDocumentiInArchivio } from "../../motoreDocumentale/MotoreDocumentale";
 
 function formattaData(data) {
-  if (!data) {
-    return "";
-  }
+  if (!data) return "";
 
-  return new Date(data).toLocaleDateString(
-    "it-IT"
-  );
+  return new Date(data).toLocaleDateString("it-IT");
 }
 
 function formattaFirma(avviso) {
   if (avviso.firma_nome) {
-    return [
-      avviso.firma_nome,
-      avviso.firma_ruolo,
-    ]
+    return [avviso.firma_nome, avviso.firma_ruolo]
       .filter(Boolean)
       .join(" — ");
   }
@@ -43,14 +36,12 @@ export default function BachecaAvvisi({
   solaLettura = false,
   onTorna,
 }) {
-  const [
-    mostraNuovoAvviso,
-    setMostraNuovoAvviso,
-  ] = useState(false);
+  const [mostraNuovoAvviso, setMostraNuovoAvviso] =
+    useState(false);
 
   const [avvisi, setAvvisi] = useState([]);
   const [avvisoAperto, setAvvisoAperto] =
-  useState(null);
+    useState(null);
   const [caricamento, setCaricamento] =
     useState(true);
   const [errore, setErrore] = useState("");
@@ -146,175 +137,174 @@ export default function BachecaAvvisi({
 
   return (
     <div className="bacheca-avvisi">
- <header className="bacheca-header">
-  <div className="bacheca-header-superiore">
-    {solaLettura && onTorna && (
-      <button
-        type="button"
-        className="btn-torna-parrocchia"
-        onClick={onTorna}
-      >
-        ← Torna alla mia Parrocchia
-      </button>
-    )}
+      <div className="bacheca-contenitore">
+        <div className="bacheca-barra-superiore">
+          {solaLettura && onTorna ? (
+            <button
+              type="button"
+              className="btn-torna-parrocchia"
+              onClick={onTorna}
+            >
+              ← Torna alla mia Parrocchia
+            </button>
+          ) : (
+            <div />
+          )}
 
-    {!solaLettura && (
-      <button
-        className="btn-nuovo-avviso"
-        type="button"
-        onClick={() =>
-          setMostraNuovoAvviso(true)
-        }
-      >
-        <span className="simbolo-aggiungi">
-          ＋
-        </span>
-        Nuovo Avviso
-      </button>
-    )}
-  </div>
-
-  <div className="bacheca-intestazione">
-    <div
-      className="bacheca-simbolo"
-      aria-hidden="true"
-    >
-      ⛪
-    </div>
-
-    <h1>Bacheca Avvisi</h1>
-
-    <p>
-      {solaLettura
-        ? "Consulta gli avvisi della tua comunità parrocchiale."
-        : "Pubblica e gestisci gli avvisi destinati alla comunità parrocchiale."}
-    </p>
-  </div>
-</header>
-
-      <section className="cornice-legno">
-        <div className="cornice-modanatura">
-          <div className="cornice-bordo-interno">
-            <div className="pannello-sughero">
-              {caricamento && (
-                <div className="bacheca-vuota">
-                  <div className="foglio-avviso">
-                    <h2>
-                      Caricamento degli avvisi...
-                    </h2>
-                  </div>
-                </div>
-              )}
-
-              {!caricamento && errore && (
-                <div className="bacheca-vuota">
-                  <div className="foglio-avviso">
-                    <h2>
-                      Impossibile caricare gli avvisi
-                    </h2>
-
-                    <p>{errore}</p>
-                  </div>
-                </div>
-              )}
-
-              {!caricamento &&
-                !errore &&
-                avvisi.length === 0 && (
-                  <div className="bacheca-vuota">
-                    <div
-                      className="puntina"
-                      aria-hidden="true"
-                    />
-
-                    <div className="foglio-avviso">
-                      <div
-                        className="icona-avviso"
-                        aria-hidden="true"
-                      >
-                        📌
-                      </div>
-
-                      <h2>
-                        Nessun avviso presente
-                      </h2>
-
-                      <p>
-                        Gli avvisi pubblicati dal
-                        parroco compariranno qui.
-                      </p>
-{!solaLettura && (
-                      <button
-                        type="button"
-                        className="btn-crea-primo-avviso"
-                        onClick={() =>
-                          setMostraNuovoAvviso(true)
-                        }
-                      >
-                        Crea il primo avviso
-                      </button>
-  )}
-                    </div>
-                  </div>
-                )}
-
-              {!caricamento &&
-                !errore &&
-                avvisi.length > 0 && (
-                  <div className="elenco-avvisi">
-                    {avvisi.map((avviso) => (
-  <article
-    key={avviso.id}
-    className={`foglio-avviso foglio-avviso-pubblicato priorita-${
-      avviso.priorita || "normale"
-    }`}
-    role="button"
-    tabIndex={0}
-    aria-label={`Apri l'avviso ${avviso.titolo}`}
-    onClick={() =>
-      setAvvisoAperto(avviso)
-    }
-    onKeyDown={(event) => {
-      if (
-        event.key === "Enter" ||
-        event.key === " "
-      ) {
-        event.preventDefault();
-        setAvvisoAperto(avviso);
-      }
-    }}
-  >
-    <div
-      className="puntina puntina-avviso"
-      aria-hidden="true"
-    />
-
-    {avviso.categoria && (
-      <p className="categoria-avviso-bacheca">
-        {avviso.categoria}
-      </p>
-    )}
-
-    <h2>{avviso.titolo}</h2>
-
-    <footer className="dati-avviso-bacheca">
-      <span>
-        {formattaData(
-          avviso.data_pubblicazione
-        )}
-      </span>
-
-      <strong>Apri avviso</strong>
-    </footer>
-  </article>
-))}
-                  </div>
-                )}
-            </div>
-          </div>
+          {!solaLettura && (
+            <button
+              type="button"
+              className="btn-nuovo-avviso"
+              onClick={() =>
+                setMostraNuovoAvviso(true)
+              }
+            >
+              <span className="simbolo-aggiungi">
+                ＋
+              </span>
+              Nuovo Avviso
+            </button>
+          )}
         </div>
-      </section>
-            {avvisoAperto && (
+
+        <header className="bacheca-testata">
+          <div
+            className="bacheca-simbolo"
+            aria-hidden="true"
+          >
+            ⛪
+          </div>
+
+          <p className="bacheca-sovratitolo">
+            {parrocchia?.nome || "La tua Parrocchia"}
+          </p>
+
+          <h1>Bacheca Avvisi</h1>
+
+          <p className="bacheca-sottotitolo">
+            {solaLettura
+              ? "Consulta gli avvisi della tua comunità parrocchiale."
+              : "Pubblica e gestisci gli avvisi destinati alla comunità parrocchiale."}
+          </p>
+
+          <div className="bacheca-separatore">
+            <span />
+            <strong>✦</strong>
+            <span />
+          </div>
+        </header>
+
+        <section className="bacheca-sezione-avvisi">
+          <div className="bacheca-titolo-sezione">
+            <p>Comunità</p>
+            <h2>Avvisi pubblicati</h2>
+          </div>
+
+          {caricamento && (
+            <div className="bacheca-stato">
+              Caricamento degli avvisi...
+            </div>
+          )}
+
+          {!caricamento && errore && (
+            <div className="bacheca-stato bacheca-stato-errore">
+              <h3>
+                Impossibile caricare gli avvisi
+              </h3>
+              <p>{errore}</p>
+            </div>
+          )}
+
+          {!caricamento &&
+            !errore &&
+            avvisi.length === 0 && (
+              <div className="bacheca-stato">
+                <div className="bacheca-stato-icona">
+                  📌
+                </div>
+
+                <h3>Nessun avviso presente</h3>
+
+                <p>
+                  Gli avvisi pubblicati dal parroco
+                  compariranno qui.
+                </p>
+
+                {!solaLettura && (
+                  <button
+                    type="button"
+                    className="btn-crea-primo-avviso"
+                    onClick={() =>
+                      setMostraNuovoAvviso(true)
+                    }
+                  >
+                    Crea il primo avviso
+                  </button>
+                )}
+              </div>
+            )}
+
+          {!caricamento &&
+            !errore &&
+            avvisi.length > 0 && (
+              <div className="elenco-avvisi">
+                {avvisi.map((avviso) => (
+                  <article
+                    key={avviso.id}
+                    className={`scheda-avviso priorita-${
+                      avviso.priorita || "normale"
+                    }`}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Apri l'avviso ${avviso.titolo}`}
+                    onClick={() =>
+                      setAvvisoAperto(avviso)
+                    }
+                    onKeyDown={(event) => {
+                      if (
+                        event.key === "Enter" ||
+                        event.key === " "
+                      ) {
+                        event.preventDefault();
+                        setAvvisoAperto(avviso);
+                      }
+                    }}
+                  >
+                    <div className="scheda-avviso-data">
+                      <span>
+                        {formattaData(
+                          avviso.data_pubblicazione
+                        )}
+                      </span>
+                    </div>
+
+                    <div className="scheda-avviso-corpo">
+                      {avviso.categoria && (
+                        <p className="categoria-avviso-bacheca">
+                          {avviso.categoria}
+                        </p>
+                      )}
+
+                      <h3>{avviso.titolo}</h3>
+
+                      <div className="scheda-avviso-fondo">
+                        <span>
+                          Avviso della comunità
+                        </span>
+
+                        <strong>
+                          Leggi tutto →
+                        </strong>
+                      </div>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            )}
+        </section>
+      </div>
+
+      {avvisoAperto && (
         <div
           className="sfondo-dettaglio-avviso"
           onClick={() =>
