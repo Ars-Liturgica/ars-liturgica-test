@@ -40,6 +40,7 @@ function formattaFirma(avviso) {
 
 export default function BachecaAvvisi({
   parrocchia,
+  solaLettura = false,
 }) {
   const [
     mostraNuovoAvviso,
@@ -153,7 +154,7 @@ export default function BachecaAvvisi({
             alla comunità parrocchiale.
           </p>
         </div>
-
+{!solaLettura && (
         <button
           className="btn-nuovo-avviso"
           type="button"
@@ -166,6 +167,7 @@ export default function BachecaAvvisi({
           </span>
           Nuovo Avviso
         </button>
+  )}
       </header>
 
       <section className="cornice-legno">
@@ -219,7 +221,7 @@ export default function BachecaAvvisi({
                         Gli avvisi pubblicati dal
                         parroco compariranno qui.
                       </p>
-
+{!solaLettura && (
                       <button
                         type="button"
                         className="btn-crea-primo-avviso"
@@ -229,6 +231,7 @@ export default function BachecaAvvisi({
                       >
                         Crea il primo avviso
                       </button>
+  )}
                     </div>
                   </div>
                 )}
