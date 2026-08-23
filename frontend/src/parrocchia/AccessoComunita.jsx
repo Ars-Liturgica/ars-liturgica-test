@@ -3,7 +3,8 @@ import LaMiaParrocchia from "./LaMiaParrocchia";
 import { supabase } from "../supabaseClient";
 function AccessoComunita({ tornaHome }) {
  const [messaggio, setMessaggio] = useState("");
-const [parrocchiaTrovata, setParrocchiaTrovata] = useState(null);
+const [parrocchieTrovate, setParrocchieTrovate] = useState([]);
+ const [parrocchiaSelezionata, setParrocchiaSelezionata] = useState(null);
  const [datiUtente, setDatiUtente] = useState(null);
  const [identificativo, setIdentificativo] = useState("");
 const [salvataggioInCorso, setSalvataggioInCorso] = useState(false);
@@ -22,7 +23,7 @@ const handleRicercaParrocchia = async (e) => {
   e.preventDefault();
 
   setMessaggio("");
-  setParrocchiaTrovata(null);
+  setParrocchieTrovate([]);
 
   const datiModulo = new FormData(e.currentTarget);
   const cittaInserita = String(datiModulo.get("Città") || "").trim();
@@ -49,31 +50,19 @@ setIdentificativo(`${nomeInserito} ${cognomeInserito}`.trim());
       throw error;
     }
 
-    const parrocchiaCompatibile = (data || []).find((parrocchia) => {
-      const cittaParrocchia =
-        parrocchia.comune ||
-        parrocchia.citta ||
-        parrocchia.localita ||
-        "";
+  
 
-      return (
-        normalizzaTesto(cittaParrocchia) ===
-        normalizzaTesto(cittaInserita)
-      );
-    });
-
-    if (!parrocchiaCompatibile) {
+   if (!data || data.length === 0) {
       setMessaggio(
         "Non abbiamo trovato alcuna parrocchia compatibile con la città e il CAP inseriti."
       );
       return;
     }
 
-    setParrocchiaTrovata(parrocchiaCompatibile);
-    setMessaggio(
-      "Abbiamo trovato una parrocchia compatibile con i dati inseriti."
-    );
-
+    setParrocchieTrovate(data);
+   setMessaggio(
+  "Abbiamo trovato le parrocchie presenti nel CAP inserito. Scegli la tua."
+);
     setTimeout(() => {
       risultatoParrocchiaRef.current?.scrollIntoView({
         behavior: "smooth",
@@ -88,7 +77,7 @@ setIdentificativo(`${nomeInserito} ${cognomeInserito}`.trim());
   }
 };
  const handleEntraParrocchia = async () => {
-  if (!datiUtente || !parrocchiaTrovata) return;
+if (!datiUtente || !parrocchiaSelezionata) return;
 
   const idScelto = identificativo.trim();
 
@@ -113,7 +102,7 @@ setIdentificativo(`${nomeInserito} ${cognomeInserito}`.trim());
         p_citta: datiUtente.citta,
         p_cap: datiUtente.cap,
         p_identificativo: idScelto,
-        p_parrocchia_id: parrocchiaTrovata.id,
+       p_parrocchia_id: parrocchiaSelezionata.id,
       }
     );
 
@@ -133,8 +122,8 @@ setIdentificativo(`${nomeInserito} ${cognomeInserito}`.trim());
     }
 
     localStorage.setItem("ars_utente_id", nuovoUtenteId);
-    localStorage.setItem("ars_parrocchia_id", parrocchiaTrovata.id);
-    localStorage.setItem("ars_nome_parrocchia", parrocchiaTrovata.nome);
+  localStorage.setItem("ars_parrocchia_id", parrocchiaSelezionata.id);
+localStorage.setItem("ars_nome_parrocchia", parrocchiaSelezionata.nome);
     localStorage.setItem("ars_identificativo", idScelto);
 
     setMostraMiaParrocchia(true);
@@ -286,7 +275,7 @@ if (mostraMiaParrocchia) {
             ✅ {messaggio}
           </div>
         )}
-{parrocchiaTrovata && (
+{parrocchieTrovate.length > 0 && (
   <div ref={risultatoParrocchiaRef}
     style={{
       marginTop: "18px",
@@ -298,9 +287,35 @@ if (mostraMiaParrocchia) {
       lineHeight: "1.5",
     }}
   >
-    <strong>Parrocchia trovata:</strong>
+   <strong>Scegli la tua parrocchia:</strong>
     <br />
-   {parrocchiaTrovata.nome}
+   {parrocchieTrovate.map((parrocchia) => (
+  <button
+    key={parrocchia.id}
+    type="button"
+    onClick={() => setParrocchiaSelezionata(parrocchia)}
+    style={{
+      width: "100%",
+      padding: "12px",
+      marginTop: "10px",
+      background:
+        parrocchiaSelezionata?.id === parrocchia.id
+          ? "#eef7f0"
+          : "#ffffff",
+      border:
+        parrocchiaSelezionata?.id === parrocchia.id
+          ? "2px solid #2f6f4e"
+          : "1px solid #d6b56d",
+      borderRadius: "10px",
+      cursor: "pointer",
+      fontSize: "15px",
+      fontWeight: "bold",
+      color: "#2f3a4a",
+    }}
+  >
+    {parrocchia.nome}
+  </button>
+))}
 <p
   style={{
     marginTop: "18px",
