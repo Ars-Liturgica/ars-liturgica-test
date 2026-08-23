@@ -4,6 +4,10 @@ import { supabase } from "../supabaseClient";
 function AccessoComunita({ tornaHome }) {
  const [messaggio, setMessaggio] = useState("");
 const [parrocchiaTrovata, setParrocchiaTrovata] = useState(null);
+ const [datiUtente, setDatiUtente] = useState(null);
+ const [identificativo, setIdentificativo] = useState("");
+const [salvataggioInCorso, setSalvataggioInCorso] = useState(false);
+ 
 const [mostraMiaParrocchia, setMostraMiaParrocchia] = useState(false);
 const risultatoParrocchiaRef = useRef(null);
 
@@ -23,7 +27,18 @@ const handleRicercaParrocchia = async (e) => {
   const datiModulo = new FormData(e.currentTarget);
   const cittaInserita = String(datiModulo.get("Città") || "").trim();
   const capInserito = String(datiModulo.get("CAP") || "").trim();
+setDatiUtente({
+  nome: String(datiModulo.get("Nome") || "").trim(),
+  cognome: String(datiModulo.get("Cognome") || "").trim(),
+  email: String(datiModulo.get("Email") || "").trim(),
+  telefono: String(datiModulo.get("Cellulare") || "").trim(),
+  citta: cittaInserita,
+  cap: capInserito,
+});
+ const nomeInserito = String(datiModulo.get("Nome") || "").trim();
+const cognomeInserito = String(datiModulo.get("Cognome") || "").trim();
 
+setIdentificativo(`${nomeInserito} ${cognomeInserito}`.trim());
   try {
     const { data, error } = await supabase
       .from("parrocchie")
@@ -70,6 +85,70 @@ const handleRicercaParrocchia = async (e) => {
     setMessaggio(
       "Non è stato possibile cercare la parrocchia. Riprova tra poco."
     );
+  }
+};
+ const handleEntraParrocchia = async () => {
+  if (!datiUtente || !parrocchiaTrovata) return;
+
+  const idScelto = identificativo.trim();
+
+  if (!idScelto) {
+    setMessaggio(
+      "Scegli come vuoi essere riconosciuto quando torni nella tua parrocchia."
+    );
+    return;
+  }
+
+  setSalvataggioInCorso(true);
+  setMessaggio("");
+
+  try {
+    const { data: nuovoUtenteId, error } = await supabase.rpc(
+      "iscrivi_fedele",
+      {
+        p_nome: datiUtente.nome,
+        p_cognome: datiUtente.cognome,
+        p_email: datiUtente.email || "",
+        p_telefono: datiUtente.telefono || "",
+        p_citta: datiUtente.citta,
+        p_cap: datiUtente.cap,
+        p_identificativo: idScelto,
+        p_parrocchia_id: parrocchiaTrovata.id,
+      }
+    );
+
+    if (error) {
+      if (
+        String(error.message || "")
+          .toLowerCase()
+          .includes("identificativo")
+      ) {
+        setMessaggio(
+          "Questo identificativo è già utilizzato. Modificalo leggermente e riprova."
+        );
+        return;
+      }
+
+      throw error;
+    }
+
+    localStorage.setItem("ars_utente_id", nuovoUtenteId);
+    localStorage.setItem("ars_parrocchia_id", parrocchiaTrovata.id);
+    localStorage.setItem("ars_nome_parrocchia", parrocchiaTrovata.nome);
+    localStorage.setItem("ars_identificativo", idScelto);
+
+    setMostraMiaParrocchia(true);
+  } catch (errore) {
+    console.error(
+      "Errore durante l'iscrizione alla parrocchia:",
+      errore
+    );
+
+    setMessaggio(
+      "Non è stato possibile completare l'iscrizione. Riprova tra poco."
+    );
+  } finally {
+    setSalvataggioInCorso(false);
   }
 };
 if (mostraMiaParrocchia) {
@@ -222,10 +301,34 @@ if (mostraMiaParrocchia) {
     <strong>Parrocchia trovata:</strong>
     <br />
    {parrocchiaTrovata.nome}
+<p
+  style={{
+    marginTop: "18px",
+    marginBottom: "8px",
+    fontSize: "14px",
+    color: "#6b5d4a",
+  }}
+>
+  Come vuoi essere riconosciuto quando torni?
+</p>
 
+<input
+  type="text"
+  value={identificativo}
+  onChange={(e) => setIdentificativo(e.target.value)}
+  style={{
+    width: "100%",
+    padding: "13px",
+    borderRadius: "10px",
+    border: "1px solid #c9b27c",
+    fontSize: "15px",
+    boxSizing: "border-box",
+  }}
+/>
     <button
       type="button"
-         onClick={() => setMostraMiaParrocchia(true)}
+         onClick={handleEntraParrocchia}
+     disabled={salvataggioInCorso}
       style={{
         width: "100%",
         padding: "13px",
@@ -239,7 +342,7 @@ if (mostraMiaParrocchia) {
         cursor: "pointer",
       }}
     >
-      ENTRA NELLA MIA PARROCCHIA
+      {salvataggioInCorso ? "INGRESSO IN CORSO..." : "ENTRA NELLA MIA PARROCCHIA"}
     </button>
   </div>
 )}
