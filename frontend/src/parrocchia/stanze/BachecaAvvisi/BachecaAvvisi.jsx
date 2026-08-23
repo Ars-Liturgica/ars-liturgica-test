@@ -41,6 +41,7 @@ function formattaFirma(avviso) {
 export default function BachecaAvvisi({
   parrocchia,
   solaLettura = false,
+  onTorna,
 }) {
   const [
     mostraNuovoAvviso,
@@ -145,30 +146,51 @@ export default function BachecaAvvisi({
 
   return (
     <div className="bacheca-avvisi">
-      <header className="bacheca-header">
-        <div className="bacheca-intestazione">
-          <h1>Bacheca Avvisi</h1>
+ <header className="bacheca-header">
+  <div className="bacheca-header-superiore">
+    {solaLettura && onTorna && (
+      <button
+        type="button"
+        className="btn-torna-parrocchia"
+        onClick={onTorna}
+      >
+        ← Torna alla mia Parrocchia
+      </button>
+    )}
 
-          <p>
-            Pubblica e gestisci gli avvisi destinati
-            alla comunità parrocchiale.
-          </p>
-        </div>
-{!solaLettura && (
-        <button
-          className="btn-nuovo-avviso"
-          type="button"
-          onClick={() =>
-            setMostraNuovoAvviso(true)
-          }
-        >
-          <span className="simbolo-aggiungi">
-            ＋
-          </span>
-          Nuovo Avviso
-        </button>
-  )}
-      </header>
+    {!solaLettura && (
+      <button
+        className="btn-nuovo-avviso"
+        type="button"
+        onClick={() =>
+          setMostraNuovoAvviso(true)
+        }
+      >
+        <span className="simbolo-aggiungi">
+          ＋
+        </span>
+        Nuovo Avviso
+      </button>
+    )}
+  </div>
+
+  <div className="bacheca-intestazione">
+    <div
+      className="bacheca-simbolo"
+      aria-hidden="true"
+    >
+      ⛪
+    </div>
+
+    <h1>Bacheca Avvisi</h1>
+
+    <p>
+      {solaLettura
+        ? "Consulta gli avvisi della tua comunità parrocchiale."
+        : "Pubblica e gestisci gli avvisi destinati alla comunità parrocchiale."}
+    </p>
+  </div>
+</header>
 
       <section className="cornice-legno">
         <div className="cornice-modanatura">
