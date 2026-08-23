@@ -865,3 +865,496 @@ background: rgba(255, 255, 252, 0.42);
     -webkit-print-color-adjust: exact;
   }
 }
+
+/* =========================================================
+   BACHECA AVVISI — ARS LITURGICA
+   Nuova grafica
+   ========================================================= */
+
+.bacheca-avvisi {
+  width: 100%;
+  min-height: 100vh;
+  padding: 34px 24px 70px;
+  box-sizing: border-box;
+  background:
+    radial-gradient(
+      circle at 8% 4%,
+      rgba(196, 151, 71, 0.13),
+      transparent 30%
+    ),
+    linear-gradient(
+      180deg,
+      #fffdf8 0%,
+      #f8f2e8 100%
+    );
+  color: #493d31;
+}
+
+.bacheca-avvisi *,
+.bacheca-avvisi *::before,
+.bacheca-avvisi *::after {
+  box-sizing: border-box;
+}
+
+.bacheca-contenitore {
+  width: min(1180px, 100%);
+  margin: 0 auto;
+}
+
+
+/* BARRA SUPERIORE */
+
+.bacheca-barra-superiore {
+  min-height: 50px;
+  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.btn-torna-parrocchia,
+.btn-nuovo-avviso {
+  min-height: 46px;
+  padding: 0 20px;
+  border: 1px solid #b98a3e;
+  border-radius: 12px;
+  background: rgba(255, 253, 247, 0.96);
+  color: #6b5028;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 5px 14px rgba(92, 65, 27, 0.07);
+  transition:
+    transform 0.2s ease,
+    background 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.btn-torna-parrocchia:hover,
+.btn-nuovo-avviso:hover {
+  transform: translateY(-1px);
+  background: #fff5df;
+  box-shadow: 0 8px 18px rgba(92, 65, 27, 0.12);
+}
+
+.simbolo-aggiungi {
+  margin-right: 5px;
+  font-size: 1.1rem;
+}
+
+
+/* TESTATA */
+
+.bacheca-testata {
+  padding: 32px 20px 38px;
+  text-align: center;
+}
+
+.bacheca-simbolo {
+  width: 66px;
+  height: 66px;
+  margin: 0 auto 16px;
+  display: grid;
+  place-items: center;
+  border: 1px solid rgba(179, 130, 48, 0.42);
+  border-radius: 50%;
+  background: rgba(255, 249, 236, 0.8);
+  font-size: 2rem;
+  box-shadow: 0 7px 20px rgba(99, 70, 28, 0.06);
+}
+
+.bacheca-sovratitolo {
+  margin: 0 0 8px;
+  color: #a57528;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+}
+
+.bacheca-testata h1 {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(2.6rem, 5vw, 4rem);
+  line-height: 1.05;
+  font-weight: 500;
+  color: #4e3b25;
+}
+
+.bacheca-sottotitolo {
+  max-width: 650px;
+  margin: 15px auto 0;
+  color: #7e7061;
+  font-size: 1.05rem;
+  line-height: 1.65;
+}
+
+.bacheca-separatore {
+  width: min(460px, 80%);
+  margin: 28px auto 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 13px;
+}
+
+.bacheca-separatore span {
+  height: 1px;
+  flex: 1;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    #c39a57
+  );
+}
+
+.bacheca-separatore span:last-child {
+  background: linear-gradient(
+    90deg,
+    #c39a57,
+    transparent
+  );
+}
+
+.bacheca-separatore strong {
+  color: #ae7d2d;
+  font-size: 0.9rem;
+  font-weight: 400;
+}
+
+
+/* SEZIONE AVVISI */
+
+.bacheca-sezione-avvisi {
+  padding: 34px;
+  border: 1px solid rgba(191, 157, 103, 0.38);
+  border-radius: 22px;
+  background: rgba(255, 254, 250, 0.78);
+  box-shadow: 0 18px 45px rgba(65, 47, 27, 0.07);
+}
+
+.bacheca-titolo-sezione {
+  margin-bottom: 26px;
+}
+
+.bacheca-titolo-sezione p {
+  margin: 0 0 5px;
+  color: #a57528;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.bacheca-titolo-sezione h2 {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.9rem;
+  font-weight: 500;
+  color: #503d28;
+}
+
+
+/* CARDS */
+
+.elenco-avvisi {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.scheda-avviso {
+  min-height: 160px;
+  display: grid;
+  grid-template-columns: 150px minmax(0, 1fr);
+  overflow: hidden;
+  border: 1px solid #e1d6c7;
+  border-radius: 18px;
+  background: #fffefa;
+  box-shadow: 0 8px 24px rgba(67, 48, 25, 0.07);
+  cursor: pointer;
+  transition:
+    transform 0.2s ease,
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.scheda-avviso:hover {
+  transform: translateY(-2px);
+  border-color: #c49a53;
+  box-shadow: 0 13px 30px rgba(67, 48, 25, 0.11);
+}
+
+.scheda-avviso-data {
+  padding: 25px 18px;
+  display: grid;
+  place-items: center;
+  border-right: 1px solid #eadfce;
+  background:
+    linear-gradient(
+      145deg,
+      #fbf2df,
+      #fffaf0
+    );
+  text-align: center;
+}
+
+.scheda-avviso-data span {
+  color: #8e651f;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.scheda-avviso-corpo {
+  min-width: 0;
+  padding: 25px 28px 20px;
+  display: flex;
+  flex-direction: column;
+}
+
+.categoria-avviso-bacheca {
+  width: fit-content;
+  margin: 0 0 8px;
+  color: #a36e19;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.scheda-avviso-corpo h3 {
+  margin: 0 0 24px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.65rem;
+  line-height: 1.2;
+  font-weight: 500;
+  color: #4b3926;
+  overflow-wrap: anywhere;
+}
+
+.scheda-avviso-fondo {
+  margin-top: auto;
+  padding-top: 15px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  border-top: 1px solid #eee5d9;
+  color: #8b7c6b;
+  font-size: 0.88rem;
+}
+
+.scheda-avviso-fondo strong {
+  color: #9f6c1b;
+  font-size: 0.86rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+
+/* PRIORITÀ */
+
+.scheda-avviso.priorita-alta {
+  border-left: 4px solid #c18a32;
+}
+
+.scheda-avviso.priorita-urgente {
+  border-left: 4px solid #a5523d;
+}
+
+
+/* STATO VUOTO / CARICAMENTO */
+
+.bacheca-stato {
+  min-height: 230px;
+  padding: 35px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e5dbce;
+  border-radius: 17px;
+  background: #fffefa;
+  text-align: center;
+  color: #776a5c;
+}
+
+.bacheca-stato-icona {
+  margin-bottom: 12px;
+  font-size: 2rem;
+}
+
+.bacheca-stato h3 {
+  margin: 0 0 10px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.6rem;
+  font-weight: 500;
+  color: #4c3a28;
+}
+
+.bacheca-stato p {
+  margin: 0;
+  line-height: 1.65;
+}
+
+.bacheca-stato-errore {
+  color: #805044;
+}
+
+.btn-crea-primo-avviso {
+  min-height: 46px;
+  margin-top: 20px;
+  padding: 0 20px;
+  border: 1px solid #b98734;
+  border-radius: 11px;
+  background: #fff6e3;
+  color: #714c10;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+
+/* DETTAGLIO AVVISO */
+
+.sfondo-dettaglio-avviso {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  padding: 24px;
+  display: grid;
+  place-items: center;
+  background: rgba(48, 37, 27, 0.48);
+  backdrop-filter: blur(4px);
+}
+
+.dettaglio-avviso {
+  position: relative;
+  width: min(760px, 100%);
+  max-height: 88vh;
+  overflow-y: auto;
+  padding: 44px;
+  border: 1px solid #d9c6a7;
+  border-radius: 20px;
+  background: #fffdf8;
+  box-shadow: 0 25px 70px rgba(40, 29, 17, 0.25);
+}
+
+.dettaglio-avviso h2 {
+  margin: 8px 45px 25px 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.9rem, 4vw, 2.8rem);
+  line-height: 1.15;
+  font-weight: 500;
+  color: #4b3825;
+}
+
+.btn-chiudi-avviso {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  border: 1px solid #d8c7b2;
+  border-radius: 50%;
+  background: #fff9ef;
+  color: #765e42;
+  font-size: 1.55rem;
+  cursor: pointer;
+}
+
+.testo-avviso-bacheca {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.05rem;
+  line-height: 1.75;
+  color: #51483f;
+}
+
+.testo-avviso-bacheca p {
+  margin: 0 0 14px;
+}
+
+.dati-avviso-bacheca {
+  margin-top: 28px;
+  padding-top: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  border-top: 1px solid #e7ddcf;
+  color: #887969;
+  font-size: 0.9rem;
+}
+
+.dati-avviso-bacheca strong {
+  color: #8f631f;
+}
+
+
+/* MOBILE */
+
+@media (max-width: 760px) {
+  .bacheca-avvisi {
+    padding: 20px 12px 45px;
+  }
+
+  .bacheca-barra-superiore {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .btn-torna-parrocchia,
+  .btn-nuovo-avviso {
+    width: 100%;
+  }
+
+  .bacheca-testata {
+    padding: 25px 10px 32px;
+  }
+
+  .bacheca-simbolo {
+    width: 58px;
+    height: 58px;
+  }
+
+  .bacheca-sezione-avvisi {
+    padding: 20px 15px;
+    border-radius: 17px;
+  }
+
+  .scheda-avviso {
+    grid-template-columns: 1fr;
+  }
+
+  .scheda-avviso-data {
+    min-height: 60px;
+    padding: 12px 18px;
+    border-right: 0;
+    border-bottom: 1px solid #eadfce;
+  }
+
+  .scheda-avviso-corpo {
+    padding: 21px 20px 18px;
+  }
+
+  .scheda-avviso-fondo {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .dettaglio-avviso {
+    padding: 36px 22px 26px;
+  }
+
+  .dati-avviso-bacheca {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 8px;
+  }
+}
