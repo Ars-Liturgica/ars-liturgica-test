@@ -449,10 +449,11 @@ outlineOffset: "-12px",
   />
 </div>
   <AccessoRiservato
-  onEntra={() => setAmbiente("parrocchia")}
+  onAttivaParrocchia={() => setAmbiente("parrocchia")}
+  onAccediGestione={() => setAmbiente("parrocchia")}
   onEntraComunita={() => setAmbiente("comunita")}
-    onEntraAreaPersonale={() => setAmbiente("area-personale")}
-    onEntraSuperAdmin={() => setAmbiente("superadmin")}
+  onEntraFedele={() => {}}
+  onEntraSuperAdmin={() => setAmbiente("superadmin")}
 />
 
 <section className="mt-8 rounded-3xl border border-[#c9a44c] bg-[#fff8ea] p-5 shadow-lg">
