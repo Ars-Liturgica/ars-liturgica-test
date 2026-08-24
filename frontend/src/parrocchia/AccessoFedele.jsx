@@ -20,53 +20,27 @@ export default function AccessoFedele({ tornaHome }) {
     setMessaggio("");
 
     try {
-      const { data: utente, error: erroreUtente } = await supabase
-        .from("utenti")
-        .select("id, identificativo")
-        .ilike("identificativo", idScelto)
-        .maybeSingle();
+  const { data, error } = await supabase.rpc("entra_fedele", {
+    p_identificativo: idScelto,
+  });
 
-      if (erroreUtente) throw erroreUtente;
+  if (error) {
+    throw error;
+  }
 
-      if (!utente) {
-        setMessaggio(
-          "Non troviamo questo nome. Controlla di averlo scritto come al momento della registrazione."
-        );
-        return;
-      }
+  if (!data) {
+    setMessaggio(
+      "Non troviamo questo nome. Controlla di averlo scritto come al momento della registrazione."
+    );
+    return;
+  }
 
-      const { data: collegamento, error: erroreCollegamento } =
-        await supabase
-          .from("utenti_parrocchie")
-          .select("parrocchia_id")
-          .eq("utente_id", utente.id)
-          .eq("ruolo", "fedele")
-          .eq("stato", "attivo")
-          .maybeSingle();
+  localStorage.setItem("ars_utente_id", data.utente_id);
+  localStorage.setItem("ars_parrocchia_id", data.parrocchia_id);
+  localStorage.setItem("ars_nome_parrocchia", data.nome_parrocchia);
+  localStorage.setItem("ars_identificativo", data.identificativo);
 
-      if (erroreCollegamento) throw erroreCollegamento;
-
-      if (!collegamento) {
-        setMessaggio(
-          "Non risulta una parrocchia attiva collegata a questo nome."
-        );
-        return;
-      }
-
-      const { data: parrocchia, error: erroreParrocchia } = await supabase
-        .from("parrocchie")
-        .select("id, nome")
-        .eq("id", collegamento.parrocchia_id)
-        .single();
-
-      if (erroreParrocchia) throw erroreParrocchia;
-
-      localStorage.setItem("ars_utente_id", utente.id);
-      localStorage.setItem("ars_parrocchia_id", parrocchia.id);
-      localStorage.setItem("ars_nome_parrocchia", parrocchia.nome);
-      localStorage.setItem("ars_identificativo", utente.identificativo);
-
-      setAccessoCompletato(true);
+  setAccessoCompletato(true);
     } catch (error) {
       console.error("Errore accesso fedele:", error);
       setMessaggio(
