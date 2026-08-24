@@ -97,20 +97,32 @@ export default function DashboardFedele() {
           </h1>
         </div>
 
-        <div
+              <div
           style={{
+            width: "100%",
+            boxSizing: "border-box",
             background: "#fffdf9",
             border: "1px solid #e5d9ca",
-            borderRadius: "18px",
-            padding: "28px 32px",
-            marginBottom: "38px",
-            boxShadow: "0 6px 20px rgba(68, 52, 35, 0.06)",
+            borderRadius: "22px",
+            padding: "42px 55px",
+            margin: "0 auto 42px",
+            textAlign: "center",
+            boxShadow: "0 8px 28px rgba(68, 52, 35, 0.07)",
           }}
         >
+          <div
+            style={{
+              width: "46px",
+              height: "1px",
+              background: "#c99536",
+              margin: "0 auto 22px",
+            }}
+          />
+
           <h2
             style={{
-              margin: "0 0 12px",
-              fontSize: "24px",
+              margin: "0 0 20px",
+              fontSize: "28px",
               fontWeight: "500",
               color: "#49392c",
             }}
@@ -120,14 +132,46 @@ export default function DashboardFedele() {
 
           <p
             style={{
-              margin: 0,
+              maxWidth: "900px",
+              margin: "0 auto",
               fontSize: "17px",
-              lineHeight: "1.75",
+              lineHeight: "1.8",
               color: "#66584c",
             }}
           >
             {messaggioBenvenuto}
           </p>
+
+          <div
+            style={{
+              width: "46px",
+              height: "1px",
+              background: "#c99536",
+              margin: "26px auto 20px",
+            }}
+          />
+
+          <div
+            style={{
+              fontSize: "13px",
+              letterSpacing: "1.5px",
+              textTransform: "uppercase",
+              color: "#8a7258",
+              marginBottom: "7px",
+            }}
+          >
+            Il tuo parroco
+          </div>
+
+          <div
+            style={{
+              fontSize: "19px",
+              fontWeight: "500",
+              color: "#49392c",
+            }}
+          >
+            {localStorage.getItem("ars_nome_parroco") || "Il Parroco"}
+          </div>
         </div>
 
         <div
