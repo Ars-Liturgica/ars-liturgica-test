@@ -1,10 +1,25 @@
 import React from "react";
+
 export default function AccessoRiservato({
-  onEntra,
+  onAttivaParrocchia,
+  onAccediGestione,
   onEntraComunita,
-  onEntraAreaPersonale,
+  onEntraFedele,
   onEntraSuperAdmin,
 }) {
+  const stilePulsante = {
+    width: "100%",
+    minHeight: "54px",
+    borderRadius: "10px",
+    padding: "10px 12px",
+    color: "#ffffff",
+    fontSize: "15px",
+    fontWeight: "800",
+    letterSpacing: "0.25px",
+    cursor: "pointer",
+    boxShadow: "0 3px 8px rgba(0,0,0,0.18)",
+  };
+
   return (
     <section
       style={{
@@ -13,7 +28,8 @@ export default function AccessoRiservato({
         padding: "10px",
         border: "2px solid #d6a23a",
         borderRadius: "18px",
-        background: "linear-gradient(135deg, #fff6df 0%, #f8e8c5 100%)",
+        background:
+          "linear-gradient(135deg, #fff6df 0%, #f8e8c5 100%)",
         boxShadow: "0 8px 22px rgba(90, 50, 0, 0.28)",
       }}
     >
@@ -27,181 +43,276 @@ export default function AccessoRiservato({
           background: "rgba(255, 250, 235, 0.75)",
         }}
       >
-        <div
-  style={{
-    minHeight: "320px",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "transparent",
-  }}
->
-  <img
-    src="/access-door.png"
-    alt="Accesso Riservato"
-    style={{
-     width: "520px",
-     maxWidth: "none",
-      height: "auto",
-      display: "block",
-    }}
-  />
-</div>
-
+        {/* PORTA - INVARIATA */}
         <div
           style={{
-            padding: "30px 34px",
-            textAlign: "center",
+            minHeight: "390px",
             display: "flex",
-            flexDirection: "column",
             alignItems: "center",
             justifyContent: "center",
+            background: "transparent",
+          }}
+        >
+          <img
+            src="/access-door.png"
+            alt="Ingresso Ars Liturgica"
+            style={{
+              width: "520px",
+              maxWidth: "none",
+              height: "auto",
+              display: "block",
+            }}
+          />
+        </div>
+
+        {/* AREA ACCESSI */}
+        <div
+          style={{
+            padding: "24px 26px",
             color: "#5b0b0b",
           }}
         >
-          <div
-            style={{
-              width: "54px",
-              height: "54px",
-              border: "2px solid #d6a23a",
-              borderRadius: "50%",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "#b88318",
-              fontSize: "26px",
-              marginBottom: "14px",
-            }}
-          >
-            ⛪
-          </div>
-
           <h2
             style={{
-              margin: "0 0 16px 0",
-              fontSize: "31px",
-              lineHeight: "1.1",
-              fontWeight: "700",
-              textTransform: "uppercase",
-              letterSpacing: "0.5px",
-              color: "#6b1111",
+              margin: "0 0 5px",
+              textAlign: "center",
+              fontSize: "28px",
+              lineHeight: "1.15",
+              color: "#8b1e2d",
+              letterSpacing: "0.4px",
             }}
           >
-            ACCESSO RISERVATO
+            ENTRA IN ARS LITURGICA
           </h2>
-
-          <div
-            style={{
-              width: "120px",
-              height: "1px",
-              background: "#d6a23a",
-              marginBottom: "18px",
-            }}
-          />
 
           <p
             style={{
-              margin: "0 0 24px 0",
-              fontSize: "17px",
-              lineHeight: "1.45",
-              color: "#2d1b0b",
+              margin: "0 0 20px",
+              textAlign: "center",
+              fontSize: "16px",
+              color: "#6b5a45",
             }}
           >
-            Entra nella tua area dedicata per gestire
-            <br />
-            la vita della tua comunità.
+            Scegli semplicemente il percorso che ti riguarda
           </p>
 
-          <button
-  onClick={onEntra}
-  style={{
-              background: "linear-gradient(180deg, #8b0000, #5a0000)",
-              color: "#ffffff",
-              border: "none",
-              borderRadius: "8px",
-              padding: "13px 32px",
-              fontSize: "14px",
-              fontWeight: "700",
-              letterSpacing: "0.4px",
-              cursor: "pointer",
-              boxShadow: "0 3px 8px rgba(0,0,0,0.25)",
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "16px",
             }}
           >
-            🔒 ENTRA NELLA TUA AREA
-          </button>
-         <button
- onClick={onEntraComunita}
-  style={{
-    marginTop: "16px",
-    background: "linear-gradient(180deg, #1f6d3d, #2f8f55)",
-    color: "#ffffff",
-    border: "none",
-    borderRadius: "8px",
-    padding: "13px 32px",
-    fontSize: "14px",
-    fontWeight: "700",
-    letterSpacing: "0.4px",
-    cursor: "pointer",
-    boxShadow: "0 3px 8px rgba(0,0,0,0.25)",
-  }}
->
-  🏛️ UNISCITI ALLA TUA COMUNITÀ PARROCCHIALE
-</button>
-          <button
-  onClick={onEntraAreaPersonale}
-  style={{
-    marginTop: "16px",
-    background: "linear-gradient(180deg, #0b2f55, #061d35)",
-    color: "#ffffff",
-    border: "1px solid #d6a23a",
-    borderRadius: "8px",
-    padding: "13px 32px",
-    fontSize: "14px",
-    fontWeight: "700",
-    letterSpacing: "0.4px",
-    cursor: "pointer",
-    boxShadow: "0 3px 8px rgba(0,0,0,0.25)",
-  }}
->
-  👤 AREA PERSONALE
-</button>
-        </div>
-        <div
-  style={{
-    textAlign: "center",
-    marginTop: "28px",
-    paddingTop: "18px",
-    borderTop: "1px solid #d8c59a",
-  }}
->
-  <p
-    style={{
-      margin: "0 0 12px",
-      fontSize: "12px",
-      color: "#8a6d3b",
-      letterSpacing: "1px",
-      textTransform: "uppercase",
-    }}
-  >
-    Accesso riservato
-  </p>
+            {/* PARROCO */}
+            <div
+              style={{
+                border: "2px solid #d6a23a",
+                borderRadius: "16px",
+                overflow: "hidden",
+                background: "#fffaf0",
+                boxShadow: "0 5px 14px rgba(90,50,0,0.10)",
+              }}
+            >
+              <div
+                style={{
+                  padding: "13px 10px",
+                  textAlign: "center",
+                  color: "#ffffff",
+                  background: "#8b1e2d",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "18px",
+                    fontWeight: "700",
+                  }}
+                >
+                  ⛪ Parroco e collaboratori
+                </div>
 
-  <button
-    onClick={onEntraSuperAdmin}
-    style={{
-      background: "transparent",
-      border: "1px solid #8b0000",
-      color: "#8b0000",
-      padding: "10px 24px",
-      borderRadius: "8px",
-      cursor: "pointer",
-      fontWeight: "bold",
-      fontSize: "14px",
-    }}
-  >
-    Console SuperAdmin
-  </button>
-</div>
+                <div
+                  style={{
+                    marginTop: "4px",
+                    fontFamily: "Arial, sans-serif",
+                    fontSize: "13px",
+                  }}
+                >
+                  Gestione della comunità
+                </div>
+              </div>
+
+              <div style={{ padding: "15px" }}>
+                <div
+                  style={{
+                    fontFamily: "Arial, sans-serif",
+                    fontSize: "14px",
+                    fontWeight: "700",
+                    color: "#6b5a45",
+                    marginBottom: "7px",
+                  }}
+                >
+                  Per iniziare
+                </div>
+
+                <button
+                  type="button"
+                  onClick={onAttivaParrocchia}
+                  style={{
+                    ...stilePulsante,
+                    background:
+                      "linear-gradient(180deg, #8b1e2d, #68131d)",
+                    border: "1px solid #68131d",
+                  }}
+                >
+                  ATTIVA UNA PARROCCHIA
+                </button>
+
+                <div
+                  style={{
+                    fontFamily: "Arial, sans-serif",
+                    fontSize: "14px",
+                    fontWeight: "700",
+                    color: "#6b5a45",
+                    marginTop: "15px",
+                    marginBottom: "7px",
+                  }}
+                >
+                  Se Ars è già attiva
+                </div>
+
+                <button
+                  type="button"
+                  onClick={onAccediGestione}
+                  style={{
+                    ...stilePulsante,
+                    background:
+                      "linear-gradient(180deg, #0b2f55, #061d35)",
+                    border: "1px solid #d6a23a",
+                  }}
+                >
+                  ACCEDI ALLA GESTIONE
+                </button>
+              </div>
+            </div>
+
+            {/* FEDELI */}
+            <div
+              style={{
+                border: "2px solid #d6a23a",
+                borderRadius: "16px",
+                overflow: "hidden",
+                background: "#fffaf0",
+                boxShadow: "0 5px 14px rgba(90,50,0,0.10)",
+              }}
+            >
+              <div
+                style={{
+                  padding: "13px 10px",
+                  textAlign: "center",
+                  color: "#ffffff",
+                  background: "#2f6f4e",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: "18px",
+                    fontWeight: "700",
+                  }}
+                >
+                  👥 Fedeli
+                </div>
+
+                <div
+                  style={{
+                    marginTop: "4px",
+                    fontFamily: "Arial, sans-serif",
+                    fontSize: "13px",
+                  }}
+                >
+                  Ingresso nella propria parrocchia
+                </div>
+              </div>
+
+              <div style={{ padding: "15px" }}>
+                <div
+                  style={{
+                    fontFamily: "Arial, sans-serif",
+                    fontSize: "14px",
+                    fontWeight: "700",
+                    color: "#6b5a45",
+                    marginBottom: "7px",
+                  }}
+                >
+                  Per unirti alla comunità
+                </div>
+
+                <button
+                  type="button"
+                  onClick={onEntraComunita}
+                  style={{
+                    ...stilePulsante,
+                    background:
+                      "linear-gradient(180deg, #2f8f55, #246d43)",
+                    border: "1px solid #24593e",
+                  }}
+                >
+                  UNISCITI ALLA TUA COMUNITÀ PARROCCHIALE
+                </button>
+
+                <div
+                  style={{
+                    fontFamily: "Arial, sans-serif",
+                    fontSize: "14px",
+                    fontWeight: "700",
+                    color: "#6b5a45",
+                    marginTop: "15px",
+                    marginBottom: "7px",
+                  }}
+                >
+                  Se sei già registrato
+                </div>
+
+                <button
+                  type="button"
+                  onClick={onEntraFedele}
+                  style={{
+                    ...stilePulsante,
+                    background:
+                      "linear-gradient(180deg, #8b1e2d, #68131d)",
+                    border: "1px solid #d6a23a",
+                  }}
+                >
+                  ENTRA NELLA TUA PARROCCHIA
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* SUPERADMIN */}
+          <div
+            style={{
+              textAlign: "center",
+              marginTop: "18px",
+              paddingTop: "14px",
+              borderTop: "1px solid #d8c59a",
+            }}
+          >
+            <button
+              type="button"
+              onClick={onEntraSuperAdmin}
+              style={{
+                background: "transparent",
+                border: "none",
+                color: "#8b0000",
+                cursor: "pointer",
+                fontSize: "12px",
+                textDecoration: "underline",
+              }}
+            >
+              Console SuperAdmin
+            </button>
+          </div>
+        </div>
       </div>
     </section>
   );
