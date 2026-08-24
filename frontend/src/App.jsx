@@ -175,6 +175,13 @@ useEffect(() => {
     />
   );
 }
+  if (ambiente === "attivazione-parrocchia") {
+  return (
+    <AttivazioneParrocchia
+      onAttivazioneCompletata={() => setAmbiente("parrocchia")}
+    />
+  );
+}
   if (ambiente === "comunita") {
    
   return (
@@ -455,7 +462,7 @@ outlineOffset: "-12px",
   />
 </div>
   <AccessoRiservato
-  onAttivaParrocchia={() => setAmbiente("parrocchia")}
+  onAttivaParrocchia={() => setAmbiente("attivazione-parrocchia")}
   onAccediGestione={() => setAmbiente("parrocchia")}
   onEntraComunita={() => setAmbiente("comunita")}
  onEntraFedele={() => setAmbiente("fedele")}
