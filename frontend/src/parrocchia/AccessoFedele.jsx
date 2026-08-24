@@ -39,7 +39,7 @@ export default function AccessoFedele({ tornaHome }) {
   localStorage.setItem("ars_parrocchia_id", data.parrocchia_id);
   localStorage.setItem("ars_nome_parrocchia", data.nome_parrocchia);
   localStorage.setItem("ars_identificativo", data.identificativo);
-
+localStorage.setItem("ars_nome_parroco", data.nome_parroco || "");
   setAccessoCompletato(true);
     } catch (error) {
       console.error("Errore accesso fedele:", error);
