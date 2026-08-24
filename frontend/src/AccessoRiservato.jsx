@@ -9,7 +9,7 @@ export default function AccessoRiservato({
 }) {
   const stilePulsante = {
     width: "100%",
-    minHeight: "54px",
+ height: "82px",
     borderRadius: "10px",
     padding: "10px 12px",
     color: "#ffffff",
@@ -164,7 +164,7 @@ export default function AccessoRiservato({
                     border: "1px solid #68131d",
                   }}
                 >
-                  ATTIVA UNA PARROCCHIA
+                  ATTIVA LA TUA PARROCCHIA
                 </button>
 
                 <div
