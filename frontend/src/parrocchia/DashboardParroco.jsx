@@ -1,5 +1,6 @@
 import BachecaAvvisi from "./stanze/BachecaAvvisi/BachecaAvvisi";
 import ArchivioDocumenti from "./stanze/ArchivioDocumenti/ArchivioDocumenti/ArchivioDocumenti";
+import ComunitaParrocchia from "./stanze/Comunita/ComunitaParrocchia";
 import React, { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient";
 export default function DashboardParroco() {
@@ -39,6 +40,7 @@ if (parrocchiaCaricata) {
 ),
       titolo: "Comunità",
       descrizione: "Fedeli iscritti, ruoli e autorizzazioni alle stanze riservate.",
+     stanza: "comunita",
     },
     {
       icona: (
@@ -99,6 +101,14 @@ if (parrocchiaCaricata) {
       descrizione: "Dati della parrocchia, configurazioni e servizi attivi.",
     },
   ];
+ if (stanzaAperta === "comunita") {
+  return (
+    <ComunitaParrocchia
+      parrocchiaId={parrocchia?.id}
+      tornaDashboard={() => setStanzaAperta(null)}
+    />
+  );
+}
 if (stanzaAperta === "bacheca-avvisi") {
   return (
    <BachecaAvvisi parrocchia={parrocchia} /> 
