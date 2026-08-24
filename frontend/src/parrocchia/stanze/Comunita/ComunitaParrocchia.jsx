@@ -246,6 +246,8 @@ export default function ComunitaParrocchia({
                       textAlign: "left",
                       padding: "13px 12px",
                       borderBottom: "2px solid #dddddd",
+                      color: "#7a1f3d",
+fontWeight: "700",
                     }}
                   >
                     {titolo}
@@ -254,7 +256,7 @@ export default function ComunitaParrocchia({
               </tr>
             </thead>
 
-            <tbody>
+         <tbody style={{ color: "#222222" }}>
               {personeFiltrate.map((persona) => (
                 <tr key={persona.chiave}>
                   <td
