@@ -440,9 +440,33 @@ export default function AdminParrocchie({ tornaHome }) {
 
                       <div style={recapitiPersonaStyle}>
                         <p>
-                          <strong>Telefono:</strong>{" "}
-                          {persona.telefono || "Non indicato"}
-                        </p>
+  <strong>Telefono:</strong>{" "}
+  {persona.telefono || "Non indicato"}
+
+  {persona.telefono && (
+    <>
+      {" "}
+      <a
+        href={`https://wa.me/39${persona.telefono.replace(/\D/g, "")}`}
+        target="_blank"
+        rel="noreferrer"
+        style={{
+          display: "inline-block",
+          marginLeft: "10px",
+          padding: "6px 10px",
+          borderRadius: "8px",
+          background: "#1f7a4d",
+          color: "#ffffff",
+          textDecoration: "none",
+          fontWeight: "bold",
+          fontSize: "13px",
+        }}
+      >
+        WhatsApp
+      </a>
+    </>
+  )}
+</p>
 
                         <p>
                           <strong>Email:</strong>{" "}
