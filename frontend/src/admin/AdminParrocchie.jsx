@@ -10,6 +10,11 @@ export default function AdminParrocchie({ tornaHome }) {
   const [statoSelezionato, setStatoSelezionato] = useState("tutti");
   const [parrocchiaSelezionata, setParrocchiaSelezionata] = useState(null);
 
+  const [contattiAperti, setContattiAperti] = useState(false);
+  const [contatti, setContatti] = useState([]);
+  const [caricamentoContatti, setCaricamentoContatti] = useState(false);
+  const [erroreContatti, setErroreContatti] = useState("");
+
   useEffect(() => {
     caricaParrocchie();
   }, []);
@@ -123,7 +128,6 @@ export default function AdminParrocchie({ tornaHome }) {
       }
 
       gruppi[diocesi].push(parrocchia);
-
       return gruppi;
     }, {});
   }, [parrocchieFiltrate]);
@@ -136,6 +140,20 @@ export default function AdminParrocchie({ tornaHome }) {
       month: "2-digit",
       year: "numeric",
     }).format(new Date(data));
+  }
+
+  function formattaRuolo(ruolo) {
+    if (!ruolo) return "Fedele";
+
+    const ruoli = {
+      parroco: "Parroco",
+      viceparroco: "Viceparroco",
+      sacerdote: "Sacerdote",
+      collaboratore: "Collaboratore",
+      fedele: "Fedele",
+    };
+
+    return ruoli[ruolo.toLowerCase()] || ruolo;
   }
 
   function stampaElenco() {
@@ -162,17 +180,283 @@ export default function AdminParrocchie({ tornaHome }) {
     }
 
     setParrocchiaSelezionata(null);
+    setContattiAperti(false);
+    setContatti([]);
     await caricaParrocchie();
   }
 
   function apriParrocchia(parrocchia) {
     setParrocchiaSelezionata(parrocchia);
+    setContattiAperti(false);
+    setContatti([]);
+    setErroreContatti("");
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function tornaAlleParrocchie() {
     setParrocchiaSelezionata(null);
+    setContattiAperti(false);
+    setContatti([]);
+    setErroreContatti("");
     window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function apriContatti() {
+    if (!parrocchiaSelezionata) return;
+
+    setCaricamentoContatti(true);
+    setErroreContatti("");
+    setContatti([]);
+
+    try {
+      const { data: collegamenti, error: erroreCollegamenti } =
+        await supabase
+          .from("utenti_parrocchie")
+          .select("*")
+          .eq("parrocchia_id", parrocchiaSelezionata.id);
+
+      if (erroreCollegamenti) {
+        throw erroreCollegamenti;
+      }
+
+      const idsUtenti = [
+        ...new Set(
+          (collegamenti || [])
+            .map((riga) => riga.utente_id)
+            .filter(Boolean)
+        ),
+      ];
+
+      let utenti = [];
+
+      if (idsUtenti.length > 0) {
+        const { data: datiUtenti, error: erroreUtenti } =
+          await supabase
+            .from("utenti")
+            .select("*")
+            .in("id", idsUtenti);
+
+        if (erroreUtenti) {
+          throw erroreUtenti;
+        }
+
+        utenti = datiUtenti || [];
+      }
+
+      const { data: personeRubrica, error: erroreRubrica } =
+        await supabase
+          .from("persone_parrocchia")
+          .select("*")
+          .eq("parrocchia_id", parrocchiaSelezionata.id);
+
+      if (erroreRubrica) {
+        throw erroreRubrica;
+      }
+
+      const elenco = new Map();
+
+      (collegamenti || []).forEach((collegamento) => {
+        const utente = utenti.find(
+          (persona) => persona.id === collegamento.utente_id
+        );
+
+        if (!utente) return;
+
+        const chiave = `utente-${utente.id}`;
+
+        elenco.set(chiave, {
+          id: chiave,
+          utente_id: utente.id,
+          nome: utente.nome || "",
+          cognome: utente.cognome || "",
+          email: utente.email || "",
+          telefono: utente.telefono || "",
+          ruolo: collegamento.ruolo || "fedele",
+        });
+      });
+
+      (personeRubrica || []).forEach((persona) => {
+        if (persona.utente_id) {
+          const chiaveUtente = `utente-${persona.utente_id}`;
+
+          if (elenco.has(chiaveUtente)) {
+            const esistente = elenco.get(chiaveUtente);
+
+            elenco.set(chiaveUtente, {
+              ...esistente,
+              nome: persona.nome || esistente.nome,
+              cognome: persona.cognome || esistente.cognome,
+              email: persona.email || esistente.email,
+              telefono: persona.telefono || esistente.telefono,
+              ruolo:
+                persona.ruolo_base ||
+                esistente.ruolo ||
+                "fedele",
+            });
+
+            return;
+          }
+        }
+
+        const chiaveNome = `persona-${persona.id}`;
+
+        elenco.set(chiaveNome, {
+          id: chiaveNome,
+          utente_id: persona.utente_id || null,
+          nome: persona.nome || "",
+          cognome: persona.cognome || "",
+          email: persona.email || "",
+          telefono: persona.telefono || "",
+          ruolo: persona.ruolo_base || "fedele",
+        });
+      });
+
+      const ordinati = Array.from(elenco.values()).sort((a, b) => {
+        const ordineRuoli = {
+          parroco: 1,
+          viceparroco: 2,
+          sacerdote: 3,
+          collaboratore: 4,
+          fedele: 5,
+        };
+
+        const ordineA =
+          ordineRuoli[(a.ruolo || "").toLowerCase()] || 99;
+
+        const ordineB =
+          ordineRuoli[(b.ruolo || "").toLowerCase()] || 99;
+
+        if (ordineA !== ordineB) {
+          return ordineA - ordineB;
+        }
+
+        const nomeA = `${a.cognome || ""} ${a.nome || ""}`;
+        const nomeB = `${b.cognome || ""} ${b.nome || ""}`;
+
+        return nomeA.localeCompare(nomeB, "it");
+      });
+
+      setContatti(ordinati);
+      setContattiAperti(true);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    } catch (error) {
+      console.error("Errore caricamento contatti:", error);
+
+      setErroreContatti(
+        "Non è stato possibile caricare i contatti della parrocchia."
+      );
+
+      setContattiAperti(true);
+    } finally {
+      setCaricamentoContatti(false);
+    }
+  }
+
+  if (parrocchiaSelezionata && contattiAperti) {
+    return (
+      <div style={paginaStyle}>
+        <div className="pagina-admin" style={sfondoStyle}>
+          <header style={headerStyle}>
+            <div>
+              <h1 style={logoStyle}>Ars Liturgica</h1>
+              <p style={payoffStyle}>Al servizio della celebrazione</p>
+              <p style={areaAdminStyle}>Area Admin</p>
+            </div>
+
+            <button
+              type="button"
+              onClick={async () => {
+                await supabase.auth.signOut();
+                tornaHome();
+              }}
+              style={pulsanteHomeStyle}
+            >
+              Torna alla Home
+            </button>
+          </header>
+
+          <main style={contenitoreStyle}>
+            <button
+              type="button"
+              onClick={() => {
+                setContattiAperti(false);
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+              style={pulsanteIndietroStyle}
+            >
+              ← Torna alla scheda
+            </button>
+
+            <p style={sovratitoloStyle}>CONTATTI DELLA PARROCCHIA</p>
+
+            <h2 style={titoloStyle}>
+              {parrocchiaSelezionata.nome}
+            </h2>
+
+            <p style={descrizioneStyle}>
+              Persone, ruoli e recapiti della comunità parrocchiale.
+            </p>
+
+            {caricamentoContatti && (
+              <div style={messaggioStyle}>
+                Caricamento dei contatti in corso…
+              </div>
+            )}
+
+            {erroreContatti && (
+              <div style={erroreStyle}>
+                {erroreContatti}
+              </div>
+            )}
+
+            {!caricamentoContatti &&
+              !erroreContatti &&
+              contatti.length === 0 && (
+                <div style={messaggioStyle}>
+                  Nessun contatto presente per questa parrocchia.
+                </div>
+              )}
+
+            {!caricamentoContatti &&
+              !erroreContatti &&
+              contatti.length > 0 && (
+                <div style={elencoContattiStyle}>
+                  {contatti.map((persona) => (
+                    <div
+                      key={persona.id}
+                      style={personaStyle}
+                    >
+                      <div>
+                        <p style={nomePersonaStyle}>
+                          {[persona.nome, persona.cognome]
+                            .filter(Boolean)
+                            .join(" ") || "Nome non indicato"}
+                        </p>
+
+                        <span style={ruoloPersonaStyle}>
+                          {formattaRuolo(persona.ruolo)}
+                        </span>
+                      </div>
+
+                      <div style={recapitiPersonaStyle}>
+                        <p>
+                          <strong>Telefono:</strong>{" "}
+                          {persona.telefono || "Non indicato"}
+                        </p>
+
+                        <p>
+                          <strong>Email:</strong>{" "}
+                          {persona.email || "Non indicata"}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+          </main>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -351,9 +635,7 @@ export default function AdminParrocchie({ tornaHome }) {
                   </div>
 
                   <div style={bloccoDettaglioStyle}>
-                    <p style={titoloBloccoStyle}>
-                      Contatti
-                    </p>
+                    <p style={titoloBloccoStyle}>Contatti</p>
 
                     <p>
                       <strong>Telefono:</strong>{" "}
@@ -382,6 +664,18 @@ export default function AdminParrocchie({ tornaHome }) {
                         "Non indicato"
                       )}
                     </p>
+
+                    <button
+                      type="button"
+                      onClick={apriContatti}
+                      disabled={caricamentoContatti}
+                      className="non-stampare"
+                      style={pulsanteContattiStyle}
+                    >
+                      {caricamentoContatti
+                        ? "Caricamento..."
+                        : "Apri contatti"}
+                    </button>
                   </div>
 
                   <div style={bloccoDettaglioStyle}>
@@ -525,10 +819,7 @@ export default function AdminParrocchie({ tornaHome }) {
                     </option>
 
                     {diocesiDisponibili.map((diocesi) => (
-                      <option
-                        key={diocesi}
-                        value={diocesi}
-                      >
+                      <option key={diocesi} value={diocesi}>
                         {diocesi}
                       </option>
                     ))}
@@ -806,7 +1097,7 @@ const titoloStyle = {
 };
 
 const descrizioneStyle = {
-  margin: "14px 0 0",
+  margin: "14px 0 30px",
   color: "#5a6570",
   fontFamily: "Arial, sans-serif",
   fontSize: "17px",
@@ -866,6 +1157,7 @@ const pulsanteStampaStyle = {
 };
 
 const messaggioStyle = {
+  marginTop: "25px",
   padding: "35px",
   textAlign: "center",
   background: "#fff8e8",
@@ -876,6 +1168,7 @@ const messaggioStyle = {
 };
 
 const erroreStyle = {
+  marginTop: "25px",
   padding: "28px",
   background: "#fff0f0",
   border: "1px solid #c66a6a",
@@ -1004,6 +1297,17 @@ const pulsanteApriStyle = {
   cursor: "pointer",
 };
 
+const pulsanteContattiStyle = {
+  marginTop: "18px",
+  padding: "11px 18px",
+  background: "#082c4c",
+  color: "#ffffff",
+  border: "none",
+  borderRadius: "10px",
+  fontWeight: "bold",
+  cursor: "pointer",
+};
+
 const pulsanteEliminaStyle = {
   padding: "12px 18px",
   background: "#8a1f1f",
@@ -1084,4 +1388,47 @@ const pulsanteStampaSchedaStyle = {
 const linkInlineStyle = {
   color: "#6d0909",
   fontWeight: "bold",
+};
+
+const elencoContattiStyle = {
+  marginTop: "28px",
+  display: "grid",
+  gap: "16px",
+};
+
+const personaStyle = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "center",
+  gap: "30px",
+  padding: "22px 24px",
+  background: "#fffdf8",
+  border: "1px solid #ead9b3",
+  borderRadius: "16px",
+  fontFamily: "Arial, sans-serif",
+};
+
+const nomePersonaStyle = {
+  margin: "0 0 8px",
+  color: "#082c4c",
+  fontFamily: "Georgia, 'Times New Roman', serif",
+  fontSize: "22px",
+  fontWeight: "bold",
+};
+
+const ruoloPersonaStyle = {
+  display: "inline-block",
+  padding: "6px 10px",
+  borderRadius: "999px",
+  background: "#fff2cd",
+  color: "#6d0909",
+  fontSize: "12px",
+  fontWeight: "bold",
+  textTransform: "uppercase",
+};
+
+const recapitiPersonaStyle = {
+  minWidth: "310px",
+  color: "#364651",
+  lineHeight: 1.5,
 };
