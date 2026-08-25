@@ -8,8 +8,9 @@ export default function AdminParrocchie({ tornaHome }) {
   const [ricerca, setRicerca] = useState("");
   const [diocesiSelezionata, setDiocesiSelezionata] = useState("tutte");
   const [statoSelezionato, setStatoSelezionato] = useState("tutti");
+  const [parrocchiaSelezionata, setParrocchiaSelezionata] = useState(null);
 
-  useEffect(() => { 
+  useEffect(() => {
     caricaParrocchie();
   }, []);
 
@@ -41,8 +42,10 @@ export default function AdminParrocchie({ tornaHome }) {
       `)
       .order("diocesi", { ascending: true })
       .order("nome", { ascending: true });
-console.log("ERRORE PARROCCHIE:", error);
-console.log("DATI PARROCCHIE:", data);
+
+    console.log("ERRORE PARROCCHIE:", error);
+    console.log("DATI PARROCCHIE:", data);
+
     if (error) {
       console.error("Errore caricamento parrocchie:", error);
       setErrore(
@@ -54,15 +57,28 @@ console.log("DATI PARROCCHIE:", data);
     }
 
     setParrocchie(data || []);
+
+    if (parrocchiaSelezionata) {
+      const aggiornata = (data || []).find(
+        (parrocchia) => parrocchia.id === parrocchiaSelezionata.id
+      );
+
+      if (aggiornata) {
+        setParrocchiaSelezionata(aggiornata);
+      }
+    }
+
     setCaricamento(false);
   }
 
   const diocesiDisponibili = useMemo(() => {
-    return [...new Set(
-      parrocchie
-        .map((parrocchia) => parrocchia.diocesi)
-        .filter(Boolean)
-    )].sort((a, b) => a.localeCompare(b, "it"));
+    return [
+      ...new Set(
+        parrocchie
+          .map((parrocchia) => parrocchia.diocesi)
+          .filter(Boolean)
+      ),
+    ].sort((a, b) => a.localeCompare(b, "it"));
   }, [parrocchie]);
 
   const parrocchieFiltrate = useMemo(() => {
@@ -107,6 +123,7 @@ console.log("DATI PARROCCHIE:", data);
       }
 
       gruppi[diocesi].push(parrocchia);
+
       return gruppi;
     }, {});
   }, [parrocchieFiltrate]);
@@ -124,27 +141,40 @@ console.log("DATI PARROCCHIE:", data);
   function stampaElenco() {
     window.print();
   }
-async function eliminaParrocchia(parrocchia) {
-  const conferma = window.confirm(
-    `Vuoi eliminare definitivamente la parrocchia "${parrocchia.nome}"?\n\nQuesta operazione non può essere annullata.`
-  );
 
-  if (!conferma) return;
+  async function eliminaParrocchia(parrocchia) {
+    const conferma = window.confirm(
+      `Vuoi eliminare definitivamente la parrocchia "${parrocchia.nome}"?\n\nQuesta operazione non può essere annullata.`
+    );
 
-  const { error } = await supabase.rpc(
-    "elimina_parrocchia_completa",
-    {
-      p_parrocchia_id: parrocchia.id,
+    if (!conferma) return;
+
+    const { error } = await supabase.rpc(
+      "elimina_parrocchia_completa",
+      {
+        p_parrocchia_id: parrocchia.id,
+      }
+    );
+
+    if (error) {
+      alert(error.message);
+      return;
     }
-  );
 
-  if (error) {
-    alert(error.message);
-    return;
+    setParrocchiaSelezionata(null);
+    await caricaParrocchie();
   }
 
-  await caricaParrocchie();
-}
+  function apriParrocchia(parrocchia) {
+    setParrocchiaSelezionata(parrocchia);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function tornaAlleParrocchie() {
+    setParrocchiaSelezionata(null);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
   return (
     <div style={paginaStyle}>
       <style>
@@ -188,6 +218,14 @@ async function eliminaParrocchia(parrocchia) {
               flex-direction: column !important;
               align-items: flex-start !important;
             }
+
+            .azioni-scheda {
+              flex-direction: column !important;
+            }
+
+            .griglia-dettagli {
+              grid-template-columns: 1fr !important;
+            }
           }
         `}
       </style>
@@ -202,10 +240,10 @@ async function eliminaParrocchia(parrocchia) {
 
           <button
             type="button"
-           onClick={async () => {
-  await supabase.auth.signOut();
-  tornaHome();
-}}
+            onClick={async () => {
+              await supabase.auth.signOut();
+              tornaHome();
+            }}
             className="non-stampare"
             style={pulsanteHomeStyle}
           >
@@ -214,243 +252,467 @@ async function eliminaParrocchia(parrocchia) {
         </header>
 
         <main className="contenitore-admin" style={contenitoreStyle}>
-          <div className="testata-admin" style={testataStyle}>
-            <div>
-              <p style={sovratitoloStyle}>AMMINISTRAZIONE</p>
-
-              <h2 style={titoloStyle}>
-                Gestione delle Parrocchie
-              </h2>
-
-              <p style={descrizioneStyle}>
-                Consulta, ricerca, filtra e stampa le parrocchie
-                registrate in Ars Liturgica.
-              </p>
-            </div>
-
-            <div style={contatoreStyle}>
-              <strong style={{ fontSize: "30px" }}>
-                {parrocchieFiltrate.length}
-              </strong>
-              <span>
-                {parrocchieFiltrate.length === 1
-                  ? "parrocchia"
-                  : "parrocchie"}
-              </span>
-            </div>
-          </div>
-
-          <section
-            className="barra-filtri non-stampare"
-            style={filtriStyle}
-          >
-            <div>
-              <label style={labelStyle}>Cerca</label>
-              <input
-                type="search"
-                value={ricerca}
-                onChange={(event) => setRicerca(event.target.value)}
-                placeholder="Nome, comune, diocesi o codice"
-                style={campoStyle}
-              />
-            </div>
-
-            <div>
-              <label style={labelStyle}>Diocesi</label>
-              <select
-                value={diocesiSelezionata}
-                onChange={(event) =>
-                  setDiocesiSelezionata(event.target.value)
-                }
-                style={campoStyle}
-              >
-                <option value="tutte">Tutte le diocesi</option>
-
-                {diocesiDisponibili.map((diocesi) => (
-                  <option key={diocesi} value={diocesi}>
-                    {diocesi}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label style={labelStyle}>Stato</label>
-              <select
-                value={statoSelezionato}
-                onChange={(event) =>
-                  setStatoSelezionato(event.target.value)
-                }
-                style={campoStyle}
-              >
-                <option value="tutti">Tutti gli stati</option>
-                <option value="attiva">Attive</option>
-                <option value="disattiva">Disattivate</option>
-              </select>
-            </div>
-
-            <button
-              type="button"
-              onClick={stampaElenco}
-              style={pulsanteStampaStyle}
-            >
-              Stampa elenco
-            </button>
-          </section>
-
-          {caricamento && (
-            <div style={messaggioStyle}>
-              Caricamento delle parrocchie in corso…
-            </div>
-          )}
-
-          {!caricamento && errore && (
-            <div style={erroreStyle}>
-              <strong>Attenzione.</strong>
-              <p style={{ margin: "8px 0 18px" }}>{errore}</p>
-
+          {parrocchiaSelezionata ? (
+            <>
               <button
                 type="button"
-                onClick={caricaParrocchie}
-                style={pulsanteRiprovaStyle}
+                onClick={tornaAlleParrocchie}
+                className="non-stampare"
+                style={pulsanteIndietroStyle}
               >
-                Riprova
+                ← Tutte le Parrocchie
               </button>
-            </div>
-          )}
 
-          {!caricamento &&
-            !errore &&
-            parrocchieFiltrate.length === 0 && (
-              <div style={messaggioStyle}>
-                Nessuna parrocchia corrisponde ai criteri selezionati.
+              <div style={testataSchedaSingolaStyle}>
+                <div>
+                  <p style={sovratitoloStyle}>
+                    SCHEDA PARROCCHIA
+                  </p>
+
+                  <h2 style={titoloStyle}>
+                    {parrocchiaSelezionata.nome}
+                  </h2>
+
+                  <p style={descrizioneStyle}>
+                    {parrocchiaSelezionata.comune ||
+                      "Comune non indicato"}
+
+                    {parrocchiaSelezionata.provincia
+                      ? ` (${parrocchiaSelezionata.provincia})`
+                      : ""}
+
+                    {parrocchiaSelezionata.diocesi
+                      ? ` — Diocesi di ${parrocchiaSelezionata.diocesi}`
+                      : ""}
+                  </p>
+                </div>
+
+                <span
+                  style={{
+                    ...statoGrandeStyle,
+                    background:
+                      parrocchiaSelezionata.stato === "attiva"
+                        ? "#e7f5ea"
+                        : "#f7e5e5",
+                    color:
+                      parrocchiaSelezionata.stato === "attiva"
+                        ? "#176b32"
+                        : "#8a1f1f",
+                  }}
+                >
+                  {parrocchiaSelezionata.stato ||
+                    "non definito"}
+                </span>
               </div>
-            )}
 
-          {!caricamento &&
-            !errore &&
-            Object.entries(parrocchieRaggruppate).map(
-              ([diocesi, elenco]) => (
-                <section key={diocesi} style={sezioneDiocesiStyle}>
-                  <div style={titoloDiocesiStyle}>
-                    <div>
-                      <p style={etichettaDiocesiStyle}>DIOCESI</p>
-                      <h3 style={nomeDiocesiStyle}>{diocesi}</h3>
+              <section style={schedaDettaglioStyle}>
+                <div
+                  className="griglia-dettagli"
+                  style={grigliaDettagliStyle}
+                >
+                  <div style={bloccoDettaglioStyle}>
+                    <p style={titoloBloccoStyle}>
+                      Dati identificativi
+                    </p>
+
+                    <p>
+                      <strong>Codice:</strong>{" "}
+                      {parrocchiaSelezionata.codice_parrocchia ||
+                        "Non assegnato"}
+                    </p>
+
+                    <p>
+                      <strong>Diocesi:</strong>{" "}
+                      {parrocchiaSelezionata.diocesi ||
+                        "Non indicata"}
+                    </p>
+
+                    <p>
+                      <strong>Comune:</strong>{" "}
+                      {parrocchiaSelezionata.comune ||
+                        "Non indicato"}
+
+                      {parrocchiaSelezionata.provincia
+                        ? ` (${parrocchiaSelezionata.provincia})`
+                        : ""}
+                    </p>
+
+                    <p>
+                      <strong>CAP:</strong>{" "}
+                      {parrocchiaSelezionata.cap ||
+                        "Non indicato"}
+                    </p>
+
+                    <p>
+                      <strong>Indirizzo:</strong>{" "}
+                      {parrocchiaSelezionata.indirizzo ||
+                        "Non indicato"}
+                    </p>
+                  </div>
+
+                  <div style={bloccoDettaglioStyle}>
+                    <p style={titoloBloccoStyle}>
+                      Contatti
+                    </p>
+
+                    <p>
+                      <strong>Telefono:</strong>{" "}
+                      {parrocchiaSelezionata.telefono ||
+                        "Non indicato"}
+                    </p>
+
+                    <p>
+                      <strong>Email:</strong>{" "}
+                      {parrocchiaSelezionata.email ||
+                        "Non indicata"}
+                    </p>
+
+                    <p>
+                      <strong>Sito web:</strong>{" "}
+                      {parrocchiaSelezionata.sito_web ? (
+                        <a
+                          href={parrocchiaSelezionata.sito_web}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={linkInlineStyle}
+                        >
+                          Apri sito
+                        </a>
+                      ) : (
+                        "Non indicato"
+                      )}
+                    </p>
+                  </div>
+
+                  <div style={bloccoDettaglioStyle}>
+                    <p style={titoloBloccoStyle}>
+                      Vita parrocchiale
+                    </p>
+
+                    <p>
+                      <strong>Patrono:</strong>{" "}
+                      {parrocchiaSelezionata.patrono ||
+                        "Non indicato"}
+                    </p>
+
+                    <p>
+                      <strong>Festa patronale:</strong>{" "}
+                      {formattaData(
+                        parrocchiaSelezionata.festa_patronale
+                      )}
+                    </p>
+                  </div>
+
+                  <div style={bloccoDettaglioStyle}>
+                    <p style={titoloBloccoStyle}>
+                      Registrazione Ars
+                    </p>
+
+                    <p>
+                      <strong>Registrata il:</strong>{" "}
+                      {formattaData(
+                        parrocchiaSelezionata.created_at
+                      )}
+                    </p>
+
+                    <p>
+                      <strong>Ultimo aggiornamento:</strong>{" "}
+                      {formattaData(
+                        parrocchiaSelezionata.updated_at
+                      )}
+                    </p>
+
+                    <p>
+                      <strong>Stato:</strong>{" "}
+                      {parrocchiaSelezionata.stato ||
+                        "Non definito"}
+                    </p>
+                  </div>
+                </div>
+
+                <div
+                  className="azioni-scheda non-stampare"
+                  style={azioniSchedaStyle}
+                >
+                  <button
+                    type="button"
+                    onClick={() => window.print()}
+                    style={pulsanteStampaSchedaStyle}
+                  >
+                    Stampa scheda
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() =>
+                      eliminaParrocchia(
+                        parrocchiaSelezionata
+                      )
+                    }
+                    style={pulsanteEliminaStyle}
+                  >
+                    Elimina parrocchia
+                  </button>
+                </div>
+              </section>
+            </>
+          ) : (
+            <>
+              <div
+                className="testata-admin"
+                style={testataStyle}
+              >
+                <div>
+                  <p style={sovratitoloStyle}>
+                    AMMINISTRAZIONE
+                  </p>
+
+                  <h2 style={titoloStyle}>
+                    Gestione delle Parrocchie
+                  </h2>
+
+                  <p style={descrizioneStyle}>
+                    Consulta, ricerca e apri le parrocchie
+                    registrate in Ars Liturgica.
+                  </p>
+                </div>
+
+                <div style={contatoreStyle}>
+                  <strong style={{ fontSize: "30px" }}>
+                    {parrocchieFiltrate.length}
+                  </strong>
+
+                  <span>
+                    {parrocchieFiltrate.length === 1
+                      ? "parrocchia"
+                      : "parrocchie"}
+                  </span>
+                </div>
+              </div>
+
+              <section
+                className="barra-filtri non-stampare"
+                style={filtriStyle}
+              >
+                <div>
+                  <label style={labelStyle}>Cerca</label>
+
+                  <input
+                    type="search"
+                    value={ricerca}
+                    onChange={(event) =>
+                      setRicerca(event.target.value)
+                    }
+                    placeholder="Nome, comune, diocesi o codice"
+                    style={campoStyle}
+                  />
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Diocesi</label>
+
+                  <select
+                    value={diocesiSelezionata}
+                    onChange={(event) =>
+                      setDiocesiSelezionata(
+                        event.target.value
+                      )
+                    }
+                    style={campoStyle}
+                  >
+                    <option value="tutte">
+                      Tutte le diocesi
+                    </option>
+
+                    {diocesiDisponibili.map((diocesi) => (
+                      <option
+                        key={diocesi}
+                        value={diocesi}
+                      >
+                        {diocesi}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label style={labelStyle}>Stato</label>
+
+                  <select
+                    value={statoSelezionato}
+                    onChange={(event) =>
+                      setStatoSelezionato(
+                        event.target.value
+                      )
+                    }
+                    style={campoStyle}
+                  >
+                    <option value="tutti">
+                      Tutti gli stati
+                    </option>
+
+                    <option value="attiva">
+                      Attive
+                    </option>
+
+                    <option value="disattiva">
+                      Disattivate
+                    </option>
+                  </select>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={stampaElenco}
+                  style={pulsanteStampaStyle}
+                >
+                  Stampa elenco
+                </button>
+              </section>
+
+              {caricamento && (
+                <div style={messaggioStyle}>
+                  Caricamento delle parrocchie in corso…
+                </div>
+              )}
+
+              {!caricamento && errore && (
+                <div style={erroreStyle}>
+                  <strong>Attenzione.</strong>
+
+                  <p style={{ margin: "8px 0 18px" }}>
+                    {errore}
+                  </p>
+
+                  <button
+                    type="button"
+                    onClick={caricaParrocchie}
+                    style={pulsanteRiprovaStyle}
+                  >
+                    Riprova
+                  </button>
+                </div>
+              )}
+
+              {!caricamento &&
+                !errore &&
+                parrocchieFiltrate.length === 0 && (
+                  <div style={messaggioStyle}>
+                    Nessuna parrocchia corrisponde ai criteri
+                    selezionati.
+                  </div>
+                )}
+
+              {!caricamento &&
+                !errore &&
+                Object.entries(
+                  parrocchieRaggruppate
+                ).map(([diocesi, elenco]) => (
+                  <section
+                    key={diocesi}
+                    style={sezioneDiocesiStyle}
+                  >
+                    <div style={titoloDiocesiStyle}>
+                      <div>
+                        <p style={etichettaDiocesiStyle}>
+                          DIOCESI
+                        </p>
+
+                        <h3 style={nomeDiocesiStyle}>
+                          {diocesi}
+                        </h3>
+                      </div>
+
+                      <span style={numeroDiocesiStyle}>
+                        {elenco.length}
+                      </span>
                     </div>
 
-                    <span style={numeroDiocesiStyle}>
-                      {elenco.length}
-                    </span>
-                  </div>
+                    <div
+                      className="griglia-parrocchie"
+                      style={grigliaStyle}
+                    >
+                      {elenco.map((parrocchia) => (
+                        <article
+                          key={parrocchia.id}
+                          className="scheda-parrocchia"
+                          style={schedaStyle}
+                        >
+                          <div style={schedaTestataStyle}>
+                            <div>
+                              <p style={codiceStyle}>
+                                {parrocchia.codice_parrocchia ||
+                                  "Codice non assegnato"}
+                              </p>
 
-                  <div
-                    className="griglia-parrocchie"
-                    style={grigliaStyle}
-                  >
-                    {elenco.map((parrocchia) => (
-                      <article
-                        key={parrocchia.id}
-                        className="scheda-parrocchia"
-                        style={schedaStyle}
-                      >
-                        <div style={schedaTestataStyle}>
-                          <div>
-                            <p style={codiceStyle}>
-                              {parrocchia.codice_parrocchia ||
-                                "Codice non assegnato"}
-                            </p>
+                              <h4
+                                style={nomeParrocchiaStyle}
+                              >
+                                {parrocchia.nome}
+                              </h4>
+                            </div>
 
-                            <h4 style={nomeParrocchiaStyle}>
-                              {parrocchia.nome}
-                            </h4>
+                            <span
+                              style={{
+                                ...statoStyle,
+                                background:
+                                  parrocchia.stato ===
+                                  "attiva"
+                                    ? "#e7f5ea"
+                                    : "#f7e5e5",
+                                color:
+                                  parrocchia.stato ===
+                                  "attiva"
+                                    ? "#176b32"
+                                    : "#8a1f1f",
+                              }}
+                            >
+                              {parrocchia.stato ||
+                                "non definito"}
+                            </span>
                           </div>
 
-                          <span
-                            style={{
-                              ...statoStyle,
-                              background:
-                                parrocchia.stato === "attiva"
-                                  ? "#e7f5ea"
-                                  : "#f7e5e5",
-                              color:
-                                parrocchia.stato === "attiva"
-                                  ? "#176b32"
-                                  : "#8a1f1f",
-                            }}
-                          >
-                            {parrocchia.stato || "non definito"}
-                          </span>
-                        </div>
+                          <div style={datiStyle}>
+                            <p>
+                              <strong>Comune:</strong>{" "}
+                              {parrocchia.comune ||
+                                "Non indicato"}
 
-                        <div style={datiStyle}>
-                          <p>
-                            <strong>Comune:</strong>{" "}
-                            {parrocchia.comune || "Non indicato"}
-                            {parrocchia.provincia
-                              ? ` (${parrocchia.provincia})`
-                              : ""}
-                          </p>
+                              {parrocchia.provincia
+                                ? ` (${parrocchia.provincia})`
+                                : ""}
+                            </p>
 
-                          <p>
-                            <strong>CAP:</strong>{" "}
-                            {parrocchia.cap || "Non indicato"}
-                          </p>
+                            <p>
+                              <strong>CAP:</strong>{" "}
+                              {parrocchia.cap ||
+                                "Non indicato"}
+                            </p>
 
-                          <p>
-                            <strong>Indirizzo:</strong>{" "}
-                            {parrocchia.indirizzo || "Non indicato"}
-                          </p>
+                            <p>
+                              <strong>Diocesi:</strong>{" "}
+                              {parrocchia.diocesi ||
+                                "Non indicata"}
+                            </p>
+                          </div>
 
-                          <p>
-                            <strong>Telefono:</strong>{" "}
-                            {parrocchia.telefono || "Non indicato"}
-                          </p>
-
-                          <p>
-                            <strong>Email:</strong>{" "}
-                            {parrocchia.email || "Non indicata"}
-                          </p>
-
-                          <p>
-                            <strong>Patrono:</strong>{" "}
-                            {parrocchia.patrono || "Non indicato"}
-                          </p>
-
-                          <p>
-                            <strong>Festa patronale:</strong>{" "}
-                            {formattaData(parrocchia.festa_patronale)}
-                          </p>
-
-                          <p>
-                            <strong>Registrata il:</strong>{" "}
-                            {formattaData(parrocchia.created_at)}
-                          </p>
-                        </div>
-<button
-  type="button"
-  onClick={() => eliminaParrocchia(parrocchia)}
-  className="non-stampare"
-  style={pulsanteEliminaStyle}
->
-  Elimina parrocchia
-</button>
-                        {parrocchia.sito_web && (
-                          <a
-                            href={parrocchia.sito_web}
-                            target="_blank"
-                            rel="noreferrer"
+                          <button
+                            type="button"
+                            onClick={() =>
+                              apriParrocchia(parrocchia)
+                            }
                             className="non-stampare"
-                            style={linkStyle}
+                            style={pulsanteApriStyle}
                           >
-                            Visita il sito web
-                          </a>
-                        )}
-                      </article>
-                    ))}
-                  </div>
-                </section>
-              )
-            )}
+                            Apri scheda
+                          </button>
+                        </article>
+                      ))}
+                    </div>
+                  </section>
+                ))}
+            </>
+          )}
         </main>
       </div>
     </div>
@@ -715,15 +977,35 @@ const statoStyle = {
   textTransform: "uppercase",
 };
 
+const statoGrandeStyle = {
+  padding: "10px 17px",
+  borderRadius: "999px",
+  fontFamily: "Arial, sans-serif",
+  fontSize: "13px",
+  fontWeight: "bold",
+  textTransform: "uppercase",
+};
+
 const datiStyle = {
   marginTop: "18px",
   color: "#364651",
   fontFamily: "Arial, sans-serif",
   lineHeight: 1.55,
 };
-const pulsanteEliminaStyle = {
+
+const pulsanteApriStyle = {
   marginTop: "16px",
-  padding: "11px 16px",
+  padding: "12px 18px",
+  background: "#082c4c",
+  color: "#ffffff",
+  border: "none",
+  borderRadius: "10px",
+  fontWeight: "bold",
+  cursor: "pointer",
+};
+
+const pulsanteEliminaStyle = {
+  padding: "12px 18px",
   background: "#8a1f1f",
   color: "#ffffff",
   border: "none",
@@ -731,11 +1013,75 @@ const pulsanteEliminaStyle = {
   fontWeight: "bold",
   cursor: "pointer",
 };
-const linkStyle = {
-  display: "inline-block",
-  marginTop: "14px",
+
+const pulsanteIndietroStyle = {
+  marginBottom: "30px",
+  padding: "11px 18px",
+  background: "#fff8e8",
+  color: "#082c4c",
+  border: "1px solid #d7a93a",
+  borderRadius: "10px",
+  fontWeight: "bold",
+  cursor: "pointer",
+};
+
+const testataSchedaSingolaStyle = {
+  display: "flex",
+  justifyContent: "space-between",
+  alignItems: "flex-start",
+  gap: "25px",
+  paddingBottom: "28px",
+  borderBottom: "2px solid #d7a93a",
+};
+
+const schedaDettaglioStyle = {
+  marginTop: "30px",
+};
+
+const grigliaDettagliStyle = {
+  display: "grid",
+  gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+  gap: "20px",
+};
+
+const bloccoDettaglioStyle = {
+  padding: "24px",
+  background: "#fffdf8",
+  border: "1px solid #ead9b3",
+  borderRadius: "18px",
+  fontFamily: "Arial, sans-serif",
+  color: "#364651",
+  lineHeight: 1.6,
+};
+
+const titoloBloccoStyle = {
+  margin: "0 0 18px",
+  color: "#6d0909",
+  fontFamily: "Georgia, 'Times New Roman', serif",
+  fontWeight: "bold",
+  fontSize: "20px",
+};
+
+const azioniSchedaStyle = {
+  marginTop: "28px",
+  paddingTop: "24px",
+  borderTop: "1px solid #ead9b3",
+  display: "flex",
+  gap: "14px",
+  justifyContent: "space-between",
+};
+
+const pulsanteStampaSchedaStyle = {
+  padding: "12px 18px",
+  background: "#082c4c",
+  color: "#ffffff",
+  border: "none",
+  borderRadius: "10px",
+  fontWeight: "bold",
+  cursor: "pointer",
+};
+
+const linkInlineStyle = {
   color: "#6d0909",
   fontWeight: "bold",
-  textDecoration: "none",
-  borderBottom: "1px solid #6d0909",
 };
