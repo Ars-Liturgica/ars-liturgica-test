@@ -286,15 +286,39 @@ fontWeight: "700",
                     {formattaRuolo(persona.ruolo)}
                   </td>
 
-                  <td
-                    style={{
-                      padding: "13px 12px",
-                      borderBottom: "1px solid #eeeeee",
-                    }}
-                  >
-                    {persona.telefono || "—"}
-                  </td>
+              <td
+  style={{
+    padding: "13px 12px",
+    borderBottom: "1px solid #eeeeee",
+  }}
+>
+  {persona.telefono || "—"}
 
+  {persona.telefono && (
+    <a
+     href={`https://wa.me/${
+  persona.telefono.replace(/\D/g, "").startsWith("39")
+    ? persona.telefono.replace(/\D/g, "")
+    : `39${persona.telefono.replace(/\D/g, "")}`
+}`}
+      target="_blank"
+      rel="noreferrer"
+      style={{
+        display: "inline-block",
+        marginLeft: "10px",
+        padding: "6px 10px",
+        borderRadius: "8px",
+        background: "#1f7a4d",
+        color: "#ffffff",
+        textDecoration: "none",
+        fontWeight: "bold",
+        fontSize: "13px",
+      }}
+    >
+      WhatsApp
+    </a>
+  )}
+</td>
                   <td
                     style={{
                       padding: "13px 12px",
