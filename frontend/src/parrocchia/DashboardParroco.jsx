@@ -77,7 +77,29 @@ if (parrocchiaCaricata) {
       descrizione: "Calendario della parrocchia e calendari personali dei sacerdoti.",
     },
     {
-      icona: (
+     
+  icona: (
+    <i className="fa-solid fa-cross icona-dashboard"></i>
+  ),
+  titolo: "Sacramenti",
+  descrizione: "Battesimi, Prime Comunioni, Cresime e Matrimoni.",
+},
+{
+  icona: (
+    <i className="fa-solid fa-church icona-dashboard"></i>
+  ),
+  titolo: "Celebrazioni",
+  descrizione: "Messe, liturgie e celebrazioni della vita parrocchiale.",
+},
+{
+  icona: (
+    <i className="fa-solid fa-people-group icona-dashboard"></i>
+  ),
+  titolo: "Attività e Gruppi",
+  descrizione: "Catechismo, GrEst, gruppi e attività della comunità parrocchiale.",
+},
+   {
+   icona: (
   <i className="fa-solid fa-folder-open icona-dashboard"></i>
 ),
       titolo: "Documenti",
