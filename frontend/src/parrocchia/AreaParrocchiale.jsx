@@ -7,7 +7,7 @@ import DashboardParroco from "./DashboardParroco";
 import AccessoParroco from "./AccessoParroco";
 export default function AreaParrocchiale({ tornaHome }) {
  const [fase, setFase] = useState("accessoParroco");
-
+const [cardGestioneAperta, setCardGestioneAperta] = useState(false);
 
 const [datiParrocchia, setDatiParrocchia] = useState(null);
 const [nomeParrocchiaAttiva, setNomeParrocchiaAttiva] = useState(
@@ -177,9 +177,11 @@ useEffect(() => {
               onAttivazioneCompletata={completaAttivazione}
             />
           )}
-
-          {fase === "dashboard" && (
-  <DashboardParroco nomeParrocchia={nomeParrocchiaAttiva} />
+{fase === "dashboard" && (
+  <DashboardParroco
+    nomeParrocchia={nomeParrocchiaAttiva}
+    onCambioVista={setCardGestioneAperta}
+  />
 )}
         </div>
       </main>
