@@ -139,13 +139,15 @@ export default function BachecaAvvisi({
     <div className="bacheca-avvisi">
       <div className="bacheca-contenitore">
         <div className="bacheca-barra-superiore">
-          {solaLettura && onTorna ? (
+         {onTorna ? (
             <button
               type="button"
               className="btn-torna-parrocchia"
               onClick={onTorna}
             >
-              ← Torna alla mia Parrocchia
+           {solaLettura
+  ? "← Torna alla mia Parrocchia"
+  : "← Torna a Gestione Parrocchia"}
             </button>
           ) : (
             <div />
