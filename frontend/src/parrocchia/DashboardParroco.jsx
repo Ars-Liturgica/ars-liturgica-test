@@ -3,9 +3,14 @@ import ArchivioDocumenti from "./stanze/ArchivioDocumenti/ArchivioDocumenti/Arch
 import ComunitaParrocchia from "./stanze/Comunita/ComunitaParrocchia";
 import React, { useEffect, useState } from "react";
 import { supabase } from "../supabaseClient";
-export default function DashboardParroco() {
+export default function DashboardParroco({ onCambioVista }) {
  const [parrocchia, setParrocchia] = useState(null);
 const [stanzaAperta, setStanzaAperta] = useState(null);
+ useEffect(() => {
+  if (typeof onCambioVista === "function") {
+    onCambioVista(Boolean(stanzaAperta));
+  }
+}, [stanzaAperta, onCambioVista]);
 useEffect(() => {
   async function caricaParrocchia() {
     const { data: { session } } = await supabase.auth.getSession();
@@ -111,7 +116,10 @@ if (parrocchiaCaricata) {
 }
 if (stanzaAperta === "bacheca-avvisi") {
   return (
-   <BachecaAvvisi parrocchia={parrocchia} /> 
+    <BachecaAvvisi
+      parrocchia={parrocchia}
+      onTorna={() => setStanzaAperta(null)}
+    />
   );
 }
  if (stanzaAperta === "archivio-documenti") {
