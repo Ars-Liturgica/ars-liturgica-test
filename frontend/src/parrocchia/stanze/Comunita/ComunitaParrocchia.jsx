@@ -156,19 +156,23 @@ export default function ComunitaParrocchia({
         padding: "32px 20px",
       }}
     >
-      <button
-        type="button"
-        onClick={tornaDashboard}
-        style={{
-          border: "none",
-          background: "transparent",
-          cursor: "pointer",
-          fontSize: "16px",
-          marginBottom: "20px",
-        }}
-      >
-        ← Torna alla Dashboard
-      </button>
+    <button
+  type="button"
+  onClick={tornaDashboard}
+  style={{
+    background: "#fff8e8",
+    color: "#0b2f55",
+    border: "1px solid #d6a23a",
+    borderRadius: "8px",
+    padding: "10px 16px",
+    fontWeight: "bold",
+    fontSize: "16px",
+    cursor: "pointer",
+    marginBottom: "24px",
+  }}
+>
+  ← Torna a Gestione Parrocchia
+</button>
 
       <div style={{ marginBottom: "28px" }}>
         <h2 style={{ marginBottom: "8px" }}>Comunità</h2>
