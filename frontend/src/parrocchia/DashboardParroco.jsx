@@ -49,14 +49,7 @@ if (parrocchiaCaricata) {
     },
     {
       icona: (
-  <i className="fa-solid fa-church icona-dashboard"></i>
-),
-      titolo: "Stanze",
-      descrizione: "Attivazione, visibilità e gestione delle stanze parrocchiali.",
-    },
-   {
-  icona: (
-    <i className="fa-solid fa-thumbtack icona-dashboard"></i>
+ 
   ),
   titolo: "Bacheca Avvisi",
   descrizione: "Avvisi ufficiali e informazioni pratiche rivolte alla comunità.",
