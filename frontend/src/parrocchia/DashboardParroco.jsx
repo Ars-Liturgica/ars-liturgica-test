@@ -49,7 +49,7 @@ if (parrocchiaCaricata) {
     },
     {
       icona: (
- 
+ <i className="fa-solid fa-thumbtack icona-dashboard"></i>
   ),
   titolo: "Bacheca Avvisi",
   descrizione: "Avvisi ufficiali e informazioni pratiche rivolte alla comunità.",
