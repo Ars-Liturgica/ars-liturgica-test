@@ -1,3 +1,4 @@
+import CalendariParroco from "./stanze/Calendari/CalendariParroco";
 import BachecaAvvisi from "./stanze/BachecaAvvisi/BachecaAvvisi";
 import ArchivioDocumenti from "./stanze/ArchivioDocumenti/ArchivioDocumenti/ArchivioDocumenti";
 import ComunitaParrocchia from "./stanze/Comunita/ComunitaParrocchia";
@@ -68,6 +69,7 @@ if (parrocchiaCaricata) {
 ),
       titolo: "Calendari",
       descrizione: "Calendario della parrocchia e calendari personali dei sacerdoti.",
+     stanza: "calendari",
     },
     {
      
@@ -121,6 +123,14 @@ if (parrocchiaCaricata) {
       descrizione: "Dati della parrocchia, configurazioni e servizi attivi.",
     },
   ];
+ if (stanzaAperta === "calendari") {
+  return (
+    <CalendariParroco
+      parrocchiaId={parrocchia?.id}
+      tornaDashboard={() => setStanzaAperta(null)}
+    />
+  );
+}
  if (stanzaAperta === "comunita") {
   return (
     <ComunitaParrocchia
