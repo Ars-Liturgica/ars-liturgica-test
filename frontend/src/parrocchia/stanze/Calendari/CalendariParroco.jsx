@@ -11,7 +11,16 @@ export default function CalendariParroco({
   const [dataCorrente, setDataCorrente] = useState(new Date());
   const [giornoSelezionato, setGiornoSelezionato] = useState(new Date());
   const [filtroCategoria, setFiltroCategoria] = useState("tutto");
-
+  const [mostraNuovoEvento, setMostraNuovoEvento] = useState(false);
+const [nuovoEvento, setNuovoEvento] = useState({
+  titolo: "",
+  descrizione: "",
+  data: "",
+  ora: "",
+  luogo: "",
+  origine: "calendario",
+  visibilita: "privato",
+});
   useEffect(() => {
     async function caricaEventi() {
       if (!parrocchiaId) {
@@ -201,7 +210,59 @@ export default function CalendariParroco({
       year: "numeric",
     }).format(data);
   }
+function aggiornaNuovoEvento(campo, valore) {
+  setNuovoEvento((precedente) => ({
+    ...precedente,
+    [campo]: valore,
+  }));
+}
+  function chiudiNuovoEvento() {
+  setMostraNuovoEvento(false);
+}
+  async function salvaNuovoEvento() {
+  if (!nuovoEvento.titolo || !nuovoEvento.data || !nuovoEvento.ora) {
+    alert("Compila almeno Titolo, Data e Ora.");
+    return;
+  }
 
+  const dataOraInizio = new Date(
+    `${nuovoEvento.data}T${nuovoEvento.ora}`
+  );
+
+  const { data, error } = await supabase
+    .from("eventi_calendario")
+    .insert({
+      parrocchia_id: parrocchiaId,
+      titolo: nuovoEvento.titolo,
+      descrizione: nuovoEvento.descrizione || null,
+      data_ora_inizio: dataOraInizio.toISOString(),
+      luogo: nuovoEvento.luogo || null,
+      origine: nuovoEvento.origine,
+      visibilita: nuovoEvento.visibilita,
+      mostra_calendario_parroco: true,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    alert(`Errore nel salvataggio: ${error.message}`);
+    return;
+  }
+
+  setEventi((precedenti) => [...precedenti, data]);
+
+  setNuovoEvento({
+    titolo: "",
+    descrizione: "",
+    data: "",
+    ora: "",
+    luogo: "",
+    origine: "calendario",
+    visibilita: "privato",
+  });
+
+  setMostraNuovoEvento(false);
+}
   return (
     <div className="calendari-parroco">
       <button
@@ -218,11 +279,82 @@ export default function CalendariParroco({
           <p>Agenda della parrocchia e dei sacerdoti.</p>
         </div>
 
-        <button type="button" className="pulsante-nuovo-evento">
+       <button
+  type="button"
+  className="pulsante-nuovo-evento"
+  onClick={() => setMostraNuovoEvento(true)}
+>
           + Nuovo evento
         </button>
       </div>
+{mostraNuovoEvento && (
+  <div className="nuovo-evento-box">
+    <div className="nuovo-evento-header">
+      <h2>Nuovo evento</h2>
 
+      <button
+        type="button"
+        onClick={chiudiNuovoEvento}
+        className="chiudi-nuovo-evento"
+      >
+        ×
+      </button>
+    </div>
+
+   <div className="nuovo-evento-form">
+  <label>
+    Titolo
+    <input
+      type="text"
+      value={nuovoEvento.titolo}
+      onChange={(e) => aggiornaNuovoEvento("titolo", e.target.value)}
+    />
+  </label>
+
+  <label>
+    Data
+    <input
+      type="date"
+      value={nuovoEvento.data}
+      onChange={(e) => aggiornaNuovoEvento("data", e.target.value)}
+    />
+  </label>
+
+  <label>
+    Ora
+    <input
+      type="time"
+      value={nuovoEvento.ora}
+      onChange={(e) => aggiornaNuovoEvento("ora", e.target.value)}
+    />
+  </label>
+
+  <label>
+    Luogo
+    <input
+      type="text"
+      value={nuovoEvento.luogo}
+      onChange={(e) => aggiornaNuovoEvento("luogo", e.target.value)}
+    />
+  </label>
+
+  <label>
+    Descrizione
+    <textarea
+      value={nuovoEvento.descrizione}
+      onChange={(e) => aggiornaNuovoEvento("descrizione", e.target.value)}
+    />
+  </label>
+     <button
+  type="button"
+  className="pulsante-salva-evento"
+  onClick={salvaNuovoEvento}
+>
+  Salva evento
+</button>
+</div>
+  </div>
+)}
       <div className="calendari-toolbar">
         <button type="button" onClick={mesePrecedente}>
           ‹
