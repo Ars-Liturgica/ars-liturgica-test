@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../../supabaseClient";
-
+import "./CalendariParroco.css";
 export default function CalendariParroco({
   parrocchiaId,
   tornaDashboard,
