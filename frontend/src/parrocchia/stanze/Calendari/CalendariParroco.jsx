@@ -407,22 +407,22 @@ function aggiornaNuovoEvento(campo, valore) {
     </small>
   )}
 
-  {nuovoEvento.visibilita === "riservato" && (
-    <small className="info-visibilita">
-      Visibile soltanto alle persone o ai gruppi che saranno
-      indicati come destinatari. Non è visibile all'intera
-      comunità e non può essere pubblicato nella Bacheca
-      pubblica.
-    </small>
-  )}
-
-  {nuovoEvento.visibilita === "pubblico" && (
-    <small className="info-visibilita">
-      Visibile alla comunità della parrocchia. Può essere
-      pubblicato anche nella Bacheca della stessa parrocchia.
-    </small>
-  )}
-</div>
+ {nuovoEvento.visibilita === "riservato" && (
+  <small className="info-visibilita">
+    Visibile esclusivamente ai gruppi della parrocchia
+    selezionati dal parroco. L'evento sarà disponibile nei
+    calendari dei gruppi selezionati e non sarà visibile
+    all'intera comunità né pubblicato nella Bacheca pubblica.
+  </small>
+)}
+ {nuovoEvento.visibilita === "pubblico" && (
+  <small className="info-visibilita">
+    Visibile a tutta la comunità nel calendario pubblico
+    della parrocchia. Se selezioni "Pubblica anche in Bacheca",
+    l'evento verrà pubblicato anche nella Bacheca della stessa
+    parrocchia.
+  </small>
+)}
       </div>
 {nuovoEvento.visibilita === "pubblico" && (
   <div className="campo-pubblica-bacheca">
