@@ -373,7 +373,41 @@
 .campo-descrizione {
   margin-bottom: 22px;
 }
+.campo-pubblica-bacheca {
+  margin-bottom: 18px;
+  padding: 14px 16px;
+  background: #fbf7ed;
+  border: 1px solid #e3d7bd;
+  border-radius: 10px;
+}
 
+.campo-pubblica-bacheca label {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #0f2f57;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.campo-pubblica-bacheca input {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  flex: 0 0 auto;
+  accent-color: #c99213;
+  cursor: pointer;
+}
+
+.campo-pubblica-bacheca small {
+  display: block;
+  margin-top: 7px;
+  padding-left: 28px;
+  color: #657487;
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
 .nuovo-evento-azioni {
   display: flex;
   justify-content: flex-end;
