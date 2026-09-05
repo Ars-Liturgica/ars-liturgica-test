@@ -20,6 +20,7 @@ const [nuovoEvento, setNuovoEvento] = useState({
   luogo: "",
   origine: "calendario",
   visibilita: "privato",
+  pubblicaInBacheca: false,
 });
   useEffect(() => {
     async function caricaEventi() {
@@ -259,6 +260,7 @@ function aggiornaNuovoEvento(campo, valore) {
     luogo: "",
     origine: "calendario",
     visibilita: "privato",
+    pubblicaInBacheca: false,
   });
 
   setMostraNuovoEvento(false);
@@ -373,22 +375,77 @@ function aggiornaNuovoEvento(campo, valore) {
           </select>
         </div>
 
-        <div className="campo-evento">
-          <label htmlFor="evento-visibilita">Visibilità</label>
-          <select
-            id="evento-visibilita"
-            value={nuovoEvento.visibilita}
-            onChange={(e) =>
-              aggiornaNuovoEvento("visibilita", e.target.value)
-            }
-          >
-            <option value="privato">Privato</option>
-            <option value="riservato">Riservato</option>
-            <option value="pubblico">Pubblico</option>
-          </select>
-        </div>
-      </div>
+      <div className="campo-evento">
+  <label htmlFor="evento-visibilita">Visibilità</label>
 
+  <select
+    id="evento-visibilita"
+    value={nuovoEvento.visibilita}
+    onChange={(e) => {
+      const nuovaVisibilita = e.target.value;
+
+      setNuovoEvento((precedente) => ({
+        ...precedente,
+        visibilita: nuovaVisibilita,
+        pubblicaInBacheca:
+          nuovaVisibilita === "pubblico"
+            ? precedente.pubblicaInBacheca
+            : false,
+      }));
+    }}
+  >
+    <option value="privato">Privato</option>
+    <option value="riservato">Riservato</option>
+    <option value="pubblico">Pubblico</option>
+  </select>
+
+  {nuovoEvento.visibilita === "privato" && (
+    <small className="info-visibilita">
+      Visibile solo al parroco e agli eventuali delegati
+      autorizzati al suo calendario. Non è visibile alla
+      comunità e non può essere pubblicato in Bacheca.
+    </small>
+  )}
+
+  {nuovoEvento.visibilita === "riservato" && (
+    <small className="info-visibilita">
+      Visibile soltanto alle persone o ai gruppi che saranno
+      indicati come destinatari. Non è visibile all'intera
+      comunità e non può essere pubblicato nella Bacheca
+      pubblica.
+    </small>
+  )}
+
+  {nuovoEvento.visibilita === "pubblico" && (
+    <small className="info-visibilita">
+      Visibile alla comunità della parrocchia. Può essere
+      pubblicato anche nella Bacheca della stessa parrocchia.
+    </small>
+  )}
+</div>
+      </div>
+{nuovoEvento.visibilita === "pubblico" && (
+  <div className="campo-pubblica-bacheca">
+    <label>
+      <input
+        type="checkbox"
+        checked={nuovoEvento.pubblicaInBacheca}
+        onChange={(e) =>
+          aggiornaNuovoEvento(
+            "pubblicaInBacheca",
+            e.target.checked
+          )
+        }
+      />
+      <span>Pubblica anche in Bacheca</span>
+    </label>
+
+    <small>
+      L'avviso sarà pubblicato nella Bacheca della stessa
+      parrocchia a cui appartiene questo evento.
+    </small>
+  </div>
+)}
       <div className="campo-evento campo-descrizione">
         <label htmlFor="evento-descrizione">Descrizione</label>
         <textarea
