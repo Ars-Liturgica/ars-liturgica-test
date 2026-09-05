@@ -424,6 +424,7 @@ function aggiornaNuovoEvento(campo, valore) {
   </small>
 )}
       </div>
+            </div>
 {nuovoEvento.visibilita === "pubblico" && (
   <div className="campo-pubblica-bacheca">
     <label>
