@@ -290,69 +290,136 @@ function aggiornaNuovoEvento(campo, valore) {
 {mostraNuovoEvento && (
   <div className="nuovo-evento-box">
     <div className="nuovo-evento-header">
-      <h2>Nuovo evento</h2>
+      <h2>NUOVO EVENTO</h2>
 
       <button
         type="button"
-        onClick={chiudiNuovoEvento}
         className="chiudi-nuovo-evento"
+        onClick={chiudiNuovoEvento}
+        aria-label="Chiudi"
       >
         ×
       </button>
     </div>
 
-   <div className="nuovo-evento-form">
-  <label>
-    Titolo
-    <input
-      type="text"
-      value={nuovoEvento.titolo}
-      onChange={(e) => aggiornaNuovoEvento("titolo", e.target.value)}
-    />
-  </label>
+    <div className="nuovo-evento-form">
+      <div className="campo-evento campo-titolo">
+        <label htmlFor="evento-titolo">Titolo</label>
+        <input
+          id="evento-titolo"
+          type="text"
+          value={nuovoEvento.titolo}
+          onChange={(e) =>
+            aggiornaNuovoEvento("titolo", e.target.value)
+          }
+          placeholder="Titolo dell'evento"
+        />
+      </div>
 
-  <label>
-    Data
-    <input
-      type="date"
-      value={nuovoEvento.data}
-      onChange={(e) => aggiornaNuovoEvento("data", e.target.value)}
-    />
-  </label>
+      <div className="nuovo-evento-riga">
+        <div className="campo-evento">
+          <label htmlFor="evento-data">Data</label>
+          <input
+            id="evento-data"
+            type="date"
+            value={nuovoEvento.data}
+            onChange={(e) =>
+              aggiornaNuovoEvento("data", e.target.value)
+            }
+          />
+        </div>
 
-  <label>
-    Ora
-    <input
-      type="time"
-      value={nuovoEvento.ora}
-      onChange={(e) => aggiornaNuovoEvento("ora", e.target.value)}
-    />
-  </label>
+        <div className="campo-evento">
+          <label htmlFor="evento-ora">Ora</label>
+          <input
+            id="evento-ora"
+            type="time"
+            value={nuovoEvento.ora}
+            onChange={(e) =>
+              aggiornaNuovoEvento("ora", e.target.value)
+            }
+          />
+        </div>
 
-  <label>
-    Luogo
-    <input
-      type="text"
-      value={nuovoEvento.luogo}
-      onChange={(e) => aggiornaNuovoEvento("luogo", e.target.value)}
-    />
-  </label>
+        <div className="campo-evento campo-luogo">
+          <label htmlFor="evento-luogo">Luogo</label>
+          <input
+            id="evento-luogo"
+            type="text"
+            value={nuovoEvento.luogo}
+            onChange={(e) =>
+              aggiornaNuovoEvento("luogo", e.target.value)
+            }
+            placeholder="Es. Chiesa parrocchiale"
+          />
+        </div>
+      </div>
 
-  <label>
-    Descrizione
-    <textarea
-      value={nuovoEvento.descrizione}
-      onChange={(e) => aggiornaNuovoEvento("descrizione", e.target.value)}
-    />
-  </label>
-     <button
-  type="button"
-  className="pulsante-salva-evento"
-  onClick={salvaNuovoEvento}
->
-  Salva evento
-</button>
-</div>
+      <div className="nuovo-evento-riga due-colonne">
+        <div className="campo-evento">
+          <label htmlFor="evento-origine">Categoria</label>
+          <select
+            id="evento-origine"
+            value={nuovoEvento.origine}
+            onChange={(e) =>
+              aggiornaNuovoEvento("origine", e.target.value)
+            }
+          >
+            <option value="calendario">Altro evento</option>
+            <option value="celebrazione">Celebrazione</option>
+            <option value="sacramento">Sacramento</option>
+            <option value="catechismo">Catechismo</option>
+            <option value="attivita">Attività e gruppi</option>
+          </select>
+        </div>
+
+        <div className="campo-evento">
+          <label htmlFor="evento-visibilita">Visibilità</label>
+          <select
+            id="evento-visibilita"
+            value={nuovoEvento.visibilita}
+            onChange={(e) =>
+              aggiornaNuovoEvento("visibilita", e.target.value)
+            }
+          >
+            <option value="privato">Privato</option>
+            <option value="riservato">Riservato</option>
+            <option value="pubblico">Pubblico</option>
+          </select>
+        </div>
+      </div>
+
+      <div className="campo-evento campo-descrizione">
+        <label htmlFor="evento-descrizione">Descrizione</label>
+        <textarea
+          id="evento-descrizione"
+          value={nuovoEvento.descrizione}
+          onChange={(e) =>
+            aggiornaNuovoEvento("descrizione", e.target.value)
+          }
+          placeholder="Note o informazioni sull'evento"
+          rows="4"
+        />
+      </div>
+
+      <div className="nuovo-evento-azioni">
+        <button
+          type="button"
+          className="pulsante-annulla-evento"
+          onClick={chiudiNuovoEvento}
+        >
+          Annulla
+        </button>
+
+        <button
+          type="button"
+          className="pulsante-salva-evento"
+          onClick={salvaNuovoEvento}
+        >
+          Salva evento
+        </button>
+      </div>
+    </div>
   </div>
 )}
       <div className="calendari-toolbar">
