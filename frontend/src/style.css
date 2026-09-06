@@ -111,3 +111,379 @@ body { margin: 0; font-family: Georgia, 'Times New Roman', serif; background: #1
   font-size: 42px;
   transition: color 0.25s ease;
 }
+/* =========================================================
+   ORARI MESSE
+   ========================================================= */
+
+.orari-messe-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 26px 0;
+}
+
+.pulsante-azione-principale,
+.pulsante-azione-secondaria {
+  min-height: 44px;
+  padding: 11px 18px;
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.pulsante-azione-principale {
+  background: #082b4c;
+  color: #fffaf0;
+  border: 1px solid #082b4c;
+}
+
+.pulsante-azione-principale:hover:not(:disabled) {
+  background: #0f426f;
+  transform: translateY(-1px);
+}
+
+.pulsante-azione-secondaria {
+  background: #fffaf0;
+  color: #082b4c;
+  border: 1px solid #d6a84f;
+}
+
+.pulsante-azione-secondaria:hover:not(:disabled) {
+  background: #f8edcf;
+  transform: translateY(-1px);
+}
+
+.pulsante-azione-principale:disabled,
+.pulsante-azione-secondaria:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Pannelli dei moduli */
+
+.pannello-form {
+  margin: 28px 0;
+  padding: 26px;
+  background: #fffaf0;
+  border: 1px solid #d6a84f;
+  border-radius: 16px;
+  box-shadow: 0 8px 22px rgba(8, 43, 76, 0.08);
+}
+
+.pannello-form h3 {
+  margin: 0 0 22px;
+  color: #082b4c;
+  font-size: 24px;
+}
+
+.griglia-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px 24px;
+}
+
+.campo-form {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  color: #1f2f3d;
+}
+
+.campo-form span {
+  color: #082b4c;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.campo-form input,
+.campo-form select,
+.campo-form textarea {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid #cbb98d;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #1f2f3d;
+  font-family: inherit;
+  font-size: 16px;
+}
+
+.campo-form textarea {
+  min-height: 96px;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.campo-form input:focus,
+.campo-form select:focus,
+.campo-form textarea:focus {
+  outline: 3px solid rgba(214, 168, 79, 0.24);
+  border-color: #a57a1f;
+}
+
+.campo-form input:disabled,
+.campo-form select:disabled,
+.campo-form textarea:disabled {
+  background: #eee9df;
+  color: #6d747a;
+  cursor: not-allowed;
+}
+
+.campo-form-largo {
+  grid-column: 1 / -1;
+}
+
+/* Opzioni e azioni */
+
+.opzioni-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px 28px;
+  margin-top: 22px;
+  padding: 18px;
+  background: #f8edcf;
+  border: 1px solid #ead4a2;
+  border-radius: 12px;
+}
+
+.campo-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #082b4c;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+.campo-checkbox input {
+  width: 18px;
+  height: 18px;
+  accent-color: #082b4c;
+}
+
+.azioni-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+/* Messaggi */
+
+.messaggio-errore,
+.messaggio-successo {
+  margin: 18px 0;
+  padding: 14px 16px;
+  border-radius: 10px;
+  font-size: 16px;
+  line-height: 1.4;
+}
+
+.messaggio-errore {
+  background: #fff0ed;
+  color: #8b2117;
+  border: 1px solid #df9b91;
+}
+
+.messaggio-successo {
+  background: #edf8ee;
+  color: #24612b;
+  border: 1px solid #9bc8a0;
+}
+
+/* Luoghi */
+
+.sezione-luoghi,
+.sezione-elenco-orari {
+  margin-top: 34px;
+}
+
+.sezione-luoghi > h3,
+.sezione-elenco-orari > h3 {
+  margin: 0 0 18px;
+  padding-bottom: 10px;
+  color: #082b4c;
+  font-size: 25px;
+  border-bottom: 1px solid #d6a84f;
+}
+
+.lista-luoghi {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.riga-luogo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  padding: 18px;
+  background: #fffaf0;
+  border: 1px solid #e2c98f;
+  border-radius: 13px;
+  box-shadow: 0 5px 16px rgba(8, 43, 76, 0.06);
+}
+
+.riga-luogo strong {
+  display: block;
+  color: #082b4c;
+  font-size: 18px;
+}
+
+.riga-luogo p {
+  margin: 6px 0 0;
+  color: #52616d;
+  font-size: 15px;
+  text-transform: capitalize;
+}
+
+/* Elenco degli orari */
+
+.gruppo-orari {
+  margin-top: 24px;
+}
+
+.gruppo-orari h4 {
+  display: inline-block;
+  margin: 0 0 14px;
+  padding: 7px 14px;
+  background: #082b4c;
+  color: #fffaf0;
+  border-radius: 999px;
+  font-size: 16px;
+}
+
+.lista-orari {
+  display: grid;
+  gap: 14px;
+}
+
+.riga-orario {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 20px;
+  background: #fffaf0;
+  border: 1px solid #e2c98f;
+  border-radius: 14px;
+  box-shadow: 0 6px 18px rgba(8, 43, 76, 0.07);
+}
+
+.orario-principale {
+  display: flex;
+  align-items: flex-start;
+  gap: 20px;
+  min-width: 0;
+}
+
+.orario-ora {
+  min-width: 82px;
+  padding: 10px 12px;
+  background: #f1dca8;
+  color: #082b4c;
+  border: 1px solid #d6a84f;
+  border-radius: 10px;
+  text-align: center;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.orario-dettagli {
+  min-width: 0;
+}
+
+.orario-dettagli strong {
+  display: block;
+  margin-bottom: 7px;
+  color: #082b4c;
+  font-size: 19px;
+}
+
+.orario-dettagli p {
+  margin: 4px 0;
+  color: #3d4d59;
+  font-size: 15px;
+  line-height: 1.4;
+}
+
+.azioni-orario {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  flex: 0 0 auto;
+}
+
+.elemento-disattivato {
+  opacity: 0.58;
+  background: #ece9e2;
+}
+
+/* Adattamento per tablet e cellulare */
+
+@media (max-width: 800px) {
+  .griglia-form,
+  .lista-luoghi {
+    grid-template-columns: 1fr;
+  }
+
+  .campo-form-largo {
+    grid-column: auto;
+  }
+
+  .riga-orario {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .azioni-orario {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 520px) {
+  .pannello-form {
+    padding: 18px;
+  }
+
+  .orari-messe-toolbar,
+  .azioni-form {
+    flex-direction: column;
+  }
+
+  .pulsante-azione-principale,
+  .pulsante-azione-secondaria {
+    width: 100%;
+  }
+
+  .riga-luogo {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .orario-principale {
+    flex-direction: column;
+  }
+
+  .orario-ora {
+    width: fit-content;
+  }
+
+  .opzioni-form {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
