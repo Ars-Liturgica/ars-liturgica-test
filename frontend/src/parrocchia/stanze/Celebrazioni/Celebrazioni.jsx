@@ -1,6 +1,10 @@
 import React, { useState } from "react";
+import OrariMesse from "./OrariMesse";
 
-export default function Celebrazioni({ tornaDashboard }) {
+export default function Celebrazioni({
+  parrocchiaId,
+  tornaDashboard,
+}) {
   const [sezioneAperta, setSezioneAperta] = useState(null);
 
   const sezioniCelebrazioni = [
@@ -13,7 +17,9 @@ export default function Celebrazioni({ tornaDashboard }) {
     },
     {
       id: "intenzioni-registro-messe",
-      icona: <i className="fa-solid fa-book-open icona-dashboard"></i>,
+      icona: (
+        <i className="fa-solid fa-book-open icona-dashboard"></i>
+      ),
       titolo: "Intenzioni e Registro Messe",
       descrizione:
         "Messe per defunti e altre intenzioni, richieste, donazioni e registro delle celebrazioni.",
@@ -34,7 +40,9 @@ export default function Celebrazioni({ tornaDashboard }) {
     },
     {
       id: "confessioni",
-      icona: <i className="fa-solid fa-hands-praying icona-dashboard"></i>,
+      icona: (
+        <i className="fa-solid fa-hands-praying icona-dashboard"></i>
+      ),
       titolo: "Confessioni",
       descrizione:
         "Orari ordinari e disponibilità particolari nei tempi forti.",
@@ -48,12 +56,23 @@ export default function Celebrazioni({ tornaDashboard }) {
     },
     {
       id: "calendario-celebrazioni",
-      icona: <i className="fa-solid fa-calendar-days icona-dashboard"></i>,
+      icona: (
+        <i className="fa-solid fa-calendar-days icona-dashboard"></i>
+      ),
       titolo: "Calendario delle celebrazioni",
       descrizione:
         "Messe, liturgie e celebrazioni provenienti dal calendario centrale.",
     },
   ];
+
+  if (sezioneAperta === "orari-messe") {
+    return (
+      <OrariMesse
+        parrocchiaId={parrocchiaId}
+        tornaCelebrazioni={() => setSezioneAperta(null)}
+      />
+    );
+  }
 
   const sezioneSelezionata = sezioniCelebrazioni.find(
     (sezione) => sezione.id === sezioneAperta
@@ -75,7 +94,8 @@ export default function Celebrazioni({ tornaDashboard }) {
 
         <div className="sezione-in-preparazione">
           <p>
-            Questa funzione sarà sviluppata nella prossima fase del cantiere.
+            Questa funzione sarà sviluppata nella prossima fase del
+            cantiere.
           </p>
         </div>
       </div>
@@ -93,9 +113,10 @@ export default function Celebrazioni({ tornaDashboard }) {
       </button>
 
       <h2>Celebrazioni</h2>
+
       <p>
-        Gestione delle Messe, delle liturgie e delle celebrazioni della vita
-        parrocchiale.
+        Gestione delle Messe, delle liturgie e delle celebrazioni
+        della vita parrocchiale.
       </p>
 
       <div className="griglia-gestione">
@@ -106,7 +127,10 @@ export default function Celebrazioni({ tornaDashboard }) {
             key={sezione.id}
             onClick={() => setSezioneAperta(sezione.id)}
           >
-            <span className="icona-gestione">{sezione.icona}</span>
+            <span className="icona-gestione">
+              {sezione.icona}
+            </span>
+
             <h3>{sezione.titolo}</h3>
             <p>{sezione.descrizione}</p>
           </button>
