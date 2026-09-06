@@ -12,6 +12,13 @@ export default function Celebrazioni({ tornaDashboard }) {
         "Orari ordinari feriali, prefestivi e festivi della parrocchia.",
     },
     {
+      id: "intenzioni-registro-messe",
+      icona: <i className="fa-solid fa-book-open icona-dashboard"></i>,
+      titolo: "Intenzioni e Registro Messe",
+      descrizione:
+        "Messe per defunti e altre intenzioni, richieste, donazioni e registro delle celebrazioni.",
+    },
+    {
       id: "solennita-feste",
       icona: <i className="fa-solid fa-star icona-dashboard"></i>,
       titolo: "Solennità e feste liturgiche",
@@ -67,7 +74,9 @@ export default function Celebrazioni({ tornaDashboard }) {
         <p>{sezioneSelezionata.descrizione}</p>
 
         <div className="sezione-in-preparazione">
-          <p>Questa funzione sarà sviluppata nella prossima fase del cantiere.</p>
+          <p>
+            Questa funzione sarà sviluppata nella prossima fase del cantiere.
+          </p>
         </div>
       </div>
     );
