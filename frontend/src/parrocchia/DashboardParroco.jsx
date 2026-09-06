@@ -152,11 +152,13 @@ export default function DashboardParroco({ onCambioVista }) {
   }
 
   if (stanzaAperta === "celebrazioni") {
-    return (
-      <Celebrazioni tornaDashboard={() => setStanzaAperta(null)} />
-    );
-  }
-
+  return (
+    <Celebrazioni
+      parrocchiaId={parrocchia?.id}
+      tornaDashboard={() => setStanzaAperta(null)}
+    />
+  );
+}
   return (
     <div className="dashboard-parroco">
       <h2>{parrocchia?.nome || "Area di Gestione"}</h2>
