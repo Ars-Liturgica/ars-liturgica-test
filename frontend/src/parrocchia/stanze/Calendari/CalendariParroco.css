@@ -507,3 +507,45 @@
     width: 100%;
   }
 }
+/* =========================================================
+   CORREZIONE ALLINEAMENTO DEI SETTE GIORNI DEL CALENDARIO
+   ========================================================= */
+
+.calendario-mese {
+  min-width: 0;
+}
+
+.calendario-settimana-titoli,
+.calendario-griglia {
+  width: 100%;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.calendario-giorno {
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.eventi-giorno,
+.evento-calendario {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.evento-calendario span {
+  flex: 0 0 auto;
+}
+
+.evento-calendario strong {
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+@media (max-width: 760px) {
+  .calendario-griglia {
+    grid-template-columns: 1fr;
+  }
+}
