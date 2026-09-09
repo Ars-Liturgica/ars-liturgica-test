@@ -32,21 +32,6 @@ const orarioIniziale = {
   note_pubbliche: "",
 };
 
-function creaUuid() {
-  if (window.crypto?.randomUUID) {
-    return window.crypto.randomUUID();
-  }
-
-  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(
-    /[xy]/g,
-    (carattere) => {
-      const numero = Math.floor(Math.random() * 16);
-      const valore = carattere === "x" ? numero : (numero & 0x3) | 0x8;
-      return valore.toString(16);
-    }
-  );
-}
-
 export default function OrariMesse({
   parrocchiaId,
   tornaCelebrazioni,
@@ -409,93 +394,35 @@ export default function OrariMesse({
         ? await trovaOCreaLuogoAlternativo()
         : luogoPredefinito.id;
 
-      const gruppoOrarioId = gruppoInModifica || creaUuid();
-      const datiComuni = {
-        parrocchia_id: parrocchiaId,
-        luogo_id: luogoId,
-        gruppo_orario_id: gruppoOrarioId,
-        nome_periodo: formOrario.nome_periodo.trim(),
-        ora: formOrario.ora,
-        tipologia: formOrario.tipologia,
-        celebrante_id: null,
-        celebrante_nome: formOrario.celebrante_nome.trim() || null,
-        valido_dal: formOrario.valido_dal,
-        valido_al: formOrario.valido_al,
-        note_pubbliche: formOrario.note_pubbliche.trim() || null,
-        visibile_pubblico: true,
-        attivo: true,
-      };
+      const eraModifica = Boolean(gruppoInModifica);
 
-      if (gruppoInModifica) {
-        const righeEsistenti = orari.filter(
-          (orario) => orario.gruppo_orario_id === gruppoInModifica
-        );
-        const giorniEsistenti = new Set(
-          righeEsistenti.map((riga) => Number(riga.giorno_settimana))
-        );
-        const giorniSelezionati = new Set(
-          formOrario.giorni_settimana.map(Number)
-        );
-
-        const { error: erroreAggiornamento } = await supabase
-          .from("orari_messe")
-          .update(datiComuni)
-          .eq("parrocchia_id", parrocchiaId)
-          .eq("gruppo_orario_id", gruppoInModifica);
-
-        if (erroreAggiornamento) throw erroreAggiornamento;
-
-        const nuoviGiorni = formOrario.giorni_settimana.filter(
-          (giorno) => !giorniEsistenti.has(Number(giorno))
-        );
-
-        if (nuoviGiorni.length > 0) {
-          const { error: erroreInserimento } = await supabase
-            .from("orari_messe")
-            .insert(
-              nuoviGiorni.map((giorno) => ({
-                ...datiComuni,
-                giorno_settimana: Number(giorno),
-              }))
-            );
-
-          if (erroreInserimento) throw erroreInserimento;
+      const { error: erroreSalvataggio } = await supabase.rpc(
+        "ars_salva_programmazione_messe_completa",
+        {
+          p_parrocchia_id: parrocchiaId,
+          p_gruppo_orario_id: gruppoInModifica || null,
+          p_luogo_id: luogoId,
+          p_nome_periodo: formOrario.nome_periodo.trim(),
+          p_giorni: formOrario.giorni_settimana.map(Number),
+          p_ora: formOrario.ora,
+          p_tipologia: formOrario.tipologia,
+          p_celebrante_nome:
+            formOrario.celebrante_nome.trim() || null,
+          p_valido_dal: formOrario.valido_dal,
+          p_valido_al: formOrario.valido_al,
+          p_note_pubbliche:
+            formOrario.note_pubbliche.trim() || null,
+          p_visibile_pubblico: true,
         }
+      );
 
-        const idDaEliminare = righeEsistenti
-          .filter(
-            (riga) =>
-              !giorniSelezionati.has(Number(riga.giorno_settimana))
-          )
-          .map((riga) => riga.id);
+      if (erroreSalvataggio) throw erroreSalvataggio;
 
-        if (idDaEliminare.length > 0) {
-          const { error: erroreEliminazione } = await supabase
-            .from("orari_messe")
-            .delete()
-            .eq("parrocchia_id", parrocchiaId)
-            .in("id", idDaEliminare);
-
-          if (erroreEliminazione) throw erroreEliminazione;
-        }
-
-        setMessaggio("Programmazione aggiornata correttamente.");
-      } else {
-        const righeDaInserire = formOrario.giorni_settimana.map(
-          (giorno) => ({
-            ...datiComuni,
-            giorno_settimana: Number(giorno),
-          })
-        );
-
-        const { error: erroreInserimento } = await supabase
-          .from("orari_messe")
-          .insert(righeDaInserire);
-
-        if (erroreInserimento) throw erroreInserimento;
-
-        setMessaggio("Programmazione aggiunta correttamente.");
-      }
+      setMessaggio(
+        eraModifica
+          ? "Programmazione, calendario e notifica aggiornati correttamente."
+          : "Programmazione aggiunta al calendario e notifica pubblicata."
+      );
 
       setMostraFormOrario(false);
       setGruppoInModifica(null);
@@ -526,20 +453,24 @@ export default function OrariMesse({
     if (!conferma) return;
 
     try {
-      const { error } = await supabase
-        .from("orari_messe")
-        .delete()
-        .eq("parrocchia_id", parrocchiaId)
-        .eq("gruppo_orario_id", programmazione.gruppo_orario_id);
+      const { error } = await supabase.rpc(
+        "ars_elimina_programmazione_messe_completa",
+        {
+          p_parrocchia_id: parrocchiaId,
+          p_gruppo_orario_id: programmazione.gruppo_orario_id,
+        }
+      );
 
       if (error) throw error;
 
-      setMessaggio("Programmazione eliminata correttamente.");
+      setMessaggio(
+        "Programmazione eliminata, calendario aggiornato e notifica pubblicata."
+      );
       await caricaDati();
     } catch (err) {
       console.error(err);
       setErrore(
-        "La programmazione non può essere eliminata perché è già collegata ad altre registrazioni."
+        err?.message || "Non è stato possibile eliminare la programmazione."
       );
     }
   }
@@ -548,15 +479,31 @@ export default function OrariMesse({
     pulisciMessaggi();
 
     try {
-      const { error } = await supabase
-        .from("orari_messe")
-        .update({ attivo: true })
-        .eq("parrocchia_id", parrocchiaId)
-        .eq("gruppo_orario_id", programmazione.gruppo_orario_id);
+      const { error } = await supabase.rpc(
+        "ars_salva_programmazione_messe_completa",
+        {
+          p_parrocchia_id: parrocchiaId,
+          p_gruppo_orario_id: programmazione.gruppo_orario_id,
+          p_luogo_id: programmazione.luogo_id,
+          p_nome_periodo:
+            programmazione.nome_periodo || "Orario abituale",
+          p_giorni: programmazione.giorni_settimana.map(Number),
+          p_ora: formattaOra(programmazione.ora),
+          p_tipologia: programmazione.tipologia,
+          p_celebrante_nome: programmazione.celebrante_nome || null,
+          p_valido_dal: programmazione.valido_dal,
+          p_valido_al: programmazione.valido_al,
+          p_note_pubbliche: programmazione.note_pubbliche || null,
+          p_visibile_pubblico:
+            programmazione.visibile_pubblico !== false,
+        }
+      );
 
       if (error) throw error;
 
-      setMessaggio("Programmazione riattivata.");
+      setMessaggio(
+        "Programmazione riattivata, calendario aggiornato e notifica pubblicata."
+      );
       await caricaDati();
     } catch (err) {
       console.error(err);
