@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import BachecaAvvisi from "./stanze/BachecaAvvisi/BachecaAvvisi";
+import CalendarioFedele from "./stanze/Calendari/CalendarioFedele";
 
 export default function DashboardFedele() {
   const [stanzaAperta, setStanzaAperta] = useState(null);
@@ -25,6 +26,28 @@ export default function DashboardFedele() {
     );
   }
 
+  if (stanzaAperta === "calendario-parrocchia") {
+    return (
+      <CalendarioFedele
+        parrocchia={parrocchia}
+        onTorna={() => setStanzaAperta(null)}
+      />
+    );
+  }
+
+  const stileCard = {
+    width: "100%",
+    background: "#ffffff",
+    border: "1px solid #e2d7ca",
+    borderRadius: "18px",
+    padding: "28px",
+    boxShadow: "0 8px 24px rgba(68, 52, 35, 0.08)",
+    cursor: "pointer",
+    boxSizing: "border-box",
+    textAlign: "left",
+    fontFamily: "inherit",
+  };
+
   return (
     <div
       style={{
@@ -34,12 +57,7 @@ export default function DashboardFedele() {
         fontFamily: "Georgia, 'Times New Roman', serif",
       }}
     >
-      <div
-        style={{
-          maxWidth: "1100px",
-          margin: "0 auto",
-        }}
-      >
+      <div style={{ maxWidth: "1100px", margin: "0 auto" }}>
         <div
           style={{
             display: "flex",
@@ -67,12 +85,7 @@ export default function DashboardFedele() {
           </button>
         </div>
 
-        <div
-          style={{
-            textAlign: "center",
-            marginBottom: "36px",
-          }}
-        >
+        <div style={{ textAlign: "center", marginBottom: "36px" }}>
           <div
             style={{
               fontSize: "14px",
@@ -97,7 +110,7 @@ export default function DashboardFedele() {
           </h1>
         </div>
 
-              <div
+        <div
           style={{
             width: "100%",
             boxSizing: "border-box",
@@ -187,51 +200,71 @@ export default function DashboardFedele() {
         </div>
 
         <div
-          onClick={() => setStanzaAperta("bacheca-avvisi")}
           style={{
-            width: "100%",
-            maxWidth: "360px",
-            background: "#ffffff",
-            border: "1px solid #e2d7ca",
-            borderRadius: "18px",
-            padding: "28px",
-            boxShadow: "0 8px 24px rgba(68, 52, 35, 0.08)",
-            cursor: "pointer",
-            boxSizing: "border-box",
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 360px))",
+            gap: "24px",
           }}
         >
-          <div
-            style={{
-              fontSize: "34px",
-              marginBottom: "16px",
-            }}
+          <button
+            type="button"
+            onClick={() => setStanzaAperta("bacheca-avvisi")}
+            style={stileCard}
           >
-            📌
-          </div>
+            <div style={{ fontSize: "34px", marginBottom: "16px" }}>📌</div>
+            <h2
+              style={{
+                margin: "0 0 10px",
+                fontSize: "22px",
+                fontWeight: "500",
+                color: "#49392c",
+              }}
+            >
+              Bacheca Avvisi
+            </h2>
+            <p
+              style={{
+                margin: 0,
+                fontFamily: "Arial, sans-serif",
+                fontSize: "15px",
+                lineHeight: "1.6",
+                color: "#75695e",
+              }}
+            >
+              Consulta gli avvisi e le informazioni della tua comunità
+              parrocchiale.
+            </p>
+          </button>
 
-          <h2
-            style={{
-              margin: "0 0 10px",
-              fontSize: "22px",
-              fontWeight: "500",
-              color: "#49392c",
-            }}
+          <button
+            type="button"
+            onClick={() => setStanzaAperta("calendario-parrocchia")}
+            style={stileCard}
           >
-            Bacheca Avvisi
-          </h2>
-
-          <p
-            style={{
-              margin: 0,
-              fontFamily: "Arial, sans-serif",
-              fontSize: "15px",
-              lineHeight: "1.6",
-              color: "#75695e",
-            }}
-          >
-            Consulta gli avvisi e le informazioni della tua comunità
-            parrocchiale.
-          </p>
+            <div style={{ fontSize: "34px", marginBottom: "16px" }}>📅</div>
+            <h2
+              style={{
+                margin: "0 0 10px",
+                fontSize: "22px",
+                fontWeight: "500",
+                color: "#49392c",
+              }}
+            >
+              Calendario della Parrocchia
+            </h2>
+            <p
+              style={{
+                margin: 0,
+                fontFamily: "Arial, sans-serif",
+                fontSize: "15px",
+                lineHeight: "1.6",
+                color: "#75695e",
+              }}
+            >
+              Consulta gli orari delle Messe e gli eventi pubblici della tua
+              comunità.
+            </p>
+          </button>
         </div>
       </div>
     </div>
