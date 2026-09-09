@@ -48,6 +48,7 @@ const [nuovoEvento, setNuovoEvento] = useState({
         .from("eventi_calendario")
         .select("*")
         .eq("parrocchia_id", parrocchiaId)
+        .neq("stato", "annullato")
         .gte("data_ora_inizio", inizioMese.toISOString())
         .lt("data_ora_inizio", fineMese.toISOString())
         .order("data_ora_inizio", { ascending: true });
@@ -112,6 +113,7 @@ const [nuovoEvento, setNuovoEvento] = useState({
     const origine = (evento.origine || "").toLowerCase();
 
     if (
+      origine === "orari_messe" ||
       origine.includes("celebrazione") ||
       origine.includes("messa") ||
       origine.includes("liturgia")
