@@ -210,7 +210,101 @@ export default function CalendarioFedele({ parrocchia, onTorna }) {
   ];
 
   return (
-    <div className="calendari-parroco">
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#fff3dc",
+        boxSizing: "border-box",
+      }}
+    >
+      <header
+        style={{
+          background: "#0b3155",
+          borderBottom: "3px solid #d39a22",
+          color: "#fffaf0",
+          padding: "34px 48px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          gap: "24px",
+          flexWrap: "wrap",
+        }}
+      >
+        <div>
+          <div
+            style={{
+              fontFamily: "Georgia, 'Times New Roman', serif",
+              fontSize: "42px",
+              fontWeight: "700",
+              lineHeight: "1.1",
+            }}
+          >
+            Ars Liturgica
+          </div>
+          <div
+            style={{
+              marginTop: "8px",
+              color: "#e2a51f",
+              fontFamily: "Georgia, 'Times New Roman', serif",
+              fontSize: "20px",
+            }}
+          >
+            Al servizio della celebrazione
+          </div>
+          <div
+            style={{
+              marginTop: "12px",
+              fontFamily: "Georgia, 'Times New Roman', serif",
+              fontSize: "20px",
+              fontWeight: "700",
+            }}
+          >
+            {parrocchia?.nome}
+          </div>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => {
+            window.location.href = "/";
+          }}
+          style={{
+            padding: "14px 24px",
+            border: "1px solid #d39a22",
+            borderRadius: "12px",
+            background: "#fffaf0",
+            color: "#0b3155",
+            fontSize: "16px",
+            fontWeight: "700",
+            cursor: "pointer",
+          }}
+        >
+          Torna alla Home
+        </button>
+      </header>
+
+      <main
+        style={{
+          padding: "72px 24px",
+          boxSizing: "border-box",
+        }}
+      >
+        <section
+          style={{
+            width: "100%",
+            maxWidth: "1590px",
+            margin: "0 auto",
+            background: "#fffdf9",
+            border: "1px solid #d9a13a",
+            borderRadius: "26px",
+            padding: "72px 64px",
+            boxSizing: "border-box",
+          }}
+        >
+          <div
+            className="calendari-parroco"
+            style={{ padding: 0, color: "#0f2f57" }}
+          >
       <button
         type="button"
         onClick={onTorna}
@@ -338,6 +432,9 @@ export default function CalendarioFedele({ parrocchia, onTorna }) {
           </aside>
         </div>
       )}
+          </div>
+        </section>
+      </main>
     </div>
   );
 }
