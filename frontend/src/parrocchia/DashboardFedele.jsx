@@ -1,9 +1,16 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
+import { supabase } from "../supabaseClient";
+
 import BachecaAvvisi from "./stanze/BachecaAvvisi/BachecaAvvisi";
 import CalendarioFedele from "./stanze/Calendari/CalendarioFedele";
+import NotificheFedele from "./stanze/Notifiche/NotificheFedele";
 
 export default function DashboardFedele() {
   const [stanzaAperta, setStanzaAperta] = useState(null);
+  const [numeroNotificheNonLette, setNumeroNotificheNonLette] =
+    useState(0);
+
+  const utenteId = localStorage.getItem("ars_utente_id");
 
   const parrocchia = {
     id: localStorage.getItem("ars_parrocchia_id"),
@@ -15,6 +22,51 @@ export default function DashboardFedele() {
   const messaggioBenvenuto =
     localStorage.getItem("ars_messaggio_benvenuto") ||
     "Siamo lieti di accoglierti in questo spazio dedicato alla nostra comunità. Qui potrai trovare avvisi, informazioni e partecipare alla vita della Parrocchia attraverso gli spazi a tua disposizione.";
+
+  const caricaConteggioNotifiche = useCallback(async () => {
+    if (!utenteId || !parrocchia.id) {
+      setNumeroNotificheNonLette(0);
+      return;
+    }
+
+    const { data, error } = await supabase.rpc(
+      "ars_elenco_notifiche_fedele",
+      {
+        p_utente_id: utenteId,
+        p_parrocchia_id: parrocchia.id,
+      }
+    );
+
+    if (error) {
+      console.error(
+        "Errore conteggio notifiche del fedele:",
+        error
+      );
+      setNumeroNotificheNonLette(0);
+      return;
+    }
+
+    const numeroNonLette = (data || []).filter(
+      (notifica) => !notifica.letta
+    ).length;
+
+    setNumeroNotificheNonLette(numeroNonLette);
+  }, [utenteId, parrocchia.id]);
+
+  useEffect(() => {
+    caricaConteggioNotifiche();
+  }, [caricaConteggioNotifiche, stanzaAperta]);
+
+  if (stanzaAperta === "notifiche") {
+    return (
+      <NotificheFedele
+        parrocchiaId={parrocchia.id}
+        utenteId={utenteId}
+        tornaDashboard={() => setStanzaAperta(null)}
+        onAggiornaConteggio={setNumeroNotificheNonLette}
+      />
+    );
+  }
 
   if (stanzaAperta === "bacheca-avvisi") {
     return (
@@ -62,9 +114,28 @@ export default function DashboardFedele() {
           style={{
             display: "flex",
             justifyContent: "flex-end",
+            alignItems: "center",
+            gap: "14px",
             marginBottom: "28px",
           }}
         >
+          <button
+            type="button"
+            className="pulsante-notifiche-dashboard"
+            onClick={() => setStanzaAperta("notifiche")}
+            aria-label={`Notifiche: ${numeroNotificheNonLette} non lette`}
+          >
+            <i className="fa-solid fa-bell"></i>
+
+            {numeroNotificheNonLette > 0 && (
+              <span className="badge-notifiche">
+                {numeroNotificheNonLette > 99
+                  ? "99+"
+                  : numeroNotificheNonLette}
+              </span>
+            )}
+          </button>
+
           <button
             type="button"
             onClick={() => {
@@ -202,7 +273,8 @@ export default function DashboardFedele() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(280px, 360px))",
+            gridTemplateColumns:
+              "repeat(auto-fit, minmax(280px, 360px))",
             gap: "24px",
           }}
         >
@@ -211,7 +283,11 @@ export default function DashboardFedele() {
             onClick={() => setStanzaAperta("bacheca-avvisi")}
             style={stileCard}
           >
-            <div style={{ fontSize: "34px", marginBottom: "16px" }}>📌</div>
+            
+            <div style={{ fontSize: "34px", marginBottom: "16px" }}>
+              📌
+            </div>
+
             <h2
               style={{
                 margin: "0 0 10px",
@@ -222,6 +298,7 @@ export default function DashboardFedele() {
             >
               Bacheca Avvisi
             </h2>
+
             <p
               style={{
                 margin: 0,
@@ -238,10 +315,15 @@ export default function DashboardFedele() {
 
           <button
             type="button"
-            onClick={() => setStanzaAperta("calendario-parrocchia")}
+            onClick={() =>
+              setStanzaAperta("calendario-parrocchia")
+            }
             style={stileCard}
           >
-            <div style={{ fontSize: "34px", marginBottom: "16px" }}>📅</div>
+            <div style={{ fontSize: "34px", marginBottom: "16px" }}>
+              📅
+            </div>
+
             <h2
               style={{
                 margin: "0 0 10px",
@@ -252,6 +334,7 @@ export default function DashboardFedele() {
             >
               Calendario della Parrocchia
             </h2>
+
             <p
               style={{
                 margin: 0,
@@ -261,8 +344,8 @@ export default function DashboardFedele() {
                 color: "#75695e",
               }}
             >
-              Consulta gli orari delle Messe e gli eventi pubblici della tua
-              comunità.
+              Consulta gli orari delle Messe e gli eventi pubblici della
+              tua comunità.
             </p>
           </button>
         </div>
