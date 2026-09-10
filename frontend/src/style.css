@@ -789,3 +789,7 @@ body { margin: 0; font-family: Georgia, 'Times New Roman', serif; background: #1
     align-self: flex-start;
   }
 }
+.notifiche-pagina-fedele {
+  min-height: 100vh;
+  background: #f7f3ed;
+}
