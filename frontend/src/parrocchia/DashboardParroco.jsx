@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { supabase } from "../supabaseClient";
 
 import CalendariParroco from "./stanze/Calendari/CalendariParroco";
@@ -6,10 +6,14 @@ import BachecaAvvisi from "./stanze/BachecaAvvisi/BachecaAvvisi";
 import ArchivioDocumenti from "./stanze/ArchivioDocumenti/ArchivioDocumenti/ArchivioDocumenti";
 import ComunitaParrocchia from "./stanze/Comunita/ComunitaParrocchia";
 import Celebrazioni from "./stanze/Celebrazioni/Celebrazioni";
+import Notifiche from "./stanze/Notifiche/Notifiche";
 
 export default function DashboardParroco({ onCambioVista }) {
   const [parrocchia, setParrocchia] = useState(null);
+  const [utenteId, setUtenteId] = useState(null);
   const [stanzaAperta, setStanzaAperta] = useState(null);
+  const [numeroNotificheNonLette, setNumeroNotificheNonLette] =
+    useState(0);
 
   useEffect(() => {
     if (typeof onCambioVista === "function") {
@@ -25,19 +29,39 @@ export default function DashboardParroco({ onCambioVista }) {
 
       if (!session) return;
 
-      const { data: collegamento } = await supabase
-        .from("utenti_parrocchie")
-        .select("parrocchia_id")
-        .eq("utente_id", session.user.id)
-        .single();
+      setUtenteId(session.user.id);
+
+      const { data: collegamento, error: erroreCollegamento } =
+        await supabase
+          .from("utenti_parrocchie")
+          .select("parrocchia_id")
+          .eq("utente_id", session.user.id)
+          .single();
+
+      if (erroreCollegamento) {
+        console.error(
+          "Errore caricamento collegamento parrocchia:",
+          erroreCollegamento
+        );
+        return;
+      }
 
       if (!collegamento) return;
 
-      const { data: parrocchiaCaricata } = await supabase
-        .from("parrocchie")
-        .select("id, nome")
-        .eq("id", collegamento.parrocchia_id)
-        .single();
+      const { data: parrocchiaCaricata, error: erroreParrocchia } =
+        await supabase
+          .from("parrocchie")
+          .select("id, nome")
+          .eq("id", collegamento.parrocchia_id)
+          .single();
+
+      if (erroreParrocchia) {
+        console.error(
+          "Errore caricamento parrocchia:",
+          erroreParrocchia
+        );
+        return;
+      }
 
       if (parrocchiaCaricata) {
         setParrocchia(parrocchiaCaricata);
@@ -46,6 +70,58 @@ export default function DashboardParroco({ onCambioVista }) {
 
     caricaParrocchia();
   }, []);
+
+  const caricaConteggioNotifiche = useCallback(
+    async (parrocchiaId, idUtente) => {
+      if (!parrocchiaId || !idUtente) {
+        setNumeroNotificheNonLette(0);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("notifiche")
+        .select(`
+          id,
+          notifiche_letture (
+            utente_id
+          )
+        `)
+        .eq("parrocchia_id", parrocchiaId)
+        .eq("pubblica_comunita", true);
+
+      if (error) {
+        console.error(
+          "Errore conteggio notifiche non lette:",
+          error
+        );
+        return;
+      }
+
+      const numeroNonLette = (data || []).filter((notifica) => {
+        const letture = Array.isArray(notifica.notifiche_letture)
+          ? notifica.notifiche_letture
+          : [];
+
+        return !letture.some(
+          (lettura) => lettura.utente_id === idUtente
+        );
+      }).length;
+
+      setNumeroNotificheNonLette(numeroNonLette);
+    },
+    []
+  );
+
+  useEffect(() => {
+    if (!parrocchia?.id || !utenteId) return;
+
+    caricaConteggioNotifiche(parrocchia.id, utenteId);
+  }, [
+    parrocchia?.id,
+    utenteId,
+    stanzaAperta,
+    caricaConteggioNotifiche,
+  ]);
 
   const sezioniGestione = [
     {
@@ -56,14 +132,18 @@ export default function DashboardParroco({ onCambioVista }) {
       stanza: "comunita",
     },
     {
-      icona: <i className="fa-solid fa-thumbtack icona-dashboard"></i>,
+      icona: (
+        <i className="fa-solid fa-thumbtack icona-dashboard"></i>
+      ),
       titolo: "Bacheca Avvisi",
       descrizione:
         "Avvisi ufficiali, messaggi del parroco e informazioni pratiche rivolte alla comunità.",
       stanza: "bacheca-avvisi",
     },
     {
-      icona: <i className="fa-solid fa-calendar-days icona-dashboard"></i>,
+      icona: (
+        <i className="fa-solid fa-calendar-days icona-dashboard"></i>
+      ),
       titolo: "Calendari",
       descrizione:
         "Calendario della parrocchia e calendari personali dei sacerdoti.",
@@ -72,7 +152,8 @@ export default function DashboardParroco({ onCambioVista }) {
     {
       icona: <i className="fa-solid fa-cross icona-dashboard"></i>,
       titolo: "Sacramenti",
-      descrizione: "Battesimi, Prime Comunioni, Cresime e Matrimoni.",
+      descrizione:
+        "Battesimi, Prime Comunioni, Cresime e Matrimoni.",
     },
     {
       icona: <i className="fa-solid fa-church icona-dashboard"></i>,
@@ -82,15 +163,20 @@ export default function DashboardParroco({ onCambioVista }) {
       stanza: "celebrazioni",
     },
     {
-      icona: <i className="fa-solid fa-people-group icona-dashboard"></i>,
+      icona: (
+        <i className="fa-solid fa-people-group icona-dashboard"></i>
+      ),
       titolo: "Attività e Gruppi",
       descrizione:
         "Catechismo, GrEst, gruppi e attività della comunità parrocchiale.",
     },
     {
-      icona: <i className="fa-solid fa-folder-open icona-dashboard"></i>,
+      icona: (
+        <i className="fa-solid fa-folder-open icona-dashboard"></i>
+      ),
       titolo: "Documenti",
-      descrizione: "Archivio, modulistica, verbali e materiali utili.",
+      descrizione:
+        "Archivio, modulistica, verbali e materiali utili.",
       stanza: "archivio-documenti",
     },
     {
@@ -102,7 +188,9 @@ export default function DashboardParroco({ onCambioVista }) {
         "Progetti, stanziamenti, raccolte fondi e donazioni online.",
     },
     {
-      icona: <i className="fa-solid fa-user-group icona-dashboard"></i>,
+      icona: (
+        <i className="fa-solid fa-user-group icona-dashboard"></i>
+      ),
       titolo: "Collaboratori",
       descrizione:
         "Viceparroco, sacerdoti, diaconi e responsabili autorizzati.",
@@ -114,6 +202,17 @@ export default function DashboardParroco({ onCambioVista }) {
         "Dati della parrocchia, configurazioni e servizi attivi.",
     },
   ];
+
+  if (stanzaAperta === "notifiche") {
+    return (
+      <Notifiche
+        parrocchiaId={parrocchia?.id}
+        utenteId={utenteId}
+        tornaDashboard={() => setStanzaAperta(null)}
+        onAggiornaConteggio={setNumeroNotificheNonLette}
+      />
+    );
+  }
 
   if (stanzaAperta === "calendari") {
     return (
@@ -152,28 +251,54 @@ export default function DashboardParroco({ onCambioVista }) {
   }
 
   if (stanzaAperta === "celebrazioni") {
-  return (
-    <Celebrazioni
-      parrocchiaId={parrocchia?.id}
-      tornaDashboard={() => setStanzaAperta(null)}
-    />
-  );
-}
+    return (
+      <Celebrazioni
+        parrocchiaId={parrocchia?.id}
+        tornaDashboard={() => setStanzaAperta(null)}
+      />
+    );
+  }
+
   return (
     <div className="dashboard-parroco">
-      <h2>{parrocchia?.nome || "Area di Gestione"}</h2>
-      <p>Strumenti riservati alla gestione della parrocchia.</p>
+      <div className="dashboard-intestazione">
+        <div>
+          <h2>{parrocchia?.nome || "Area di Gestione"}</h2>
+          <p>Strumenti riservati alla gestione della parrocchia.</p>
+        </div>
+
+        <button
+          type="button"
+          className="pulsante-notifiche-dashboard"
+          onClick={() => setStanzaAperta("notifiche")}
+          aria-label={`Notifiche: ${numeroNotificheNonLette} non lette`}
+        >
+          <i className="fa-solid fa-bell"></i>
+
+          {numeroNotificheNonLette > 0 && (
+            <span className="badge-notifiche">
+              {numeroNotificheNonLette > 99
+                ? "99+"
+                : numeroNotificheNonLette}
+            </span>
+          )}
+        </button>
+      </div>
 
       <div className="griglia-gestione">
         {sezioniGestione.map((sezione) => (
           <button
+            type="button"
             className="card-gestione"
             key={sezione.titolo}
             onClick={() =>
               sezione.stanza && setStanzaAperta(sezione.stanza)
             }
           >
-            <span className="icona-gestione">{sezione.icona}</span>
+            <span className="icona-gestione">
+              {sezione.icona}
+            </span>
+
             <h3>{sezione.titolo}</h3>
             <p>{sezione.descrizione}</p>
           </button>
