@@ -6,6 +6,7 @@ export default function Notifiche({
   utenteId,
   tornaDashboard,
   onAggiornaConteggio,
+  testoRitorno = "← Torna a Gestione Parrocchia",
 }) {
   const [notifiche, setNotifiche] = useState([]);
   const [caricamento, setCaricamento] = useState(true);
@@ -182,7 +183,7 @@ export default function Notifiche({
         className="pulsante-torna-dashboard"
         onClick={tornaDashboard}
       >
-        ← Torna a Gestione Parrocchia
+       {testoRitorno}
       </button>
 
       <div className="notifiche-header">
