@@ -167,7 +167,7 @@ export default function NotificheFedele({
   ).length;
 
   return (
-    <div className="notifiche-pagina">
+    <div className="notifiche-pagina notifiche-pagina-fedele">
       <button
         type="button"
         className="pulsante-torna-dashboard"
