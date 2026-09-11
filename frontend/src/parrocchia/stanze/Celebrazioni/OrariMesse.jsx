@@ -30,6 +30,9 @@ const orarioIniziale = {
   tipo_luogo_altro: "cappella",
   indirizzo_luogo_altro: "",
   note_pubbliche: "",
+  accetta_intenzioni: true,
+  numero_massimo_intenzioni: "",
+  consenti_offerte: false,
 };
 
 export default function OrariMesse({
@@ -292,6 +295,10 @@ export default function OrariMesse({
         ? riferimento.luogo?.indirizzo || ""
         : "",
       note_pubbliche: riferimento.note_pubbliche || "",
+      accetta_intenzioni: riferimento.accetta_intenzioni !== false,
+      numero_massimo_intenzioni:
+        riferimento.numero_massimo_intenzioni ?? "",
+      consenti_offerte: Boolean(riferimento.consenti_offerte),
     });
 
     setMostraFormOrario(true);
@@ -387,6 +394,23 @@ export default function OrariMesse({
       return;
     }
 
+    const numeroMassimoIntenzioni =
+      formOrario.numero_massimo_intenzioni === ""
+        ? null
+        : Number(formOrario.numero_massimo_intenzioni);
+
+    if (
+      formOrario.accetta_intenzioni &&
+      numeroMassimoIntenzioni !== null &&
+      (!Number.isInteger(numeroMassimoIntenzioni) ||
+        numeroMassimoIntenzioni < 1)
+    ) {
+      setErrore(
+        "Il numero massimo di intenzioni deve essere un numero intero maggiore di zero."
+      );
+      return;
+    }
+
     setSalvataggio(true);
 
     try {
@@ -413,6 +437,13 @@ export default function OrariMesse({
           p_note_pubbliche:
             formOrario.note_pubbliche.trim() || null,
           p_visibile_pubblico: true,
+          p_accetta_intenzioni: formOrario.accetta_intenzioni,
+          p_numero_massimo_intenzioni: formOrario.accetta_intenzioni
+            ? numeroMassimoIntenzioni
+            : null,
+          p_consenti_offerte:
+            formOrario.accetta_intenzioni &&
+            formOrario.consenti_offerte,
         }
       );
 
@@ -496,6 +527,15 @@ export default function OrariMesse({
           p_note_pubbliche: programmazione.note_pubbliche || null,
           p_visibile_pubblico:
             programmazione.visibile_pubblico !== false,
+          p_accetta_intenzioni:
+            programmazione.accetta_intenzioni !== false,
+          p_numero_massimo_intenzioni:
+            programmazione.accetta_intenzioni !== false
+              ? programmazione.numero_massimo_intenzioni ?? null
+              : null,
+          p_consenti_offerte:
+            programmazione.accetta_intenzioni !== false &&
+            Boolean(programmazione.consenti_offerte),
         }
       );
 
@@ -687,6 +727,72 @@ export default function OrariMesse({
             </label>
 
             <div className="campo-form campo-form-largo">
+              <span>Intenzioni per questa Messa</span>
+
+              <div className="opzioni-form">
+                <label className="campo-checkbox">
+                  <input
+                    type="checkbox"
+                    checked={formOrario.accetta_intenzioni}
+                    onChange={(event) =>
+                      setFormOrario({
+                        ...formOrario,
+                        accetta_intenzioni: event.target.checked,
+                        numero_massimo_intenzioni: event.target.checked
+                          ? formOrario.numero_massimo_intenzioni
+                          : "",
+                        consenti_offerte: event.target.checked
+                          ? formOrario.consenti_offerte
+                          : false,
+                      })
+                    }
+                  />
+                  <span>Questa Messa accetta intenzioni</span>
+                </label>
+              </div>
+            </div>
+
+            {formOrario.accetta_intenzioni && (
+              <>
+                <label className="campo-form">
+                  <span>Numero massimo di intenzioni</span>
+                  <input
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={formOrario.numero_massimo_intenzioni}
+                    onChange={(event) =>
+                      setFormOrario({
+                        ...formOrario,
+                        numero_massimo_intenzioni: event.target.value,
+                      })
+                    }
+                    placeholder="Illimitato"
+                  />
+                  <small>Lascia vuoto per non impostare alcun limite.</small>
+                </label>
+
+                <div className="campo-form">
+                  <span>Offerte collegate</span>
+
+                  <label className="campo-checkbox">
+                    <input
+                      type="checkbox"
+                      checked={formOrario.consenti_offerte}
+                      onChange={(event) =>
+                        setFormOrario({
+                          ...formOrario,
+                          consenti_offerte: event.target.checked,
+                        })
+                      }
+                    />
+                    <span>Consenti offerte per le intenzioni</span>
+                  </label>
+                </div>
+              </>
+            )}
+
+            <div className="campo-form campo-form-largo">
               <span>Luogo della celebrazione</span>
 
               <div className="opzioni-form">
@@ -860,6 +966,21 @@ export default function OrariMesse({
                             {programmazione.note_pubbliche && (
                               <p>{programmazione.note_pubbliche}</p>
                             )}
+
+                            <p>
+                              Intenzioni:{" "}
+                              {programmazione.accetta_intenzioni !== false
+                                ? programmazione.numero_massimo_intenzioni ==
+                                  null
+                                  ? "Illimitate"
+                                  : `massimo ${programmazione.numero_massimo_intenzioni}`
+                                : "Non accettate"}
+                            </p>
+
+                            {programmazione.accetta_intenzioni !== false &&
+                              programmazione.consenti_offerte && (
+                                <p>Offerte collegate: consentite</p>
+                              )}
                           </div>
                         </div>
 
