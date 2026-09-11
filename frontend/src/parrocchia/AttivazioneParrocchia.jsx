@@ -4,9 +4,26 @@ import PassaggioRegistrante from "./attivazione/PassaggioRegistrante";
 import PassaggioParrocchia from "./attivazione/PassaggioParrocchia";
 const PERMESSI = [
   { codice: "gestione_avvisi", nome: "Gestione Avvisi" },
-  { codice: "gestione_comunicazioni", nome: "Gestione Comunicazioni" },
-  { codice: "gestione_bollettino", nome: "Gestione Bollettino" },
-  { codice: "gestione_albo_defunti", nome: "Gestione Albo Defunti" },
+  {
+    codice: "gestione_comunicazioni",
+    nome: "Gestione Comunicazioni",
+  },
+  {
+    codice: "gestione_bollettino",
+    nome: "Gestione Bollettino",
+  },
+  {
+    codice: "gestione_albo_defunti",
+    nome: "Gestione Albo Defunti",
+  },
+  {
+    codice: "gestione_intenzioni_messe",
+    nome: "Gestione Intenzioni Messe",
+  },
+  {
+    codice: "gestione_registro_messe",
+    nome: "Gestione Registro Messe",
+  },
   {
     codice: "gestione_progetti_donazioni",
     nome: "Gestione Progetti e Donazioni",
@@ -20,7 +37,6 @@ const PERMESSI = [
     nome: "Impostazioni della parrocchia",
   },
 ];
-
 const PERSONA_VUOTA = {
   nome: "",
   cognome: "",
