@@ -4,6 +4,7 @@ import "./CalendariParroco.css";
 
 export default function CalendarioFedele({ parrocchia, onTorna }) {
   const [eventi, setEventi] = useState([]);
+  const [intenzioniPubbliche, setIntenzioniPubbliche] = useState([]);
   const [caricamento, setCaricamento] = useState(true);
   const [errore, setErrore] = useState("");
   const [dataCorrente, setDataCorrente] = useState(new Date());
@@ -33,7 +34,21 @@ export default function CalendarioFedele({ parrocchia, onTorna }) {
         1
       );
 
-      const { data, error } = await supabase
+      const ultimoGiornoMese = new Date(
+        dataCorrente.getFullYear(),
+        dataCorrente.getMonth() + 1,
+        0
+      );
+
+      function formattaDataPerDatabase(data) {
+        const anno = data.getFullYear();
+        const mese = String(data.getMonth() + 1).padStart(2, "0");
+        const giorno = String(data.getDate()).padStart(2, "0");
+
+        return `${anno}-${mese}-${giorno}`;
+      }
+
+      const { data: datiEventi, error: erroreEventi } = await supabase
         .from("eventi_calendario")
         .select("*")
         .eq("parrocchia_id", parrocchia.id)
@@ -44,12 +59,36 @@ export default function CalendarioFedele({ parrocchia, onTorna }) {
         .lt("data_ora_inizio", fineMese.toISOString())
         .order("data_ora_inizio", { ascending: true });
 
-      if (error) {
-        setErrore(error.message);
+      if (erroreEventi) {
+        setErrore(erroreEventi.message);
         setEventi([]);
-      } else {
-        setEventi(data || []);
+        setIntenzioniPubbliche([]);
+        setCaricamento(false);
+        return;
       }
+
+      const {
+        data: datiIntenzioni,
+        error: erroreIntenzioni,
+      } = await supabase.rpc(
+        "ars_elenco_intenzioni_pubbliche_calendario_fedele",
+        {
+          p_parrocchia_id: parrocchia.id,
+          p_data_dal: formattaDataPerDatabase(inizioMese),
+          p_data_al: formattaDataPerDatabase(ultimoGiornoMese),
+        }
+      );
+
+      if (erroreIntenzioni) {
+        setErrore(erroreIntenzioni.message);
+        setEventi([]);
+        setIntenzioniPubbliche([]);
+        setCaricamento(false);
+        return;
+      }
+
+      setEventi(datiEventi || []);
+      setIntenzioniPubbliche(datiIntenzioni || []);
 
       setCaricamento(false);
     }
@@ -153,6 +192,12 @@ export default function CalendarioFedele({ parrocchia, onTorna }) {
   function eventiDelGiorno(giorno) {
     return eventiFiltrati.filter((evento) =>
       stessoGiorno(new Date(evento.data_ora_inizio), giorno)
+    );
+  }
+
+  function intenzioniDellEvento(eventoId) {
+    return intenzioniPubbliche.filter(
+      (intenzione) => intenzione.evento_id === eventoId
     );
   }
 
@@ -416,18 +461,60 @@ export default function CalendarioFedele({ parrocchia, onTorna }) {
             {eventiGiornoSelezionato.length === 0 ? (
               <p>Nessun evento previsto per questo giorno.</p>
             ) : (
-              eventiGiornoSelezionato.map((evento) => (
-                <div key={evento.id} className="dettaglio-evento">
-                  <div className="dettaglio-orario">
-                    {formattaOra(evento.data_ora_inizio)}
+              eventiGiornoSelezionato.map((evento) => {
+                const intenzioni = intenzioniDellEvento(evento.id);
+
+                return (
+                  <div key={evento.id} className="dettaglio-evento">
+                    <div className="dettaglio-orario">
+                      {formattaOra(evento.data_ora_inizio)}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <strong>{evento.titolo}</strong>
+                      {evento.luogo && <p>{evento.luogo}</p>}
+                      {evento.descrizione && <p>{evento.descrizione}</p>}
+
+                      {intenzioni.length > 0 && (
+                        <div
+                          style={{
+                            marginTop: "12px",
+                            padding: "12px 14px",
+                            background: "#fff8e8",
+                            borderLeft: "3px solid #d39a22",
+                            borderRadius: "8px",
+                          }}
+                        >
+                          <div
+                            style={{
+                              marginBottom: "6px",
+                              color: "#7b5a20",
+                              fontSize: "13px",
+                              fontWeight: "700",
+                              letterSpacing: "0.5px",
+                              textTransform: "uppercase",
+                            }}
+                          >
+                            Intenzioni della Messa
+                          </div>
+
+                          {intenzioni.map((intenzione, indice) => (
+                            <p
+                              key={`${evento.id}-${indice}`}
+                              style={{
+                                margin: indice === 0 ? 0 : "6px 0 0",
+                                color: "#49392c",
+                                lineHeight: "1.5",
+                              }}
+                            >
+                              {intenzione.testo_intenzione}
+                            </p>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                  <div>
-                    <strong>{evento.titolo}</strong>
-                    {evento.luogo && <p>{evento.luogo}</p>}
-                    {evento.descrizione && <p>{evento.descrizione}</p>}
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
           </aside>
         </div>
