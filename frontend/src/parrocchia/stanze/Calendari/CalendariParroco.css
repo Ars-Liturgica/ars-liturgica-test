@@ -549,3 +549,74 @@
     grid-template-columns: 1fr;
   }
 }
+.avviso-intenzioni-calendario {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border: 1px solid #e3d7bd;
+  border-radius: 10px;
+  background: #fff8e8;
+  color: #7b5a20;
+}
+
+.conteggio-intenzioni-calendario {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  min-width: 20px;
+  height: 20px;
+  margin-left: auto;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: #c99213;
+  color: #ffffff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.contenuto-dettaglio-evento {
+  min-width: 0;
+}
+
+.intenzioni-calendario-parroco {
+  margin-top: 12px;
+  padding: 12px;
+  border-left: 3px solid #c99213;
+  border-radius: 8px;
+  background: #fff8e8;
+}
+
+.intenzioni-calendario-titolo {
+  margin-bottom: 8px;
+  color: #7b5a20;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.intenzione-calendario-parroco {
+  padding: 10px 0;
+  border-top: 1px solid #ead9b8;
+}
+
+.intenzione-calendario-parroco:first-of-type {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.intenzione-calendario-parroco:last-child {
+  padding-bottom: 0;
+}
+
+.intenzione-calendario-parroco > strong {
+  display: block;
+  color: #49392c;
+  line-height: 1.4;
+}
+
+.intenzione-calendario-parroco p {
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+}
