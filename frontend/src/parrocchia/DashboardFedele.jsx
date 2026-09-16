@@ -4,6 +4,7 @@ import { supabase } from "../supabaseClient";
 import BachecaAvvisi from "./stanze/BachecaAvvisi/BachecaAvvisi";
 import CalendarioFedele from "./stanze/Calendari/CalendarioFedele";
 import NotificheFedele from "./stanze/Notifiche/NotificheFedele";
+import IntenzioniMesseFedele from "./stanze/Celebrazioni/IntenzioniMesseFedele";
 
 export default function DashboardFedele() {
   const [stanzaAperta, setStanzaAperta] = useState(null);
@@ -83,6 +84,16 @@ export default function DashboardFedele() {
       <CalendarioFedele
         parrocchia={parrocchia}
         onTorna={() => setStanzaAperta(null)}
+      />
+    );
+  }
+
+  if (stanzaAperta === "intenzioni-messe") {
+    return (
+      <IntenzioniMesseFedele
+        parrocchiaId={parrocchia.id}
+        utenteId={utenteId}
+        tornaDashboard={() => setStanzaAperta(null)}
       />
     );
   }
@@ -283,7 +294,6 @@ export default function DashboardFedele() {
             onClick={() => setStanzaAperta("bacheca-avvisi")}
             style={stileCard}
           >
-            
             <div style={{ fontSize: "34px", marginBottom: "16px" }}>
               📌
             </div>
@@ -346,6 +356,40 @@ export default function DashboardFedele() {
             >
               Consulta gli orari delle Messe e gli eventi pubblici della
               tua comunità.
+            </p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setStanzaAperta("intenzioni-messe")}
+            style={stileCard}
+          >
+            <div style={{ fontSize: "34px", marginBottom: "16px" }}>
+              🕊️
+            </div>
+
+            <h2
+              style={{
+                margin: "0 0 10px",
+                fontSize: "22px",
+                fontWeight: "500",
+                color: "#49392c",
+              }}
+            >
+              Intenzioni per le Messe
+            </h2>
+
+            <p
+              style={{
+                margin: 0,
+                fontFamily: "Arial, sans-serif",
+                fontSize: "15px",
+                lineHeight: "1.6",
+                color: "#75695e",
+              }}
+            >
+              Affida un’intenzione alla Parrocchia scegliendo una delle
+              Messe disponibili.
             </p>
           </button>
         </div>
