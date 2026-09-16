@@ -1,13 +1,16 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../../supabaseClient";
 import "./CalendariParroco.css";
+
 export default function CalendariParroco({
   parrocchiaId,
   tornaDashboard,
 }) {
   const [eventi, setEventi] = useState([]);
+  const [intenzioni, setIntenzioni] = useState([]);
   const [caricamento, setCaricamento] = useState(true);
   const [errore, setErrore] = useState("");
+  const [erroreIntenzioni, setErroreIntenzioni] = useState("");
   const [dataCorrente, setDataCorrente] = useState(new Date());
   const [giornoSelezionato, setGiornoSelezionato] = useState(new Date());
   const [filtroCategoria, setFiltroCategoria] = useState("tutto");
@@ -31,6 +34,7 @@ const [nuovoEvento, setNuovoEvento] = useState({
 
       setCaricamento(true);
       setErrore("");
+      setErroreIntenzioni("");
 
       const inizioMese = new Date(
         dataCorrente.getFullYear(),
@@ -44,7 +48,21 @@ const [nuovoEvento, setNuovoEvento] = useState({
         1
       );
 
-      const { data, error } = await supabase
+      const ultimoGiornoMese = new Date(
+        dataCorrente.getFullYear(),
+        dataCorrente.getMonth() + 1,
+        0
+      );
+
+      function formattaDataPerDatabase(data) {
+        const anno = data.getFullYear();
+        const mese = String(data.getMonth() + 1).padStart(2, "0");
+        const giorno = String(data.getDate()).padStart(2, "0");
+
+        return `${anno}-${mese}-${giorno}`;
+      }
+
+      const { data: datiEventi, error: erroreEventi } = await supabase
         .from("eventi_calendario")
         .select("*")
         .eq("parrocchia_id", parrocchiaId)
@@ -53,11 +71,36 @@ const [nuovoEvento, setNuovoEvento] = useState({
         .lt("data_ora_inizio", fineMese.toISOString())
         .order("data_ora_inizio", { ascending: true });
 
-      if (error) {
-        setErrore(error.message);
+      if (erroreEventi) {
+        setErrore(erroreEventi.message);
         setEventi([]);
+        setIntenzioni([]);
+        setCaricamento(false);
+        return;
+      }
+
+      const {
+        data: datiIntenzioni,
+        error: erroreCaricamentoIntenzioni,
+      } = await supabase.rpc("ars_elenco_intenzioni_parroco", {
+        p_parrocchia_id: parrocchiaId,
+        p_data_dal: formattaDataPerDatabase(inizioMese),
+        p_data_al: formattaDataPerDatabase(ultimoGiornoMese),
+      });
+
+      setEventi(datiEventi || []);
+
+      if (erroreCaricamentoIntenzioni) {
+        console.error(
+          "Errore caricamento intenzioni del parroco:",
+          erroreCaricamentoIntenzioni
+        );
+        setIntenzioni([]);
+        setErroreIntenzioni(
+          "Le intenzioni non sono momentaneamente disponibili."
+        );
       } else {
-        setEventi(data || []);
+        setIntenzioni(datiIntenzioni || []);
       }
 
       setCaricamento(false);
@@ -166,6 +209,23 @@ const [nuovoEvento, setNuovoEvento] = useState({
     return eventiFiltrati.filter((evento) =>
       stessoGiorno(new Date(evento.data_ora_inizio), giorno)
     );
+  }
+
+  function intenzioniDellEvento(eventoId) {
+    return intenzioni.filter(
+      (intenzione) => intenzione.evento_id === eventoId
+    );
+  }
+
+  function etichettaTipoIntenzione(tipo) {
+    const etichette = {
+      defunto: "Per un defunto",
+      persona_vivente: "Per una persona vivente",
+      ringraziamento: "In ringraziamento",
+      altra: "Altra intenzione",
+    };
+
+    return etichette[tipo] || "Intenzione";
   }
 
   const eventiGiornoSelezionato = eventiDelGiorno(giornoSelezionato);
@@ -566,6 +626,12 @@ function aggiornaNuovoEvento(campo, valore) {
         </p>
       )}
 
+      {erroreIntenzioni && !errore && (
+        <p className="avviso-intenzioni-calendario">
+          {erroreIntenzioni}
+        </p>
+      )}
+
       {!caricamento && !errore && (
         <div className="calendario-contenitore">
           <div className="calendario-mese">
@@ -605,20 +671,36 @@ function aggiornaNuovoEvento(campo, valore) {
                     </span>
 
                     <div className="eventi-giorno">
-                      {eventiGiorno.slice(0, 4).map((evento) => (
-                        <div
-                          key={evento.id}
-                          className={`evento-calendario categoria-${categoriaEvento(
-                            evento
-                          )}`}
-                        >
-                          <span>
-                            {formattaOra(evento.data_ora_inizio)}
-                          </span>
+                      {eventiGiorno.slice(0, 4).map((evento) => {
+                        const numeroIntenzioni =
+                          intenzioniDellEvento(evento.id).length;
 
-                          <strong>{evento.titolo}</strong>
-                        </div>
-                      ))}
+                        return (
+                          <div
+                            key={evento.id}
+                            className={`evento-calendario categoria-${categoriaEvento(
+                              evento
+                            )}`}
+                          >
+                            <span>
+                              {formattaOra(evento.data_ora_inizio)}
+                            </span>
+
+                            <strong>{evento.titolo}</strong>
+
+                            {numeroIntenzioni > 0 && (
+                              <span
+                                className="conteggio-intenzioni-calendario"
+                                title={`${numeroIntenzioni} intenzion${
+                                  numeroIntenzioni === 1 ? "e" : "i"
+                                }`}
+                              >
+                                {numeroIntenzioni}
+                              </span>
+                            )}
+                          </div>
+                        );
+                      })}
 
                       {eventiGiorno.length > 4 && (
                         <div className="altri-eventi">
@@ -640,23 +722,84 @@ function aggiornaNuovoEvento(campo, valore) {
             {eventiGiornoSelezionato.length === 0 ? (
               <p>Nessun evento previsto per questo giorno.</p>
             ) : (
-              eventiGiornoSelezionato.map((evento) => (
-                <div key={evento.id} className="dettaglio-evento">
-                  <div className="dettaglio-orario">
-                    {formattaOra(evento.data_ora_inizio)}
+              eventiGiornoSelezionato.map((evento) => {
+                const intenzioniEvento = intenzioniDellEvento(evento.id);
+
+                return (
+                  <div key={evento.id} className="dettaglio-evento">
+                    <div className="dettaglio-orario">
+                      {formattaOra(evento.data_ora_inizio)}
+                    </div>
+
+                    <div className="contenuto-dettaglio-evento">
+                      <strong>{evento.titolo}</strong>
+
+                      {evento.luogo && <p>{evento.luogo}</p>}
+
+                      {evento.descrizione && (
+                        <p>{evento.descrizione}</p>
+                      )}
+
+                      {intenzioniEvento.length > 0 && (
+                        <div className="intenzioni-calendario-parroco">
+                          <div className="intenzioni-calendario-titolo">
+                            {intenzioniEvento.length}{" "}
+                            {intenzioniEvento.length === 1
+                              ? "intenzione"
+                              : "intenzioni"}
+                          </div>
+
+                          {intenzioniEvento.map((intenzione) => (
+                            <div
+                              key={intenzione.intenzione_id}
+                              className="intenzione-calendario-parroco"
+                            >
+                              <strong>
+                                {intenzione.testo_intenzione}
+                              </strong>
+
+                              <p>
+                                {etichettaTipoIntenzione(
+                                  intenzione.tipo_intenzione
+                                )}
+                                {" · "}
+                                {intenzione.pubblicabile
+                                  ? "Pubblica"
+                                  : "Riservata"}
+                                {" · "}
+                                {intenzione.stato === "da_regolarizzare"
+                                  ? "Da regolarizzare"
+                                  : "Prenotata"}
+                              </p>
+
+                              <p>
+                                Richiedente:{" "}
+                                <strong>
+                                  {intenzione.nome_richiedente}
+                                </strong>
+                              </p>
+
+                              {intenzione.contatto_richiedente && (
+                                <p>
+                                  Contatto:{" "}
+                                  {intenzione.contatto_richiedente}
+                                </p>
+                              )}
+
+                              {Number(intenzione.numero_spostamenti) > 0 && (
+                                <p>
+                                  Spostamenti registrati:{" "}
+                                  {intenzione.numero_spostamenti}
+                                </p>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
-
-                  <div>
-                    <strong>{evento.titolo}</strong>
-
-                    {evento.luogo && <p>{evento.luogo}</p>}
-
-                    {evento.descrizione && (
-                      <p>{evento.descrizione}</p>
-                    )}
-                  </div>
-                </div>
-              ))
+                );
+              })
             )}
           </aside>
         </div>
