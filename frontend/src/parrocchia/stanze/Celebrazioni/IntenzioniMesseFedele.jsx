@@ -38,6 +38,17 @@ const stilePulsanteSecondario = {
   cursor: "pointer",
 };
 
+const stilePulsantePericolo = {
+  border: "1px solid #b85c52",
+  borderRadius: "11px",
+  padding: "11px 18px",
+  background: "#fff4f2",
+  color: "#8a2f25",
+  fontSize: "15px",
+  fontWeight: "700",
+  cursor: "pointer",
+};
+
 const stileCampo = {
   width: "100%",
   boxSizing: "border-box",
@@ -124,6 +135,13 @@ export default function IntenzioniMesseFedele({
     useState(null);
   const [nuovoEventoId, setNuovoEventoId] = useState("");
 
+  const [intenzioneDaModificare, setIntenzioneDaModificare] =
+    useState(null);
+  const [intenzioneDaAnnullare, setIntenzioneDaAnnullare] =
+    useState(null);
+  const [motivoAnnullamento, setMotivoAnnullamento] =
+    useState("");
+
   const caricaDati = useCallback(async () => {
     if (!utenteId || !parrocchiaId) {
       setErrore(
@@ -209,6 +227,9 @@ export default function IntenzioniMesseFedele({
     setPubblicabile(false);
     setIntenzioneDaSpostare(null);
     setNuovoEventoId("");
+    setIntenzioneDaModificare(null);
+    setIntenzioneDaAnnullare(null);
+    setMotivoAnnullamento("");
     setErrore("");
   }
 
@@ -312,6 +333,114 @@ export default function IntenzioniMesseFedele({
     setMessaggio(
       "L’intenzione è stata spostata correttamente."
     );
+    setSalvataggio(false);
+  }
+
+  function apriModifica(intenzione) {
+    setIntenzioneDaModificare(intenzione);
+    setTipoIntenzione(intenzione.tipo_intenzione);
+    setTestoIntenzione(intenzione.testo_intenzione);
+    setPubblicabile(Boolean(intenzione.pubblicabile));
+    setErrore("");
+    setMessaggio("");
+    setVista("modifica");
+  }
+
+  async function modificaIntenzione(evento) {
+    evento.preventDefault();
+
+    if (!intenzioneDaModificare) {
+      setErrore("Non è stato possibile riconoscere l’intenzione.");
+      return;
+    }
+
+    if (!testoIntenzione.trim()) {
+      setErrore("Scrivi il testo dell’intenzione.");
+      return;
+    }
+
+    setSalvataggio(true);
+    setErrore("");
+    setMessaggio("");
+
+    const { error } = await supabase.rpc(
+      "ars_modifica_intenzione_fedele",
+      {
+        p_utente_id: utenteId,
+        p_parrocchia_id: parrocchiaId,
+        p_intenzione_id: intenzioneDaModificare.id,
+        p_tipo_intenzione: tipoIntenzione,
+        p_testo_intenzione: testoIntenzione.trim(),
+        p_pubblicabile: pubblicabile,
+      }
+    );
+
+    if (error) {
+      console.error("Errore modifica intenzione:", error);
+      setErrore(error.message);
+      setSalvataggio(false);
+      return;
+    }
+
+    await caricaDati();
+
+    setVista("elenco");
+    setIntenzioneDaModificare(null);
+    setTipoIntenzione("defunto");
+    setTestoIntenzione("");
+    setPubblicabile(false);
+    setMessaggio("L’intenzione è stata modificata correttamente.");
+    setSalvataggio(false);
+  }
+
+  function apriAnnullamento(intenzione) {
+    setIntenzioneDaAnnullare(intenzione);
+    setMotivoAnnullamento("");
+    setErrore("");
+    setMessaggio("");
+    setVista("annulla");
+  }
+
+  async function annullaIntenzione(evento) {
+    evento.preventDefault();
+
+    if (!intenzioneDaAnnullare) {
+      setErrore("Non è stato possibile riconoscere l’intenzione.");
+      return;
+    }
+
+    if (!motivoAnnullamento.trim()) {
+      setErrore("Indica il motivo dell’annullamento.");
+      return;
+    }
+
+    setSalvataggio(true);
+    setErrore("");
+    setMessaggio("");
+
+    const { error } = await supabase.rpc(
+      "ars_annulla_intenzione_fedele",
+      {
+        p_utente_id: utenteId,
+        p_parrocchia_id: parrocchiaId,
+        p_intenzione_id: intenzioneDaAnnullare.id,
+        p_motivo: motivoAnnullamento.trim(),
+      }
+    );
+
+    if (error) {
+      console.error("Errore annullamento intenzione:", error);
+      setErrore(error.message);
+      setSalvataggio(false);
+      return;
+    }
+
+    await caricaDati();
+
+    setVista("elenco");
+    setIntenzioneDaAnnullare(null);
+    setMotivoAnnullamento("");
+    setMessaggio("L’intenzione è stata annullata correttamente.");
     setSalvataggio(false);
   }
 
@@ -595,17 +724,68 @@ export default function IntenzioniMesseFedele({
                             </div>
                           </div>
 
-                          {intenzione.modificabile && (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                apriSpostamento(intenzione)
-                              }
-                              style={stilePulsanteSecondario}
-                            >
-                              Sposta
-                            </button>
-                          )}
+                          <div
+                            style={{
+                              flex: "0 1 auto",
+                              display: "flex",
+                              flexWrap: "wrap",
+                              justifyContent: "flex-end",
+                              gap: "10px",
+                            }}
+                          >
+                            {intenzione.modificabile ? (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    apriModifica(intenzione)
+                                  }
+                                  style={stilePulsanteSecondario}
+                                >
+                                  Modifica
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    apriSpostamento(intenzione)
+                                  }
+                                  style={stilePulsanteSecondario}
+                                >
+                                  Sposta
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    apriAnnullamento(intenzione)
+                                  }
+                                  style={stilePulsantePericolo}
+                                >
+                                  Annulla
+                                </button>
+                              </>
+                            ) : (
+                              intenzione.stato === "prenotata" && (
+                                <div
+                                  style={{
+                                    maxWidth: "300px",
+                                    background: "#f7f3ed",
+                                    borderRadius: "11px",
+                                    padding: "12px 14px",
+                                    color: "#62564b",
+                                    fontFamily: "Arial, sans-serif",
+                                    fontSize: "14px",
+                                    lineHeight: "1.5",
+                                  }}
+                                >
+                                  Nelle ultime 24 ore, per modificare,
+                                  spostare o annullare l’intenzione,
+                                  contatta direttamente la parrocchia.
+                                </div>
+                              )
+                            )}
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -939,6 +1119,304 @@ export default function IntenzioniMesseFedele({
                       style={stilePulsanteSecondario}
                     >
                       Annulla
+                    </button>
+                  </div>
+                </form>
+              )}
+
+            {vista === "modifica" &&
+              intenzioneDaModificare && (
+                <form
+                  onSubmit={modificaIntenzione}
+                  style={{
+                    background: "#fffdf9",
+                    border: "1px solid #e2d7ca",
+                    borderRadius: "18px",
+                    padding: "28px",
+                    boxShadow:
+                      "0 8px 24px rgba(68, 52, 35, 0.06)",
+                  }}
+                >
+                  <h2
+                    style={{
+                      margin: "0 0 12px",
+                      fontSize: "27px",
+                      fontWeight: "500",
+                    }}
+                  >
+                    Modifica l’intenzione
+                  </h2>
+
+                  <p
+                    style={{
+                      margin: "0 0 24px",
+                      color: "#6e6257",
+                      fontFamily: "Arial, sans-serif",
+                      lineHeight: "1.6",
+                    }}
+                  >
+                    La Messa resta fissata per{" "}
+                    <strong>
+                      {formattaData(
+                        intenzioneDaModificare.data_celebrazione
+                      )}
+                    </strong>{" "}
+                    alle{" "}
+                    <strong>
+                      {formattaOra(
+                        intenzioneDaModificare.ora_celebrazione
+                      )}
+                    </strong>
+                    . Per cambiare data o orario usa il comando
+                    “Sposta”.
+                  </p>
+
+                  <div style={{ marginBottom: "20px" }}>
+                    <label
+                      htmlFor="tipo-intenzione-modifica"
+                      style={{
+                        display: "block",
+                        marginBottom: "8px",
+                        fontWeight: "700",
+                      }}
+                    >
+                      Tipo di intenzione
+                    </label>
+
+                    <select
+                      id="tipo-intenzione-modifica"
+                      value={tipoIntenzione}
+                      onChange={(evento) =>
+                        setTipoIntenzione(evento.target.value)
+                      }
+                      style={stileCampo}
+                    >
+                      {TIPI_INTENZIONE.map((tipo) => (
+                        <option
+                          key={tipo.valore}
+                          value={tipo.valore}
+                        >
+                          {tipo.etichetta}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div style={{ marginBottom: "20px" }}>
+                    <label
+                      htmlFor="testo-intenzione-modifica"
+                      style={{
+                        display: "block",
+                        marginBottom: "8px",
+                        fontWeight: "700",
+                      }}
+                    >
+                      Intenzione
+                    </label>
+
+                    <textarea
+                      id="testo-intenzione-modifica"
+                      value={testoIntenzione}
+                      onChange={(evento) =>
+                        setTestoIntenzione(evento.target.value)
+                      }
+                      rows={4}
+                      maxLength={500}
+                      style={{
+                        ...stileCampo,
+                        resize: "vertical",
+                      }}
+                      required
+                    />
+                  </div>
+
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "flex-start",
+                      gap: "10px",
+                      padding: "15px",
+                      background: "#f7f3ed",
+                      borderRadius: "11px",
+                      marginBottom: "24px",
+                      fontFamily: "Arial, sans-serif",
+                      lineHeight: "1.5",
+                      cursor: "pointer",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={pubblicabile}
+                      onChange={(evento) =>
+                        setPubblicabile(evento.target.checked)
+                      }
+                      style={{
+                        marginTop: "3px",
+                        width: "17px",
+                        height: "17px",
+                      }}
+                    />
+
+                    <span>
+                      Desidero che l’intenzione sia visibile alla
+                      comunità. Se non selezioni questa scelta,
+                      resterà riservata.
+                    </span>
+                  </label>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: "12px",
+                    }}
+                  >
+                    <button
+                      type="submit"
+                      disabled={salvataggio}
+                      style={{
+                        ...stilePulsantePrincipale,
+                        opacity: salvataggio ? 0.65 : 1,
+                      }}
+                    >
+                      {salvataggio
+                        ? "Salvataggio..."
+                        : "Salva modifiche"}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={tornaElenco}
+                      disabled={salvataggio}
+                      style={stilePulsanteSecondario}
+                    >
+                      Torna indietro
+                    </button>
+                  </div>
+                </form>
+              )}
+
+            {vista === "annulla" &&
+              intenzioneDaAnnullare && (
+                <form
+                  onSubmit={annullaIntenzione}
+                  style={{
+                    background: "#fffdf9",
+                    border: "1px solid #e2d7ca",
+                    borderRadius: "18px",
+                    padding: "28px",
+                    boxShadow:
+                      "0 8px 24px rgba(68, 52, 35, 0.06)",
+                  }}
+                >
+                  <h2
+                    style={{
+                      margin: "0 0 12px",
+                      fontSize: "27px",
+                      fontWeight: "500",
+                    }}
+                  >
+                    Annulla l’intenzione
+                  </h2>
+
+                  <p
+                    style={{
+                      margin: "0 0 20px",
+                      color: "#6e6257",
+                      fontFamily: "Arial, sans-serif",
+                      lineHeight: "1.6",
+                    }}
+                  >
+                    Stai annullando “
+                    {intenzioneDaAnnullare.testo_intenzione}”,
+                    prevista per{" "}
+                    <strong>
+                      {formattaData(
+                        intenzioneDaAnnullare.data_celebrazione
+                      )}
+                    </strong>{" "}
+                    alle{" "}
+                    <strong>
+                      {formattaOra(
+                        intenzioneDaAnnullare.ora_celebrazione
+                      )}
+                    </strong>
+                    .
+                  </p>
+
+                  <div
+                    style={{
+                      background: "#fff4f2",
+                      border: "1px solid #e3aaa2",
+                      borderRadius: "11px",
+                      padding: "14px",
+                      color: "#7c3831",
+                      fontFamily: "Arial, sans-serif",
+                      lineHeight: "1.5",
+                      marginBottom: "20px",
+                    }}
+                  >
+                    L’annullamento non cancella automaticamente
+                    l’eventuale offerta, che resta collegata e sarà
+                    gestita separatamente dalla parrocchia.
+                  </div>
+
+                  <div style={{ marginBottom: "24px" }}>
+                    <label
+                      htmlFor="motivo-annullamento"
+                      style={{
+                        display: "block",
+                        marginBottom: "8px",
+                        fontWeight: "700",
+                      }}
+                    >
+                      Motivo dell’annullamento
+                    </label>
+
+                    <textarea
+                      id="motivo-annullamento"
+                      value={motivoAnnullamento}
+                      onChange={(evento) =>
+                        setMotivoAnnullamento(evento.target.value)
+                      }
+                      rows={3}
+                      maxLength={500}
+                      placeholder="Indica brevemente il motivo"
+                      style={{
+                        ...stileCampo,
+                        resize: "vertical",
+                      }}
+                      required
+                    />
+                  </div>
+
+                  <div
+                    style={{
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: "12px",
+                    }}
+                  >
+                    <button
+                      type="submit"
+                      disabled={salvataggio}
+                      style={{
+                        ...stilePulsantePericolo,
+                        opacity: salvataggio ? 0.65 : 1,
+                      }}
+                    >
+                      {salvataggio
+                        ? "Annullamento..."
+                        : "Conferma annullamento"}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={tornaElenco}
+                      disabled={salvataggio}
+                      style={stilePulsanteSecondario}
+                    >
+                      Torna indietro
                     </button>
                   </div>
                 </form>
