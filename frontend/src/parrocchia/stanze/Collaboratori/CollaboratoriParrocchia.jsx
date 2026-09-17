@@ -30,7 +30,6 @@ const PERMESSI = [
   ["gestione_comunicazioni", "Gestione comunicazioni"],
   ["gestione_impostazioni", "Gestione impostazioni"],
   ["gestione_persone_permessi", "Gestione collaboratori e permessi"],
-  ["gestione_progetti_donazioni", "Gestione progetti e donazioni"],
 ];
 
 const AMBITI = {
@@ -45,6 +44,8 @@ const AMBITI = {
   feste_volontariato: "Feste e volontariato",
   altro: "Altro",
 };
+
+const PERSONE_PER_BLOCCO = 24;
 
 const pagina = {
   minHeight: "100vh",
@@ -102,6 +103,8 @@ export default function CollaboratoriParrocchia({
 }) {
   const [persone, setPersone] = useState([]);
   const [filtro, setFiltro] = useState("disponibili");
+  const [ricerca, setRicerca] = useState("");
+  const [numeroVisibile, setNumeroVisibile] = useState(PERSONE_PER_BLOCCO);
   const [personaAperta, setPersonaAperta] = useState(null);
   const [ruoliSelezionati, setRuoliSelezionati] = useState([]);
   const [permessiSelezionati, setPermessiSelezionati] = useState([]);
@@ -164,6 +167,29 @@ export default function CollaboratoriParrocchia({
     if (filtro === "attivi") return attivi;
     return comunita;
   }, [filtro, disponibili, attivi, comunita]);
+
+  const elencoFiltrato = useMemo(() => {
+    const testo = ricerca.trim().toLocaleLowerCase("it");
+
+    if (!testo) return elenco;
+
+    return elenco.filter((persona) =>
+      [persona.nome, persona.cognome]
+        .filter(Boolean)
+        .join(" ")
+        .toLocaleLowerCase("it")
+        .includes(testo),
+    );
+  }, [elenco, ricerca]);
+
+  useEffect(() => {
+    setNumeroVisibile(PERSONE_PER_BLOCCO);
+  }, [filtro, ricerca]);
+
+  const elencoVisibile = useMemo(
+    () => elencoFiltrato.slice(0, numeroVisibile),
+    [elencoFiltrato, numeroVisibile],
+  );
 
   function apriGestione(persona) {
     setPersonaAperta(persona);
@@ -538,6 +564,42 @@ export default function CollaboratoriParrocchia({
           </div>
         )}
 
+        <div style={{ marginBottom: "18px" }}>
+          <label
+            htmlFor="ricerca-collaboratori"
+            style={{
+              display: "block",
+              marginBottom: "7px",
+              color: "#675b50",
+              fontFamily: "Arial, sans-serif",
+              fontSize: "14px",
+              fontWeight: "700",
+            }}
+          >
+            Cerca una persona
+          </label>
+          <input
+            id="ricerca-collaboratori"
+            type="search"
+            value={ricerca}
+            onChange={(evento) => setRicerca(evento.target.value)}
+            placeholder="Cerca per nome o cognome..."
+            autoComplete="off"
+            style={{
+              width: "100%",
+              boxSizing: "border-box",
+              border: "1px solid #d8c9b7",
+              borderRadius: "12px",
+              padding: "13px 15px",
+              background: "#fff",
+              color: "#3e3328",
+              fontFamily: "Arial, sans-serif",
+              fontSize: "16px",
+              outlineColor: "#c99536",
+            }}
+          />
+        </div>
+
         <div
           style={{
             display: "flex",
@@ -564,13 +626,15 @@ export default function CollaboratoriParrocchia({
 
         {caricamento ? (
           <div style={scheda}>Caricamento...</div>
-        ) : elenco.length === 0 ? (
+        ) : elencoFiltrato.length === 0 ? (
           <div style={{ ...scheda, textAlign: "center" }}>
-            Nessuna persona presente in questo elenco.
+            {ricerca.trim()
+              ? "Nessuna persona trovata con questo nome."
+              : "Nessuna persona presente in questo elenco."}
           </div>
         ) : (
           <div style={{ display: "grid", gap: "15px" }}>
-            {elenco.map((persona) => {
+            {elencoVisibile.map((persona) => {
               const ruoli = Array.isArray(persona.ruoli) ? persona.ruoli : [];
               const ambiti = Array.isArray(persona.ambiti_collaborazione)
                 ? persona.ambiti_collaborazione
@@ -750,6 +814,32 @@ export default function CollaboratoriParrocchia({
                 </div>
               );
             })}
+
+            {elencoFiltrato.length > numeroVisibile && (
+              <div style={{ textAlign: "center", marginTop: "3px" }}>
+                <div
+                  style={{
+                    marginBottom: "10px",
+                    color: "#675b50",
+                    fontFamily: "Arial, sans-serif",
+                    fontSize: "14px",
+                  }}
+                >
+                  Visualizzate {elencoVisibile.length} di{" "}
+                  {elencoFiltrato.length}
+                  persone
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    setNumeroVisibile((numero) => numero + PERSONE_PER_BLOCCO)
+                  }
+                  style={pulsanteSecondario}
+                >
+                  Mostra altre persone
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
