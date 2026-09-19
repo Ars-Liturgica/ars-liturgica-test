@@ -1,6 +1,9 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { supabase } from "../../../supabaseClient";
 
+const GIORNI_VISIBILITA_DOPO_LETTURA = 30;
+const GIORNI_CONSERVAZIONE_MASSIMA = 180;
+
 export default function Notifiche({
   parrocchiaId,
   utenteId,
@@ -22,6 +25,13 @@ export default function Notifiche({
     setCaricamento(true);
     setErrore("");
 
+    const adesso = Date.now();
+    const limiteLette =
+      adesso - GIORNI_VISIBILITA_DOPO_LETTURA * 24 * 60 * 60 * 1000;
+    const limiteConservazione = new Date(
+      adesso - GIORNI_CONSERVAZIONE_MASSIMA * 24 * 60 * 60 * 1000,
+    ).toISOString();
+
     const { data, error } = await supabase
       .from("notifiche")
       .select(`
@@ -38,7 +48,7 @@ export default function Notifiche({
         )
       `)
       .eq("parrocchia_id", parrocchiaId)
-      .eq("pubblica_comunita", true)
+      .gte("created_at", limiteConservazione)
       .order("created_at", { ascending: false });
 
     if (error) {
@@ -46,24 +56,33 @@ export default function Notifiche({
       setErrore("Non è stato possibile caricare le notifiche.");
       setNotifiche([]);
     } else {
-      const elenco = (data || []).map((notifica) => {
-        const letture = Array.isArray(notifica.notifiche_letture)
-          ? notifica.notifiche_letture
-          : [];
+      const elenco = (data || [])
+        .map((notifica) => {
+          const letture = Array.isArray(notifica.notifiche_letture)
+            ? notifica.notifiche_letture
+            : [];
+          const letturaUtente = letture.find(
+            (lettura) => lettura.utente_id === utenteId,
+          );
 
-        return {
-          ...notifica,
-          letta: letture.some(
-            (lettura) => lettura.utente_id === utenteId
-          ),
-        };
-      });
+          return {
+            ...notifica,
+            letta: Boolean(letturaUtente),
+            lettaAt: letturaUtente?.letta_at || null,
+          };
+        })
+        .filter((notifica) => {
+          if (!notifica.letta) return true;
+          if (!notifica.lettaAt) return true;
+
+          return new Date(notifica.lettaAt).getTime() >= limiteLette;
+        });
 
       setNotifiche(elenco);
 
       if (typeof onAggiornaConteggio === "function") {
         onAggiornaConteggio(
-          elenco.filter((notifica) => !notifica.letta).length
+          elenco.filter((notifica) => !notifica.letta).length,
         );
       }
     }
@@ -80,17 +99,18 @@ export default function Notifiche({
 
     if (!notifica || notifica.letta || !utenteId) return;
 
+    const lettaAt = new Date().toISOString();
     const { error } = await supabase
       .from("notifiche_letture")
       .upsert(
         {
           notifica_id: notificaId,
           utente_id: utenteId,
-          letta_at: new Date().toISOString(),
+          letta_at: lettaAt,
         },
         {
           onConflict: "notifica_id,utente_id",
-        }
+        },
       );
 
     if (error) {
@@ -101,12 +121,14 @@ export default function Notifiche({
 
     setNotifiche((elencoAttuale) => {
       const elencoAggiornato = elencoAttuale.map((item) =>
-        item.id === notificaId ? { ...item, letta: true } : item
+        item.id === notificaId
+          ? { ...item, letta: true, lettaAt }
+          : item,
       );
 
       if (typeof onAggiornaConteggio === "function") {
         onAggiornaConteggio(
-          elencoAggiornato.filter((item) => !item.letta).length
+          elencoAggiornato.filter((item) => !item.letta).length,
         );
       }
 
@@ -119,10 +141,11 @@ export default function Notifiche({
 
     if (nonLette.length === 0 || !utenteId) return;
 
+    const lettaAt = new Date().toISOString();
     const lettureDaSalvare = nonLette.map((notifica) => ({
       notifica_id: notifica.id,
       utente_id: utenteId,
-      letta_at: new Date().toISOString(),
+      letta_at: lettaAt,
     }));
 
     const { error } = await supabase
@@ -141,7 +164,8 @@ export default function Notifiche({
       elencoAttuale.map((notifica) => ({
         ...notifica,
         letta: true,
-      }))
+        lettaAt,
+      })),
     );
 
     if (typeof onAggiornaConteggio === "function") {
@@ -173,7 +197,7 @@ export default function Notifiche({
   }
 
   const numeroNonLette = notifiche.filter(
-    (notifica) => !notifica.letta
+    (notifica) => !notifica.letta,
   ).length;
 
   return (
@@ -183,15 +207,14 @@ export default function Notifiche({
         className="pulsante-torna-dashboard"
         onClick={tornaDashboard}
       >
-       {testoRitorno}
+        {testoRitorno}
       </button>
 
       <div className="notifiche-header">
         <div>
           <h1>Notifiche</h1>
-          <p>
-            Aggiornamenti, modifiche e comunicazioni della parrocchia.
-          </p>
+          <p>Aggiornamenti, modifiche e comunicazioni della parrocchia.</p>
+          <p>Le notifiche lette restano visibili per 30 giorni.</p>
         </div>
 
         {numeroNonLette > 0 && (
@@ -241,9 +264,7 @@ export default function Notifiche({
                   <strong>{notifica.titolo}</strong>
 
                   {!notifica.letta && (
-                    <span className="notifica-indicatore">
-                      Non letta
-                    </span>
+                    <span className="notifica-indicatore">Non letta</span>
                   )}
                 </span>
 
