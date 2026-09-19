@@ -74,11 +74,16 @@ export default function DashboardParroco({ onCambioVista }) {
         return;
       }
 
+      const dataLimiteConservazione = new Date();
+      dataLimiteConservazione.setDate(
+        dataLimiteConservazione.getDate() - 180,
+      );
+
       const { data, error } = await supabase
         .from("notifiche")
-        .select("id, notifiche_letture (utente_id)")
+        .select("id, created_at, notifiche_letture (utente_id)")
         .eq("parrocchia_id", parrocchiaId)
-        .eq("pubblica_comunita", true);
+        .gte("created_at", dataLimiteConservazione.toISOString());
 
       if (error) {
         console.error("Errore conteggio notifiche non lette:", error);
