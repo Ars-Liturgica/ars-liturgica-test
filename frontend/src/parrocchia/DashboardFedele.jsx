@@ -5,6 +5,7 @@ import BachecaAvvisi from "./stanze/BachecaAvvisi/BachecaAvvisi";
 import CalendarioFedele from "./stanze/Calendari/CalendarioFedele";
 import NotificheFedele from "./stanze/Notifiche/NotificheFedele";
 import IntenzioniMesseFedele from "./stanze/Celebrazioni/IntenzioniMesseFedele";
+import PartecipazioneComunita from "./stanze/Collaboratori/PartecipazioneComunita";
 
 export default function DashboardFedele() {
   const [stanzaAperta, setStanzaAperta] = useState(null);
@@ -91,6 +92,16 @@ export default function DashboardFedele() {
   if (stanzaAperta === "intenzioni-messe") {
     return (
       <IntenzioniMesseFedele
+        parrocchiaId={parrocchia.id}
+        utenteId={utenteId}
+        tornaDashboard={() => setStanzaAperta(null)}
+      />
+    );
+  }
+
+  if (stanzaAperta === "partecipazione-comunita") {
+    return (
+      <PartecipazioneComunita
         parrocchiaId={parrocchia.id}
         utenteId={utenteId}
         tornaDashboard={() => setStanzaAperta(null)}
@@ -390,6 +401,44 @@ export default function DashboardFedele() {
             >
               Affida un’intenzione alla Parrocchia scegliendo una delle
               Messe disponibili.
+            </p>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setStanzaAperta("partecipazione-comunita")}
+            style={{
+              ...stileCard,
+              background: "#fffaf0",
+              border: "1px solid #d6b56d",
+            }}
+          >
+            <div style={{ fontSize: "34px", marginBottom: "16px" }}>
+              🤝
+            </div>
+
+            <h2
+              style={{
+                margin: "0 0 10px",
+                fontSize: "22px",
+                fontWeight: "500",
+                color: "#49392c",
+              }}
+            >
+              Partecipa alla vita della Comunità
+            </h2>
+
+            <p
+              style={{
+                margin: 0,
+                fontFamily: "Arial, sans-serif",
+                fontSize: "15px",
+                lineHeight: "1.6",
+                color: "#75695e",
+              }}
+            >
+              La comunità cresce con il contributo di ciascuno. Scopri come
+              offrire il tuo tempo, le tue capacità e la tua presenza.
             </p>
           </button>
         </div>
