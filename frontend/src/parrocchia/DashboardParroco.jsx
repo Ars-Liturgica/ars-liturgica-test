@@ -8,6 +8,7 @@ import ComunitaParrocchia from "./stanze/Comunita/ComunitaParrocchia";
 import Celebrazioni from "./stanze/Celebrazioni/Celebrazioni";
 import Notifiche from "./stanze/Notifiche/Notifiche";
 import CollaboratoriParrocchia from "./stanze/Collaboratori/CollaboratoriParrocchia";
+import ProgettiDonazioni from "./stanze/ProgettiDonazioni/ProgettiDonazioni";
 
 export default function DashboardParroco({ onCambioVista }) {
   const [parrocchia, setParrocchia] = useState(null);
@@ -159,6 +160,7 @@ export default function DashboardParroco({ onCambioVista }) {
       icona: <i className="fa-solid fa-hand-holding-heart icona-dashboard"></i>,
       titolo: "Progetti e Donazioni",
       descrizione: "Progetti, stanziamenti, raccolte fondi e donazioni online.",
+      stanza: "progetti-donazioni",
     },
     {
       icona: <i className="fa-solid fa-user-group icona-dashboard"></i>,
@@ -233,6 +235,15 @@ export default function DashboardParroco({ onCambioVista }) {
   if (stanzaAperta === "celebrazioni") {
     return (
       <Celebrazioni
+        parrocchiaId={parrocchia?.id}
+        tornaDashboard={() => setStanzaAperta(null)}
+      />
+    );
+  }
+
+  if (stanzaAperta === "progetti-donazioni") {
+    return (
+      <ProgettiDonazioni
         parrocchiaId={parrocchia?.id}
         tornaDashboard={() => setStanzaAperta(null)}
       />
