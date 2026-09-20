@@ -1106,3 +1106,41 @@ body { margin: 0; font-family: Georgia, 'Times New Roman', serif; background: #1
     border: 1px solid #777777;
   }
 }
+/* Rifinitura pulsanti Pagamenti */
+
+.pagamenti-parrocchia .pulsante-primario {
+  min-height: 42px;
+  padding: 9px 17px;
+  border: 1px solid #0f2f57;
+  border-radius: 9px;
+  background: #0f2f57;
+  color: #ffffff;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    transform 0.2s ease;
+}
+
+.pagamenti-parrocchia .pulsante-primario:hover:not(:disabled) {
+  background: #173f6d;
+  transform: translateY(-1px);
+}
+
+.pagamenti-parrocchia .pulsante-primario:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.azioni-filtri-pagamenti {
+  grid-column: 1 / -1;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+@media (max-width: 600px) {
+  .azioni-filtri-pagamenti {
+    justify-content: stretch;
+  }
+}
