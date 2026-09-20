@@ -793,3 +793,316 @@ body { margin: 0; font-family: Georgia, 'Times New Roman', serif; background: #1
   min-height: 100vh;
   background: #f7f3ed;
 }
+/* =========================================================
+   PAGAMENTI DELLA PARROCCHIA
+   ========================================================= */
+
+.pagamenti-parrocchia {
+  padding: 28px;
+  color: #0f2f57;
+}
+
+.pagamenti-intestazione {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 24px;
+}
+
+.pagamenti-intestazione h2 {
+  margin: 0 0 8px;
+  color: #0f2f57;
+}
+
+.pagamenti-intestazione p {
+  margin: 0;
+  max-width: 760px;
+  line-height: 1.6;
+  color: #4b5f75;
+}
+
+.filtri-pagamenti {
+  display: grid;
+  grid-template-columns:
+    repeat(auto-fit, minmax(160px, 1fr));
+  gap: 16px;
+  align-items: end;
+  padding: 20px;
+  margin-bottom: 24px;
+  border: 1px solid #d7c59d;
+  border-radius: 14px;
+  background: #fffdf8;
+}
+
+.campo-filtro-pagamenti {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+}
+
+.campo-filtro-pagamenti label {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: #0f2f57;
+}
+
+.campo-filtro-pagamenti input,
+.campo-filtro-pagamenti select {
+  width: 100%;
+  min-height: 42px;
+  box-sizing: border-box;
+  padding: 9px 11px;
+  border: 1px solid #bcc8d5;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #183b5d;
+  font: inherit;
+}
+
+.campo-filtro-pagamenti input:focus,
+.campo-filtro-pagamenti select:focus {
+  outline: 2px solid rgba(15, 47, 87, 0.18);
+  border-color: #0f2f57;
+}
+
+.campo-ricerca-pagamenti {
+  grid-column: span 2;
+}
+
+.azioni-filtri-pagamenti {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.pagamenti-parrocchia .pulsante-secondario {
+  min-height: 42px;
+  padding: 9px 16px;
+  border: 1px solid #0f2f57;
+  border-radius: 9px;
+  background: #ffffff;
+  color: #0f2f57;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pagamenti-parrocchia .pulsante-secondario:hover {
+  background: #f2f6fa;
+}
+
+.riepilogo-pagamenti {
+  display: grid;
+  grid-template-columns:
+    repeat(4, minmax(150px, 1fr));
+  gap: 16px;
+  margin-bottom: 26px;
+}
+
+.riepilogo-pagamenti article {
+  padding: 18px;
+  border: 1px solid #dce3ea;
+  border-radius: 13px;
+  background: #ffffff;
+  box-shadow: 0 5px 16px rgba(15, 47, 87, 0.06);
+}
+
+.riepilogo-pagamenti span {
+  display: block;
+  margin-bottom: 7px;
+  color: #607286;
+  font-size: 0.9rem;
+}
+
+.riepilogo-pagamenti strong {
+  display: block;
+  color: #0f2f57;
+  font-size: 1.35rem;
+}
+
+.registro-pagamenti {
+  padding: 22px;
+  border: 1px solid #dce3ea;
+  border-radius: 14px;
+  background: #ffffff;
+}
+
+.intestazione-registro-pagamenti {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 18px;
+}
+
+.intestazione-registro-pagamenti h3 {
+  margin: 0 0 6px;
+  color: #0f2f57;
+}
+
+.intestazione-registro-pagamenti p {
+  margin: 0;
+  color: #607286;
+}
+
+.tabella-pagamenti-contenitore {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.tabella-pagamenti {
+  width: 100%;
+  min-width: 1050px;
+  border-collapse: collapse;
+}
+
+.tabella-pagamenti th,
+.tabella-pagamenti td {
+  padding: 12px 11px;
+  border: 1px solid #d9e0e7;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.tabella-pagamenti th {
+  background: #0f2f57;
+  color: #ffffff;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+
+.tabella-pagamenti tbody tr:nth-child(even) {
+  background: #f7f9fb;
+}
+
+.tabella-pagamenti tbody tr:hover {
+  background: #eef4f9;
+}
+
+.tabella-pagamenti td:last-child,
+.tabella-pagamenti th:last-child {
+  text-align: right;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .pagamenti-parrocchia {
+    padding: 20px;
+  }
+
+  .pagamenti-intestazione {
+    flex-direction: column;
+  }
+
+  .riepilogo-pagamenti {
+    grid-template-columns:
+      repeat(2, minmax(140px, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .pagamenti-parrocchia {
+    padding: 16px;
+  }
+
+  .campo-ricerca-pagamenti {
+    grid-column: span 1;
+  }
+
+  .riepilogo-pagamenti {
+    grid-template-columns: 1fr;
+  }
+
+  .registro-pagamenti {
+    padding: 16px;
+  }
+
+  .azioni-filtri-pagamenti {
+    flex-direction: column;
+  }
+
+  .azioni-filtri-pagamenti button {
+    width: 100%;
+  }
+}
+
+/* =========================================================
+   STAMPA DEL REGISTRO PAGAMENTI
+   ========================================================= */
+
+@media print {
+  @page {
+    size: landscape;
+    margin: 12mm;
+  }
+
+  .azioni-non-stampabili {
+    display: none !important;
+  }
+
+  .pagamenti-parrocchia {
+    padding: 0;
+    color: #000000;
+  }
+
+  .pagamenti-intestazione {
+    margin-bottom: 14px;
+  }
+
+  .pagamenti-intestazione h2,
+  .pagamenti-intestazione p {
+    color: #000000;
+  }
+
+  .riepilogo-pagamenti {
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 14px;
+  }
+
+  .riepilogo-pagamenti article {
+    padding: 9px;
+    border: 1px solid #999999;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .riepilogo-pagamenti span,
+  .riepilogo-pagamenti strong {
+    color: #000000;
+  }
+
+  .registro-pagamenti {
+    padding: 0;
+    border: 0;
+  }
+
+  .tabella-pagamenti-contenitore {
+    overflow: visible;
+  }
+
+  .tabella-pagamenti {
+    min-width: 0;
+    font-size: 8.5pt;
+  }
+
+  .tabella-pagamenti thead {
+    display: table-header-group;
+  }
+
+  .tabella-pagamenti tr {
+    break-inside: avoid;
+  }
+
+  .tabella-pagamenti th {
+    background: #e5e5e5 !important;
+    color: #000000 !important;
+  }
+
+  .tabella-pagamenti th,
+  .tabella-pagamenti td {
+    padding: 6px;
+    border: 1px solid #777777;
+  }
+}
