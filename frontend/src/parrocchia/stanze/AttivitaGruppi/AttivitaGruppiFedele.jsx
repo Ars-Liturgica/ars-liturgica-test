@@ -3,6 +3,7 @@ import { supabase } from "../../../supabaseClient";
 import IscrizioneGrestFedele from "./IscrizioneGrestFedele";
 
 const stile = {
+  sfondo: { minHeight: "100vh", background: "#f7f3ed" },
   pagina: { maxWidth: 1100, margin: "0 auto", padding: "32px 20px", color: "#173955" },
   intestazione: { display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 18, marginBottom: 28 },
   griglia: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(270px, 1fr))", gap: 20 },
@@ -59,6 +60,7 @@ export default function AttivitaGruppiFedele({ parrocchiaId, tornaDashboard }) {
   useEffect(() => { caricaAttivita(); }, [caricaAttivita]);
 
   return (
+    <div style={stile.sfondo}>
     <main style={stile.pagina}>
       {grestSelezionato ? (
         <IscrizioneGrestFedele attivita={grestSelezionato} onIndietro={() => setGrestSelezionato(null)} />
@@ -97,5 +99,6 @@ export default function AttivitaGruppiFedele({ parrocchiaId, tornaDashboard }) {
       )}
       </>}
     </main>
+    </div>
   );
 }
