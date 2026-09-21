@@ -14,6 +14,7 @@ import Notifiche from "./stanze/Notifiche/Notifiche";
 import CollaboratoriParrocchia from "./stanze/Collaboratori/CollaboratoriParrocchia";
 import ProgettiDonazioni from "./stanze/ProgettiDonazioni/ProgettiDonazioni";
 import PagamentiParrocchia from "./stanze/PagamentiParrocchia/PagamentiParrocchia";
+import AttivitaGruppiParroco from "./stanze/AttivitaGruppi/AttivitaGruppiParroco";
 
 export default function DashboardParroco({
   onCambioVista,
@@ -204,6 +205,7 @@ export default function DashboardParroco({
       titolo: "Attività e Gruppi",
       descrizione:
         "Catechismo, GrEst, gruppi e attività della comunità parrocchiale.",
+      stanza: "attivita-gruppi",
     },
     {
       icona: (
@@ -333,6 +335,17 @@ export default function DashboardParroco({
   if (stanzaAperta === "progetti-donazioni") {
     return (
       <ProgettiDonazioni
+        parrocchiaId={parrocchia?.id}
+        tornaDashboard={() =>
+          setStanzaAperta(null)
+        }
+      />
+    );
+  }
+
+  if (stanzaAperta === "attivita-gruppi") {
+    return (
+      <AttivitaGruppiParroco
         parrocchiaId={parrocchia?.id}
         tornaDashboard={() =>
           setStanzaAperta(null)
