@@ -6,6 +6,7 @@ import CalendarioFedele from "./stanze/Calendari/CalendarioFedele";
 import NotificheFedele from "./stanze/Notifiche/NotificheFedele";
 import IntenzioniMesseFedele from "./stanze/Celebrazioni/IntenzioniMesseFedele";
 import PartecipazioneComunita from "./stanze/Collaboratori/PartecipazioneComunita";
+import AttivitaGruppiFedele from "./stanze/AttivitaGruppi/AttivitaGruppiFedele";
 
 export default function DashboardFedele() {
   const [stanzaAperta, setStanzaAperta] = useState(null);
@@ -104,6 +105,15 @@ export default function DashboardFedele() {
       <PartecipazioneComunita
         parrocchiaId={parrocchia.id}
         utenteId={utenteId}
+        tornaDashboard={() => setStanzaAperta(null)}
+      />
+    );
+  }
+
+  if (stanzaAperta === "attivita-gruppi") {
+    return (
+      <AttivitaGruppiFedele
+        parrocchiaId={parrocchia.id}
         tornaDashboard={() => setStanzaAperta(null)}
       />
     );
@@ -439,6 +449,38 @@ export default function DashboardFedele() {
             >
               La comunità cresce con il contributo di ciascuno. Scopri come
               offrire il tuo tempo, le tue capacità e la tua presenza.
+            </p>
+          </button>
+          <button
+            type="button"
+            onClick={() => setStanzaAperta("attivita-gruppi")}
+            style={stileCard}
+          >
+            <div style={{ fontSize: "34px", marginBottom: "16px" }}>
+              📋
+            </div>
+
+            <h2
+              style={{
+                margin: "0 0 10px",
+                fontSize: "22px",
+                fontWeight: "500",
+                color: "#49392c",
+              }}
+            >
+              Attività e Gruppi
+            </h2>
+
+            <p
+              style={{
+                margin: 0,
+                fontFamily: "Arial, sans-serif",
+                fontSize: "15px",
+                lineHeight: "1.6",
+                color: "#75695e",
+              }}
+            >
+              Scopri le attività della parrocchia e, quando saranno aperte, le iscrizioni.
             </p>
           </button>
         </div>
