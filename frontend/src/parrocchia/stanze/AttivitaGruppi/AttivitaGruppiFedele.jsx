@@ -25,6 +25,28 @@ function elencoDaRisposta(valore) {
   return null;
 }
 
+function indirizzoPdf(valore) {
+  if (typeof valore !== "string" || !valore.trim()) return null;
+  try {
+    const url = new URL(valore.trim(), window.location.origin);
+    return ["http:", "https:"].includes(url.protocol) ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+function moduloCartaceo(voce) {
+  const config = voce.configurazione_modulo || {};
+  const urlParrocchia =
+    config.pdf_parrocchia_url ||
+    config.url_pdf_parrocchia ||
+    config.modulo_pdf_url ||
+    config.url_modulo_pdf ||
+    config.modulo_cartaceo_url ||
+    config.modulo_cartaceo?.url;
+  return indirizzoPdf(urlParrocchia) || "/modulo-grest-cartaceo.pdf";
+}
+
 export default function AttivitaGruppiFedele({ parrocchiaId, tornaDashboard }) {
   const [attivita, setAttivita] = useState([]);
   const [caricamento, setCaricamento] = useState(true);
@@ -89,10 +111,17 @@ export default function AttivitaGruppiFedele({ parrocchiaId, tornaDashboard }) {
               {voce.modello_quota === "quota_fissa" && <p>Quota: {Number(voce.importo_quota).toLocaleString("it-IT", { style: "currency", currency: "EUR" })}</p>}
               {voce.modello_quota === "contributo_libero" && <p>Contributo libero</p>}
               {voce.modello_quota === "gratuita" && <p>Partecipazione gratuita</p>}
-              {String(voce.tipo).toLowerCase() === "grest" && voce.configurazione_modulo?.abilita_iscrizioni_grest === true && (
-                <button type="button" style={stile.pulsante} onClick={() => setGrestSelezionato(voce)}>Iscrivi un ragazzo</button>
-              )}
-              {String(voce.tipo).toLowerCase() === "grest" && voce.configurazione_modulo?.abilita_iscrizioni_grest !== true && <p>Iscrizioni in preparazione.</p>}
+              {String(voce.tipo).toLowerCase() === "grest" && <>
+                {voce.configurazione_modulo?.abilita_iscrizioni_grest === true ? (
+                  <button type="button" style={stile.pulsante} onClick={() => setGrestSelezionato(voce)}>Iscrivi un ragazzo</button>
+                ) : <p>Iscrizioni in preparazione.</p>}
+                <p>
+                  <a href={moduloCartaceo(voce)} target="_blank" rel="noopener noreferrer" style={{ ...stile.pulsante, display: "inline-block", textDecoration: "none" }}>
+                    Scarica il modulo cartaceo
+                  </a>
+                </p>
+                <p>Compila il modulo e consegnalo alla segreteria della parrocchia.</p>
+              </>}
             </article>
           ))}
         </div>
