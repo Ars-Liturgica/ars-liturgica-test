@@ -35,16 +35,18 @@ function indirizzoPdf(valore) {
   }
 }
 
-function moduloCartaceo(voce) {
+function moduliCartacei(voce) {
   const config = voce.configurazione_modulo || {};
-  const urlParrocchia =
-    config.pdf_parrocchia_url ||
-    config.url_pdf_parrocchia ||
-    config.modulo_pdf_url ||
-    config.url_modulo_pdf ||
-    config.modulo_cartaceo_url ||
-    config.modulo_cartaceo?.url;
-  return indirizzoPdf(urlParrocchia) || "/modulo-grest-cartaceo.pdf";
+  const urlParrocchia = indirizzoPdf(config.modulo_cartaceo_url);
+  const modalita = config.modulo_cartaceo_modalita || (urlParrocchia ? "parrocchia" : "ars");
+  const moduli = [];
+  if (modalita !== "parrocchia" || !urlParrocchia) {
+    moduli.push({ etichetta: modalita === "entrambi" ? "Scarica il modulo Ars Liturgica" : "Scarica il modulo cartaceo", url: "/modulo-grest-cartaceo.pdf" });
+  }
+  if (urlParrocchia && modalita !== "ars") {
+    moduli.push({ etichetta: modalita === "entrambi" ? "Scarica il modulo della parrocchia" : "Scarica il modulo cartaceo", url: urlParrocchia });
+  }
+  return moduli;
 }
 
 export default function AttivitaGruppiFedele({ parrocchiaId, tornaDashboard }) {
@@ -115,11 +117,13 @@ export default function AttivitaGruppiFedele({ parrocchiaId, tornaDashboard }) {
                 {voce.configurazione_modulo?.abilita_iscrizioni_grest === true ? (
                   <button type="button" style={stile.pulsante} onClick={() => setGrestSelezionato(voce)}>Iscrivi un ragazzo</button>
                 ) : <p>Iscrizioni in preparazione.</p>}
-                <p>
-                  <a href={moduloCartaceo(voce)} target="_blank" rel="noopener noreferrer" style={{ ...stile.pulsante, display: "inline-block", textDecoration: "none" }}>
-                    Scarica il modulo cartaceo
-                  </a>
-                </p>
+                {moduliCartacei(voce).map((modulo) => (
+                  <p key={modulo.url}>
+                    <a href={modulo.url} target="_blank" rel="noopener noreferrer" style={{ ...stile.pulsante, display: "inline-block", textDecoration: "none" }}>
+                      {modulo.etichetta}
+                    </a>
+                  </p>
+                ))}
                 <p>Compila il modulo e consegnalo alla segreteria della parrocchia.</p>
               </>}
             </article>
