@@ -1,14 +1,12 @@
 import React, { useState } from "react";
 import { supabase } from "../../../supabaseClient";
-import VerificaGenitoreGrest from "./VerificaGenitoreGrest";
 
 const campo = { display: "grid", gap: 6, marginBottom: 16 };
 const input = { width: "100%", boxSizing: "border-box", padding: 10, border: "1px solid #b8aa99", borderRadius: 8, font: "inherit" };
 const pulsante = { padding: "10px 16px", border: "1px solid #765c3e", borderRadius: 9, background: "#fffaf0", color: "#173955", cursor: "pointer", font: "inherit" };
 
 export default function IscrizioneGrestFedele({ attivita, onIndietro }) {
-  const [verificato, setVerificato] = useState(false);
-  const [genitore, setGenitore] = useState({ nome: "", cognome: "", rapporto: "", telefono: "" });
+  const [genitore, setGenitore] = useState({ nome: "", cognome: "", rapporto: "", telefono: "", email: "" });
   const [ragazzo, setRagazzo] = useState({ nome: "", cognome: "", data_nascita: "" });
   const [delegato, setDelegato] = useState({ nome: "", cognome: "", telefono: "" });
   const [taglia, setTaglia] = useState("");
@@ -29,18 +27,16 @@ export default function IscrizioneGrestFedele({ attivita, onIndietro }) {
       setErrore("Inserisci nome e cognome della persona delegata al ritiro.");
       return;
     }
-    setOccupato(true);
-    const { data: identita, error: erroreIdentita } = await supabase.auth.getUser();
-    if (erroreIdentita || !identita?.user?.email_confirmed_at) {
-      setVerificato(false);
-      setErrore("Verifica nuovamente l'email del genitore.");
-      setOccupato(false);
+    if (!genitore.telefono.trim()) {
+      setErrore("Inserisci un telefono al quale la parrocchia possa contattarti.");
       return;
     }
+    setOccupato(true);
     const { data, error } = await supabase.rpc("ars_iscrivi_grest", {
       p_attivita_id: attivita.id,
       p_scheda: {
-        genitore, ragazzo, taglia_maglietta: taglia,
+        genitore: { ...genitore, telefono: genitore.telefono.trim(), email: genitore.email.trim() || null },
+        ragazzo, taglia_maglietta: taglia,
         delegati_ritiro: delegato.nome.trim() ? [delegato] : [],
         salute, consensi,
       },
@@ -48,8 +44,8 @@ export default function IscrizioneGrestFedele({ attivita, onIndietro }) {
     setOccupato(false);
     if (error) {
       console.error("Invio iscrizione GREST:", error);
-      setErrore(error.message?.includes("duplicato") || error.code === "23505"
-        ? "Questo ragazzo risulta già iscritto al GREST con la tua email."
+      setErrore(error.message?.toLowerCase().includes("duplicat") || error.code === "23505"
+        ? "Per questo ragazzo risulta già una domanda di iscrizione al GREST. Contatta la parrocchia se devi correggerla."
         : "Non siamo riusciti a inviare l'iscrizione. Controlla i dati e riprova.");
       return;
     }
@@ -74,14 +70,15 @@ export default function IscrizioneGrestFedele({ attivita, onIndietro }) {
     <p>{attivita.modello_quota === "quota_fissa" ? `Quota prevista: ${Number(attivita.importo_quota).toLocaleString("it-IT", { style: "currency", currency: attivita.valuta || "EUR" })}.` : "La quota sarà confermata dalla parrocchia."} L'importo definitivo viene calcolato al momento dell'invio.</p>
     {ricevuta ? <div role="status">
       <h2>Iscrizione ricevuta</h2>
-      <p>La parrocchia ha ricevuto la richiesta per {ragazzo.nome} {ragazzo.cognome}. Stato: {ricevuta.stato}.</p>
+      <p>La parrocchia ha ricevuto la richiesta per {ragazzo.nome} {ragazzo.cognome}. Potrà confermarla dopo il pagamento o secondo le decisioni del parroco.</p>
       <p>Quota dovuta: {Number(ricevuta.importo_dovuto).toLocaleString("it-IT", { style: "currency", currency: ricevuta.valuta || "EUR" })}. Le istruzioni per il pagamento saranno disponibili dopo l'attivazione del sistema di incasso della parrocchia.</p>
-    </div> : !verificato ? <VerificaGenitoreGrest onVerificato={() => setVerificato(true)} onAnnulla={onIndietro} /> : <form onSubmit={invia}>
+    </div> : <form onSubmit={invia}>
       <h2>Genitore o tutore</h2>
       {campoTesto("Nome", genitore.nome, (v) => setGenitore({ ...genitore, nome: v }), { required: true, maxLength: 100 })}
       {campoTesto("Cognome", genitore.cognome, (v) => setGenitore({ ...genitore, cognome: v }), { required: true, maxLength: 100 })}
       {campoTesto("Rapporto con il ragazzo", genitore.rapporto, (v) => setGenitore({ ...genitore, rapporto: v }), { required: true, maxLength: 100, placeholder: "Es. madre, padre, tutore" })}
-      {campoTesto("Telefono di contatto", genitore.telefono, (v) => setGenitore({ ...genitore, telefono: v }), { type: "tel", maxLength: 30 })}
+      {campoTesto("Telefono di contatto", genitore.telefono, (v) => setGenitore({ ...genitore, telefono: v }), { type: "tel", required: true, maxLength: 30, autoComplete: "tel" })}
+      {campoTesto("Email (facoltativa)", genitore.email, (v) => setGenitore({ ...genitore, email: v }), { type: "email", maxLength: 254, autoComplete: "email" })}
       <h2>Ragazzo</h2>
       {campoTesto("Nome", ragazzo.nome, (v) => setRagazzo({ ...ragazzo, nome: v }), { required: true, maxLength: 100 })}
       {campoTesto("Cognome", ragazzo.cognome, (v) => setRagazzo({ ...ragazzo, cognome: v }), { required: true, maxLength: 100 })}
