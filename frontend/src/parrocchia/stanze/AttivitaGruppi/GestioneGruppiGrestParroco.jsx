@@ -119,8 +119,58 @@ export default function GestioneGruppiGrestParroco({ attivita, parrocchiaId, onI
       p_gruppo_id: gruppo.id, p_percorso: null,
     });
     if (error) { setOperazione(false); return setErrore(error.message); }
-    if (gruppo.immagine_path) await supabase.storage.from(bucket).remove([gruppo.immagine_path]);
+    if (gruppo.immagine_path) {
+      const { error: erroreFile } = await supabase.storage.from(bucket).remove([gruppo.immagine_path]);
+      if (erroreFile) {
+        await supabase.rpc("ars_salva_immagine_gruppo_grest_parroco", {
+          p_gruppo_id: gruppo.id, p_percorso: gruppo.immagine_path,
+        });
+        setOperazione(false);
+        await carica();
+        setErrore("Non è stato possibile cancellare il file dell'immagine. Riprova.");
+        return;
+      }
+    }
     setOperazione(false); setMessaggio("Immagine rimossa."); await carica();
+  }
+
+  async function eliminaGruppo(gruppo) {
+    const numero = (gruppo.ragazzi || []).length;
+    const conferma = window.confirm(`Eliminare il gruppo «${gruppo.nome}»?\n` +
+      `${numero} ${numero === 1 ? "ragazzo tornerà" : "ragazzi torneranno"} da assegnare. ` +
+      "Le iscrizioni dei ragazzi resteranno valide. Questa operazione non si può annullare.");
+    if (!conferma) return;
+    setOperazione(true); setErrore(""); setMessaggio("");
+    if (gruppo.immagine_path) {
+      const { error: scollegaErrore } = await supabase.rpc("ars_salva_immagine_gruppo_grest_parroco", {
+        p_gruppo_id: gruppo.id, p_percorso: null,
+      });
+      if (scollegaErrore) {
+        setOperazione(false); return setErrore(scollegaErrore.message);
+      }
+      const { error: erroreFile } = await supabase.storage.from(bucket).remove([gruppo.immagine_path]);
+      if (erroreFile) {
+        await supabase.rpc("ars_salva_immagine_gruppo_grest_parroco", {
+          p_gruppo_id: gruppo.id, p_percorso: gruppo.immagine_path,
+        });
+        setOperazione(false);
+        await carica();
+        setErrore("Impossibile cancellare l'immagine: il gruppo è ancora presente.");
+        return;
+      }
+    }
+    const { error } = await supabase.rpc("ars_elimina_gruppo_grest_parroco", {
+      p_attivita_id: attivita.id, p_gruppo_id: gruppo.id,
+    });
+    setOperazione(false);
+    if (error) {
+      await carica();
+      setErrore(error.message || "Impossibile eliminare il gruppo.");
+      return;
+    }
+    if (modifica === gruppo.id) setModifica(null);
+    setMessaggio(`Gruppo eliminato. ${numero} ${numero === 1 ? "ragazzo è da riassegnare" : "ragazzi sono da riassegnare"}.`);
+    await carica();
   }
 
   const assegnazioni = Object.fromEntries(gruppi.flatMap((g) => (g.ragazzi || []).map((id) => [id, g.id])));
@@ -163,6 +213,7 @@ export default function GestioneGruppiGrestParroco({ attivita, parrocchiaId, onI
           <p>{(g.ragazzi || []).length} ragazzi assegnati</p>
           <p>Collaboratori: {(g.volontari || []).map((id) => volontari.find((v) => v.id === id)).filter(Boolean).map(nomeIntero).join(", ") || "nessuno"}</p>
           <button type="button" style={bottone} onClick={() => apri(g)} disabled={operazione}>Modifica</button>
+          {" "}<button type="button" style={bottone} onClick={() => eliminaGruppo(g)} disabled={operazione}>Elimina gruppo</button>
           <div style={{ marginTop: 12 }}><label>Immagine del gruppo (facoltativa, massimo 2 MB)<br />
             <input type="file" accept="image/jpeg,image/png,image/webp" disabled={operazione} onChange={(e) => { const file = e.target.files?.[0]; e.target.value = ""; cambiaImmagine(g, file); }} />
           </label></div>
