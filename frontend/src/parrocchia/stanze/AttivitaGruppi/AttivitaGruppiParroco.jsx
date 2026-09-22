@@ -15,7 +15,7 @@ const stile = {
 const bozzaIniziale = {
   id: null, titolo: "GREST 2027", descrizione: "", luogo: "", dataInizio: "", dataFine: "",
   modelloQuota: "gratuita", importoQuota: "", scadenzaQuota: "", configurazioneModulo: { versione: 1, tipo: "grest" },
-  iscrizioniOnline: false, moduloScelto: "ars",
+  iscrizioniOnline: false, moduloScelto: "ars", statoOriginale: "bozza",
 };
 
 const bucketModuli = "ars-grest-moduli";
@@ -107,7 +107,8 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
       scadenzaQuota: voce.scadenza_quota || "",
       configurazioneModulo: voce.configurazione_modulo || { versione: 1, tipo: "grest" },
       iscrizioniOnline: voce.configurazione_modulo?.abilita_iscrizioni_grest === true,
-      moduloScelto: voce.configurazione_modulo?.modulo_cartaceo_url ? "parrocchia" : "ars",
+      moduloScelto: voce.configurazione_modulo?.modulo_cartaceo_modalita || (voce.configurazione_modulo?.modulo_cartaceo_url ? "parrocchia" : "ars"),
+      statoOriginale: voce.stato,
     });
     setPdfParrocchia(null);
     setErrore("");
@@ -116,7 +117,7 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
-  async function salvaAttivita(evento, stato = "bozza") {
+  async function salvaAttivita(evento, stato = bozza.statoOriginale || "bozza") {
     evento?.preventDefault();
     setErrore("");
     setMessaggio("");
@@ -132,13 +133,13 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
     if (stato === "pubblicata" && bozza.modelloQuota === "quota_fissa" && bozza.scadenzaQuota && bozza.scadenzaQuota < oggiLocale()) {
       return setErrore("La scadenza della quota è passata. Aggiornala prima di pubblicare.");
     }
-    if (bozza.id && bozza.moduloScelto === "parrocchia" && !pdfParrocchia && !bozza.configurazioneModulo?.modulo_cartaceo_url) {
+    if (bozza.id && bozza.moduloScelto !== "ars" && !pdfParrocchia && !bozza.configurazioneModulo?.modulo_cartaceo_url) {
       return setErrore("Seleziona il PDF della parrocchia prima di salvare.");
     }
 
     setSalvataggio(true);
     let urlPersonalizzato = bozza.configurazioneModulo?.modulo_cartaceo_url;
-    if (bozza.moduloScelto === "parrocchia" && pdfParrocchia) {
+    if (bozza.moduloScelto !== "ars" && pdfParrocchia) {
       if (!bozza.id) {
         setSalvataggio(false);
         return setErrore("Salva prima la bozza, poi carica il PDF della parrocchia.");
@@ -162,8 +163,9 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
     }
     const configurazioneModulo = { ...bozza.configurazioneModulo,
       abilita_iscrizioni_grest: stato === "pubblicata" && bozza.iscrizioniOnline,
+      modulo_cartaceo_modalita: bozza.moduloScelto,
     };
-    if (bozza.moduloScelto === "parrocchia" && urlPersonalizzato) configurazioneModulo.modulo_cartaceo_url = urlPersonalizzato;
+    if (bozza.moduloScelto !== "ars" && urlPersonalizzato) configurazioneModulo.modulo_cartaceo_url = urlPersonalizzato;
     else delete configurazioneModulo.modulo_cartaceo_url;
     const { data, error } = await supabase.rpc("ars_salva_attivita_parrocchiale", {
       p_parrocchia_id: parrocchiaId,
@@ -220,8 +222,8 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
 
       {mostraModulo && (
         <form onSubmit={(evento) => salvaAttivita(evento)} style={{ ...stile.card, marginBottom: 24 }}>
-          <h2>{bozza.id ? "Modifica GREST in bozza" : "Nuovo GREST in bozza"}</h2>
-          <p>Prima di aprire le iscrizioni online, completa il modulo e le informative della parrocchia.</p>
+          <h2>{bozza.statoOriginale === "pubblicata" ? "Gestisci GREST pubblicato" : bozza.id ? "Modifica GREST in bozza" : "Nuovo GREST in bozza"}</h2>
+          <p>Seleziona i moduli cartacei da mostrare ai fedeli. Le iscrizioni online si gestiscono separatamente.</p>
           <label style={stile.campo}>Titolo <input style={stile.controllo} required value={bozza.titolo} onChange={(e) => setBozza({ ...bozza, titolo: e.target.value })} /></label>
           <label style={stile.campo}>Descrizione <textarea style={stile.controllo} rows={4} value={bozza.descrizione} onChange={(e) => setBozza({ ...bozza, descrizione: e.target.value })} /></label>
           <label style={stile.campo}>Luogo <input style={stile.controllo} value={bozza.luogo} onChange={(e) => setBozza({ ...bozza, luogo: e.target.value })} /></label>
@@ -246,22 +248,27 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
             <label style={{ display: "block", marginBottom: 10 }}>
               <input type="radio" name="moduloCartaceo" checked={bozza.moduloScelto === "parrocchia"} onChange={() => setBozza({ ...bozza, moduloScelto: "parrocchia" })} /> Usa il modulo della parrocchia
             </label>
-            {bozza.moduloScelto === "parrocchia" && (
+            <label style={{ display: "block", marginBottom: 10 }}>
+              <input type="radio" name="moduloCartaceo" checked={bozza.moduloScelto === "entrambi"} onChange={() => setBozza({ ...bozza, moduloScelto: "entrambi" })} /> Mostra entrambi i moduli
+            </label>
+            {bozza.moduloScelto !== "ars" && (
               bozza.id ? <>
                 <label style={stile.campo}>Carica un PDF vuoto (massimo 5 MB)
                   <input style={stile.controllo} type="file" accept="application/pdf,.pdf" onChange={(e) => setPdfParrocchia(e.target.files?.[0] || null)} />
                 </label>
                 {bozza.configurazioneModulo?.modulo_cartaceo_url && !pdfParrocchia && <p>Il PDF già caricato rimane attivo. Scegli un file solo per sostituirlo.</p>}
+                {bozza.configurazioneModulo?.modulo_cartaceo_url && <p><a href={bozza.configurazioneModulo.modulo_cartaceo_url} target="_blank" rel="noopener noreferrer">Apri il PDF della parrocchia attualmente caricato</a></p>}
                 <p>Il PDF sarà pubblico. Non caricare moduli compilati né dati sanitari.</p>
               </> : <p>Salva prima la bozza per poter caricare il PDF della parrocchia.</p>
             )}
+            {bozza.moduloScelto === "ars" && bozza.configurazioneModulo?.modulo_cartaceo_url && <p>Dopo il salvataggio il PDF della parrocchia non sarà più mostrato ai fedeli. Il file già caricato rimarrà nel deposito pubblico.</p>}
           </fieldset>
           {bozza.id && <label style={{ display: "flex", gap: 9, alignItems: "flex-start", marginBottom: 16 }}>
             <input type="checkbox" checked={bozza.iscrizioniOnline} onChange={(e) => setBozza({ ...bozza, iscrizioniOnline: e.target.checked })} />
-            Apri le iscrizioni online quando pubblichi questa attività
+            {bozza.statoOriginale === "pubblicata" ? "Iscrizioni online aperte" : "Apri le iscrizioni online quando pubblichi questa attività"}
           </label>}
-          <button type="submit" style={stile.pulsante} disabled={salvataggio}>{salvataggio ? "Salvataggio…" : "Salva bozza"}</button>{" "}
-          {bozza.id && <button type="button" style={stile.pulsante} disabled={salvataggio} onClick={(evento) => {
+          <button type="submit" style={stile.pulsante} disabled={salvataggio}>{salvataggio ? "Salvataggio…" : bozza.statoOriginale === "pubblicata" ? "Salva modifiche" : "Salva bozza"}</button>{" "}
+          {bozza.id && bozza.statoOriginale !== "pubblicata" && <button type="button" style={stile.pulsante} disabled={salvataggio} onClick={(evento) => {
             if (evento.currentTarget.form?.reportValidity()) salvaAttivita(evento, "pubblicata");
           }}>{salvataggio ? "Pubblicazione…" : "Pubblica"}</button>}{" "}
           <button type="button" style={stile.pulsante} disabled={salvataggio} onClick={() => setMostraModulo(false)}>Annulla</button>
@@ -289,8 +296,8 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
                 {(inizio || fine) && <p>{[inizio, fine].filter(Boolean).join(" – ")}</p>}
                 {voce.luogo && <p>Luogo: {voce.luogo}</p>}
                 <p>{voce.modello_quota === "quota_fissa" ? `Quota: ${Number(voce.importo_quota).toLocaleString("it-IT", { style: "currency", currency: "EUR" })}` : voce.modello_quota === "contributo_libero" ? "Contributo libero" : "Gratuita"}</p>
-                {voce.stato === "bozza" && voce.tipo?.toLowerCase() === "grest" && (
-                  <button type="button" style={stile.pulsante} onClick={() => modificaBozza(voce)}>Modifica bozza</button>
+                {["bozza", "pubblicata"].includes(voce.stato) && voce.tipo?.toLowerCase() === "grest" && (
+                  <button type="button" style={stile.pulsante} onClick={() => modificaBozza(voce)}>{voce.stato === "bozza" ? "Modifica bozza" : "Gestisci attività e moduli"}</button>
                 )}
               </article>
             );
