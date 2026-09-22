@@ -117,16 +117,14 @@ export default function ElencoIscrizioniGrestParroco({ attivita, onIndietro }) {
     {!caricamento && !errore && filtrate.length === 0 && <p>Nessuna iscrizione corrisponde alla ricerca.</p>}
     {!caricamento && filtrate.length > 0 && <>
       <p>Mostrate {((corrente - 1) * perPagina) + 1}–{Math.min(corrente * perPagina, filtrate.length)} di {filtrate.length}</p>
-      <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 400 }}>
-          <thead><tr style={{ textAlign: "left", borderBottom: "2px solid #ded5c6" }}>
-            <th style={{ padding: 10 }}>Ragazzo</th><th style={{ padding: 10 }}>Pagamenti</th>
-          </tr></thead>
-          <tbody>{visibili.map((voce) => <tr key={voce.id} style={{ borderBottom: "1px solid #ded5c6" }}>
-            <td style={{ padding: 10 }}><button type="button" style={{ ...pulsante, border: 0, padding: 0, textDecoration: "underline", textAlign: "left" }} onClick={() => apriScheda(voce)} aria-expanded={selezionata === voce.id}>{voce.nome_partecipante} {voce.cognome_partecipante}</button></td>
-            <td style={{ padding: 10 }}>{Number(voce.importo_dovuto) === 0 ? "Gratuita" : "Pagamento non registrato"}</td>
-          </tr>)}</tbody>
-        </table>
+      <div role="table" aria-label="Iscrizioni GREST" style={{ color: "#173955" }}>
+        <div role="row" style={{ display: "grid", gridTemplateColumns: "minmax(160px, 1fr) minmax(160px, 1fr)", gap: 12, borderBottom: "2px solid #b8aa99", padding: "10px 12px", fontWeight: 700 }}>
+          <span role="columnheader">Ragazzo</span><span role="columnheader">Pagamenti</span>
+        </div>
+        {visibili.map((voce) => <div role="row" key={voce.id} style={{ display: "grid", gridTemplateColumns: "minmax(160px, 1fr) minmax(160px, 1fr)", gap: 12, borderBottom: "1px solid #ded5c6", padding: "10px 12px", alignItems: "center" }}>
+          <span role="cell"><button type="button" style={{ color: "#173955", background: "transparent", border: "none", boxShadow: "none", borderRadius: 0, padding: 0, textDecoration: "underline", textAlign: "left", cursor: "pointer", font: "inherit" }} onClick={() => apriScheda(voce)} aria-expanded={selezionata === voce.id}>{voce.nome_partecipante} {voce.cognome_partecipante}</button></span>
+          <span role="cell" style={{ color: "#173955" }}>{Number(voce.importo_dovuto) === 0 ? "Gratuita" : "Pagamento non registrato"}</span>
+        </div>)}
       </div>
       {pagine > 1 && <nav aria-label="Pagine delle iscrizioni" style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 16 }}>
         <button type="button" style={pulsante} disabled={corrente === 1} onClick={() => { setPagina(corrente - 1); setSelezionata(null); }}>Precedente</button>
