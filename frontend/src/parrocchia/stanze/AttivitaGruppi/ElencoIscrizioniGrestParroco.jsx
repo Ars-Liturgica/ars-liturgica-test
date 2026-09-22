@@ -1,8 +1,11 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase } from "../../../supabaseClient";
 
-const pulsante = { border: "1px solid #765c3e", borderRadius: 8, padding: "9px 14px", background: "transparent", color: "#503b28", cursor: "pointer" };
-const card = { border: "1px solid #ded5c6", borderRadius: 14, padding: 18, background: "#fffdf8", marginBottom: 12 };
+const pulsante = { border: "1px solid #765c3e", borderRadius: 8, padding: "8px 12px", background: "transparent", color: "#503b28", cursor: "pointer", font: "inherit" };
+const controllo = { padding: 9, borderRadius: 8, border: "1px solid #b8aa99", font: "inherit" };
+const perPagina = 25;
+const euro = (valore) => Number(valore || 0).toLocaleString("it-IT", { style: "currency", currency: "EUR" });
+const normalizza = (valore) => String(valore || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 
 export default function ElencoIscrizioniGrestParroco({ attivita, onIndietro }) {
   const [iscrizioni, setIscrizioni] = useState([]);
@@ -10,6 +13,13 @@ export default function ElencoIscrizioniGrestParroco({ attivita, onIndietro }) {
   const [operazione, setOperazione] = useState(null);
   const [errore, setErrore] = useState("");
   const [messaggio, setMessaggio] = useState("");
+  const [ricerca, setRicerca] = useState("");
+  const [stato, setStato] = useState("tutte");
+  const [pagina, setPagina] = useState(1);
+  const [selezionata, setSelezionata] = useState(null);
+  const [scheda, setScheda] = useState(null);
+  const [caricamentoScheda, setCaricamentoScheda] = useState(false);
+  const [erroreScheda, setErroreScheda] = useState("");
 
   const carica = useCallback(async () => {
     setCaricamento(true);
@@ -28,6 +38,41 @@ export default function ElencoIscrizioniGrestParroco({ attivita, onIndietro }) {
 
   useEffect(() => { carica(); }, [carica]);
 
+  const filtrate = useMemo(() => {
+    const testo = normalizza(ricerca.trim());
+    return iscrizioni.filter((voce) => {
+      if (stato !== "tutte" && voce.stato !== stato) return false;
+      if (!testo) return true;
+      return normalizza(`${voce.nome_partecipante} ${voce.cognome_partecipante} ${voce.genitore_nome} ${voce.genitore_cognome}`).includes(testo);
+    });
+  }, [iscrizioni, ricerca, stato]);
+  const pagine = Math.max(1, Math.ceil(filtrate.length / perPagina));
+  const corrente = Math.min(pagina, pagine);
+  const visibili = filtrate.slice((corrente - 1) * perPagina, corrente * perPagina);
+  const dettaglio = iscrizioni.find((voce) => voce.id === selezionata);
+
+  async function apriScheda(voce) {
+    if (selezionata === voce.id) {
+      setSelezionata(null);
+      setScheda(null);
+      return;
+    }
+    setSelezionata(voce.id);
+    setScheda(null);
+    setErroreScheda("");
+    setCaricamentoScheda(true);
+    const { data, error } = await supabase.rpc("ars_scheda_iscrizione_grest", {
+      p_iscrizione_id: voce.id,
+    });
+    setCaricamentoScheda(false);
+    if (error || !data?.iscrizione_id) {
+      console.error("Scheda iscrizione GREST:", error || data);
+      setErroreScheda("Non è stato possibile aprire la scheda.");
+      return;
+    }
+    setScheda(data);
+  }
+
   async function annulla(voce) {
     if (!window.confirm(`Annullare l'iscrizione di ${voce.nome_partecipante} ${voce.cognome_partecipante}?`)) return;
     setOperazione(voce.id);
@@ -42,30 +87,76 @@ export default function ElencoIscrizioniGrestParroco({ attivita, onIndietro }) {
       setErrore("Non è stato possibile annullare l'iscrizione.");
       return;
     }
-    setMessaggio("Iscrizione annullata. I dati restano conservati nella scheda riservata.");
+    setMessaggio("Iscrizione annullata. La scheda rimane consultabile.");
     await carica();
   }
 
-  return <section style={{ maxWidth: 950, margin: "0 auto", padding: "24px 16px" }}>
+  return <section style={{ maxWidth: 1100, margin: "0 auto", padding: "24px 16px" }}>
     <button type="button" style={pulsante} onClick={onIndietro}>← Torna alle attività</button>
     <h1>Iscrizioni a {attivita.titolo}</h1>
-    <p>Le domande ricevute sono visibili alla parrocchia. Lo stato economico e gli incassi saranno gestiti separatamente.</p>
-    <button type="button" style={pulsante} disabled={caricamento} onClick={carica}>Aggiorna elenco</button>
+    <p>Domande ricevute: <strong>{iscrizioni.length}</strong>. Apri il nome per consultare la scheda.</p>
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "end", marginBottom: 16 }}>
+      <label style={{ display: "grid", gap: 5, flex: "1 1 280px" }}>Cerca ragazzo o genitore
+        <input style={controllo} type="search" value={ricerca} onChange={(e) => { setRicerca(e.target.value); setPagina(1); setSelezionata(null); }} placeholder="Nome o cognome" />
+      </label>
+      <label style={{ display: "grid", gap: 5 }}>Stato
+        <select style={controllo} value={stato} onChange={(e) => { setStato(e.target.value); setPagina(1); setSelezionata(null); }}>
+          <option value="tutte">Tutte</option>
+          <option value="ricevuta">Ricevute</option>
+          <option value="confermata">Confermate</option>
+          <option value="lista_attesa">Lista d'attesa</option>
+          <option value="annullata">Annullate</option>
+          <option value="ritirata">Ritirate</option>
+        </select>
+      </label>
+      <button type="button" style={pulsante} disabled={caricamento} onClick={carica}>Aggiorna elenco</button>
+    </div>
     {caricamento && <p role="status">Caricamento iscrizioni…</p>}
     {errore && <p role="alert">{errore}</p>}
     {messaggio && <p role="status">{messaggio}</p>}
-    {!caricamento && !errore && iscrizioni.length === 0 && <p>Non ci sono ancora iscrizioni.</p>}
-    {!caricamento && iscrizioni.map((voce) => <article key={voce.id} style={card}>
-      <h2 style={{ marginTop: 0 }}>{voce.nome_partecipante} {voce.cognome_partecipante}</h2>
-      <p>Domanda: <strong>{voce.stato}</strong> · Quota prevista: {Number(voce.importo_dovuto).toLocaleString("it-IT", { style: "currency", currency: "EUR" })}</p>
-      <p>Genitore o tutore: {voce.genitore_nome} {voce.genitore_cognome}<br />
-        Telefono: {voce.telefono_contatto || "Non disponibile"}
-        {voce.email_contatto && <> · Email: {voce.email_contatto}</>}
+    {!caricamento && !errore && filtrate.length === 0 && <p>Nessuna iscrizione corrisponde alla ricerca.</p>}
+    {!caricamento && filtrate.length > 0 && <>
+      <p>Mostrate {((corrente - 1) * perPagina) + 1}–{Math.min(corrente * perPagina, filtrate.length)} di {filtrate.length}</p>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", minWidth: 400 }}>
+          <thead><tr style={{ textAlign: "left", borderBottom: "2px solid #ded5c6" }}>
+            <th style={{ padding: 10 }}>Ragazzo</th><th style={{ padding: 10 }}>Pagamenti</th>
+          </tr></thead>
+          <tbody>{visibili.map((voce) => <tr key={voce.id} style={{ borderBottom: "1px solid #ded5c6" }}>
+            <td style={{ padding: 10 }}><button type="button" style={{ ...pulsante, border: 0, padding: 0, textDecoration: "underline", textAlign: "left" }} onClick={() => apriScheda(voce)} aria-expanded={selezionata === voce.id}>{voce.nome_partecipante} {voce.cognome_partecipante}</button></td>
+            <td style={{ padding: 10 }}>{Number(voce.importo_dovuto) === 0 ? "Gratuita" : "Pagamento non registrato"}</td>
+          </tr>)}</tbody>
+        </table>
+      </div>
+      {pagine > 1 && <nav aria-label="Pagine delle iscrizioni" style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 16 }}>
+        <button type="button" style={pulsante} disabled={corrente === 1} onClick={() => { setPagina(corrente - 1); setSelezionata(null); }}>Precedente</button>
+        <span>Pagina {corrente} di {pagine}</span>
+        <button type="button" style={pulsante} disabled={corrente === pagine} onClick={() => { setPagina(corrente + 1); setSelezionata(null); }}>Successiva</button>
+      </nav>}
+    </>}
+    {dettaglio && <section style={{ border: "1px solid #ded5c6", borderRadius: 12, background: "#fffdf8", padding: 20, marginTop: 20 }}>
+      <h2>Scheda di {dettaglio.nome_partecipante} {dettaglio.cognome_partecipante}</h2>
+      <p>Domanda: <strong>{dettaglio.stato}</strong> · Quota prevista: {euro(dettaglio.importo_dovuto)} · Pagamento: {Number(dettaglio.importo_dovuto) === 0 ? "Gratuita" : "non registrato"}</p>
+      {dettaglio.data_nascita && <p>Data di nascita: {new Date(`${dettaglio.data_nascita}T12:00:00`).toLocaleDateString("it-IT")}</p>}
+      <p>Genitore o tutore: {dettaglio.genitore_nome} {dettaglio.genitore_cognome}<br />
+        Telefono: {dettaglio.telefono_contatto || "Non disponibile"}
+        {dettaglio.email_contatto && <> · Email: {dettaglio.email_contatto}</>}
       </p>
-      {!["annullata", "ritirata"].includes(voce.stato) && <button type="button" style={pulsante}
-        disabled={Boolean(operazione)} onClick={() => annulla(voce)}>
-        {operazione === voce.id ? "Annullamento…" : "Annulla iscrizione"}
+      {caricamentoScheda && <p>Caricamento scheda…</p>}
+      {erroreScheda && <p role="alert">{erroreScheda}</p>}
+      {scheda && <>
+        <p>Rapporto con il ragazzo: {scheda.rapporto_con_minore}<br />Taglia maglietta: {scheda.taglia_maglietta}</p>
+        <p>Partecipazione autorizzata: {scheda.consensi?.partecipazione ? "Sì" : "No"} ·
+          Uscita autonoma: {scheda.consensi?.uscita_autonoma ? "Sì" : "No"}</p>
+        {Array.isArray(scheda.delegati_ritiro) && scheda.delegati_ritiro.length > 0 && <div>
+          <strong>Persone delegate al ritiro</strong>
+          <ul>{scheda.delegati_ritiro.map((persona, indice) => <li key={indice}>{persona.nome} {persona.cognome}{persona.telefono ? ` · ${persona.telefono}` : ""}</li>)}</ul>
+        </div>}
+      </>}
+      {!["annullata", "ritirata"].includes(dettaglio.stato) && <button type="button" style={pulsante}
+        disabled={Boolean(operazione)} onClick={() => annulla(dettaglio)}>
+        {operazione === dettaglio.id ? "Annullamento…" : "Annulla iscrizione"}
       </button>}
-    </article>)}
+    </section>}
   </section>;
 }
