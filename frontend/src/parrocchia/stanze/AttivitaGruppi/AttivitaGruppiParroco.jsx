@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { supabase } from "../../../supabaseClient";
 import ElencoIscrizioniGrestParroco from "./ElencoIscrizioniGrestParroco";
+import GestioneGruppiGrestParroco from "./GestioneGruppiGrestParroco";
 
 const stile = {
   pagina: { maxWidth: 1120, margin: "0 auto", padding: "24px 16px" },
@@ -59,6 +60,7 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
   const [bozza, setBozza] = useState(bozzaIniziale);
   const [pdfParrocchia, setPdfParrocchia] = useState(null);
   const [grestIscrizioni, setGrestIscrizioni] = useState(null);
+  const [grestGruppi, setGrestGruppi] = useState(null);
   const grest2027InBozza = attivita.find((voce) =>
     voce.tipo?.toLowerCase() === "grest" &&
     voce.titolo?.trim().toLowerCase() === "grest 2027" &&
@@ -206,6 +208,11 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
       attivita={grestIscrizioni}
       onIndietro={() => { setGrestIscrizioni(null); caricaAttivita(); }}
     /> :
+    grestGruppi ? <GestioneGruppiGrestParroco
+      attivita={grestGruppi}
+      parrocchiaId={parrocchiaId}
+      onIndietro={() => { setGrestGruppi(null); caricaAttivita(); }}
+    /> :
     <main style={stile.pagina}>
       <header style={stile.intestazione}>
         <div>
@@ -307,6 +314,7 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
                 )}
                 {voce.stato === "pubblicata" && voce.tipo?.toLowerCase() === "grest" && <>
                   {" "}<button type="button" style={stile.pulsante} onClick={() => setGrestIscrizioni(voce)}>Vedi iscrizioni</button>
+                  {" "}<button type="button" style={stile.pulsante} onClick={() => setGrestGruppi(voce)}>Gestisci gruppi</button>
                 </>}
               </article>
             );
