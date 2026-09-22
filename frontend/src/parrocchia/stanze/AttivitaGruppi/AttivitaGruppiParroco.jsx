@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { supabase } from "../../../supabaseClient";
+import ElencoIscrizioniGrestParroco from "./ElencoIscrizioniGrestParroco";
 
 const stile = {
   pagina: { maxWidth: 1120, margin: "0 auto", padding: "24px 16px" },
@@ -57,6 +58,7 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
   const [mostraModulo, setMostraModulo] = useState(false);
   const [bozza, setBozza] = useState(bozzaIniziale);
   const [pdfParrocchia, setPdfParrocchia] = useState(null);
+  const [grestIscrizioni, setGrestIscrizioni] = useState(null);
   const grest2027InBozza = attivita.find((voce) =>
     voce.tipo?.toLowerCase() === "grest" &&
     voce.titolo?.trim().toLowerCase() === "grest 2027" &&
@@ -200,6 +202,10 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
   }
 
   return (
+    grestIscrizioni ? <ElencoIscrizioniGrestParroco
+      attivita={grestIscrizioni}
+      onIndietro={() => { setGrestIscrizioni(null); caricaAttivita(); }}
+    /> :
     <main style={stile.pagina}>
       <header style={stile.intestazione}>
         <div>
@@ -299,6 +305,9 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
                 {["bozza", "pubblicata"].includes(voce.stato) && voce.tipo?.toLowerCase() === "grest" && (
                   <button type="button" style={stile.pulsante} onClick={() => modificaBozza(voce)}>{voce.stato === "bozza" ? "Modifica bozza" : "Gestisci attività e moduli"}</button>
                 )}
+                {voce.stato === "pubblicata" && voce.tipo?.toLowerCase() === "grest" && <>
+                  {" "}<button type="button" style={stile.pulsante} onClick={() => setGrestIscrizioni(voce)}>Vedi iscrizioni</button>
+                </>}
               </article>
             );
           })}
