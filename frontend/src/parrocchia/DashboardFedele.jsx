@@ -27,31 +27,31 @@ export default function DashboardFedele() {
     "Siamo lieti di accoglierti in questo spazio dedicato alla nostra comunità. Qui potrai trovare avvisi, informazioni e partecipare alla vita della Parrocchia attraverso gli spazi a tua disposizione.";
 
   const caricaConteggioNotifiche = useCallback(async () => {
-    if (!utenteId || !parrocchia.id) {
+    if (!parrocchia.id) {
       setNumeroNotificheNonLette(0);
       return;
     }
 
-    const { data, error } = await supabase.rpc(
-      "ars_elenco_notifiche_fedele",
-      {
-        p_utente_id: utenteId,
+    const { data: autenticazione } = await supabase.auth.getUser();
+    const [{ data, error }, { data: avvisi, error: erroreAvvisi }] = await Promise.all([
+      utenteId ? supabase.rpc("ars_elenco_notifiche_fedele", {
+        p_utente_id: utenteId, p_parrocchia_id: parrocchia.id,
+      }) : Promise.resolve({ data: [], error: null }),
+      autenticazione?.user?.id ? supabase.rpc("ars_bacheca_cancellazioni_mie_attivita", {
         p_parrocchia_id: parrocchia.id,
-      }
-    );
+      }) : Promise.resolve({ data: [], error: null }),
+    ]);
 
-    if (error) {
+    if (error || erroreAvvisi) {
       console.error(
         "Errore conteggio notifiche del fedele:",
-        error
+        error || erroreAvvisi
       );
-      setNumeroNotificheNonLette(0);
-      return;
     }
 
-    const numeroNonLette = (data || []).filter(
+    const numeroNonLette = (error ? [] : data || []).filter(
       (notifica) => !notifica.letta
-    ).length;
+    ).length + (erroreAvvisi ? [] : avvisi || []).filter((avviso) => !avviso.letta_at).length;
 
     setNumeroNotificheNonLette(numeroNonLette);
   }, [utenteId, parrocchia.id]);
