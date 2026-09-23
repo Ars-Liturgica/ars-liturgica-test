@@ -36,6 +36,12 @@ escluderle, mentre quelle riservate della parrocchia le devono poter leggere.
 Una pagina della bacheca per i partecipanti richiede un accesso che verifichi
 l'appartenenza all'attività, anche per chi si è iscritto senza account. Evitare
 un URL indovinabile che esponga dati o avvisi riservati.
+La migrazione include `ars_bacheca_cancellazioni_mie_attivita`: restituisce
+solo il titolo e il messaggio ai richiedenti con un account Supabase associato
+all'iscrizione; la vista del fedele li mostra nella bacheca delle sue attività.
+I genitori con solo telefono non possono ancora accedervi: il canale diretto
+resta indispensabile. L'accesso completo alla bacheca riservata per genitori
+senza account richiede la verifica di possesso del recapito.
 
 L'invio esterno usa una coda persistente per ogni famiglia e un servizio
 configurato dalla parrocchia. Stato distinto: `in_attesa`, `inviato`,
@@ -60,9 +66,9 @@ La query ricevuta il 23 settembre 2026 ha confermato lo stato `annullata`,
 l'elenco pubblico limitato a `pubblicata`, il vincolo che preserva le iscrizioni
 e le colonne dei recapiti GREST. La migrazione proposta in
 `backend/sql/07_cancellazione_attivita.sql` prepara l'annullamento atomico,
-il registro riservato e una coda degli avvisi. Non pubblica ancora l'avviso
-nella bacheca dei partecipanti e non spedisce messaggi: servono l'accesso
-riservato anche ai genitori senza account e un canale di recapito effettivo.
+il registro riservato, una bacheca per i richiedenti autenticati e una coda
+degli avvisi. Non spedisce ancora messaggi: servono l'accesso riservato anche
+ai genitori senza account e un canale di recapito effettivo.
 I vincoli dei pagamenti sono stati verificati: il riferimento a iscrizione e
 attività usa `ON DELETE RESTRICT` e l'archivio indica quanti pagamenti sono
 registrati o in attesa, senza cambiarne importi o stati. Le definizioni delle
