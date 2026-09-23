@@ -1,5 +1,5 @@
--- Prima fase: chiusura atomica e coda riservata degli avvisi.
--- NON invia SMS/email: richiede un servizio di consegna separato.
+-- Chiusura atomica e elenco riservato delle famiglie da avvisare.
+-- WhatsApp si apre su richiesta del parroco: l'app non invia messaggi da sola.
 -- Applicare dopo aver verificato lo schema della parrocchia test.
 begin;
 
@@ -184,7 +184,7 @@ begin
     (attivita_id, chiave_famiglia, email, telefono, stato)
   select distinct on (chiave_famiglia)
     p_attivita_id, chiave_famiglia, email, telefono,
-    case when telefono is not null or email is not null then 'in_attesa'
+    case when telefono is not null then 'in_attesa'
          else 'da_contattare' end
   from (
     select i.id,
@@ -258,6 +258,59 @@ $function$;
 revoke all on function public.ars_elenco_attivita_cancellate_parroco(uuid)
   from public, anon, authenticated;
 grant execute on function public.ars_elenco_attivita_cancellate_parroco(uuid)
+  to authenticated;
+
+-- Recapiti visibili soltanto a chi gestisce l'attività. Lo stato "inviato"
+-- indica la conferma manuale dell'operatore, non una ricevuta WhatsApp.
+create or replace function public.ars_famiglie_cancellazione_parroco(p_attivita_id uuid)
+returns jsonb language plpgsql stable security definer
+set search_path = public, pg_temp
+as $function$
+declare v_parrocchia_id uuid; v_risultato jsonb;
+begin
+  select parrocchia_id into v_parrocchia_id
+  from public.ars_cancellazioni_attivita where attivita_id = p_attivita_id;
+  if auth.uid() is null or v_parrocchia_id is null
+     or not coalesce(public.ars_puo_gestire_attivita(v_parrocchia_id), false) then
+    raise exception 'Non autorizzato a consultare i recapiti';
+  end if;
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'id', f.id, 'telefono', f.telefono, 'email', f.email, 'stato', f.stato
+  ) order by f.created_at, f.id), '[]'::jsonb) into v_risultato
+  from public.ars_avvisi_cancellazione_famiglie f
+  where f.attivita_id = p_attivita_id;
+  return v_risultato;
+end;
+$function$;
+revoke all on function public.ars_famiglie_cancellazione_parroco(uuid)
+  from public, anon, authenticated;
+grant execute on function public.ars_famiglie_cancellazione_parroco(uuid)
+  to authenticated;
+
+create or replace function public.ars_conferma_avviso_whatsapp_parroco(
+  p_attivita_id uuid, p_avviso_id uuid
+)
+returns void language plpgsql security definer
+set search_path = public, pg_temp
+as $function$
+declare v_parrocchia_id uuid;
+begin
+  select parrocchia_id into v_parrocchia_id
+  from public.ars_cancellazioni_attivita where attivita_id = p_attivita_id;
+  if auth.uid() is null or v_parrocchia_id is null
+     or not coalesce(public.ars_puo_gestire_attivita(v_parrocchia_id), false) then
+    raise exception 'Non autorizzato a confermare questo avviso';
+  end if;
+  update public.ars_avvisi_cancellazione_famiglie
+  set stato = 'inviato', inviato_at = now()
+  where id = p_avviso_id and attivita_id = p_attivita_id
+    and telefono is not null and stato in ('in_attesa', 'fallito');
+  if not found then raise exception 'Avviso non disponibile o già confermato'; end if;
+end;
+$function$;
+revoke all on function public.ars_conferma_avviso_whatsapp_parroco(uuid, uuid)
+  from public, anon, authenticated;
+grant execute on function public.ars_conferma_avviso_whatsapp_parroco(uuid, uuid)
   to authenticated;
 
 -- Bacheca dell'attività: solo il richiedente autenticato che risulta
