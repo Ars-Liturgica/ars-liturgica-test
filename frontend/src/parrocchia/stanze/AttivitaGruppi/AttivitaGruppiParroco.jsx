@@ -312,8 +312,8 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
                 {["bozza", "pubblicata"].includes(voce.stato) && voce.tipo?.toLowerCase() === "grest" && (
                   <button type="button" style={stile.pulsante} onClick={() => modificaBozza(voce)}>{voce.stato === "bozza" ? "Modifica bozza" : "Gestisci attività e moduli"}</button>
                 )}
-                {voce.stato === "pubblicata" && voce.tipo?.toLowerCase() === "grest" && <>
-                  {" "}<button type="button" style={stile.pulsante} onClick={() => setGrestIscrizioni(voce)}>Vedi iscrizioni</button>
+                {["bozza", "pubblicata"].includes(voce.stato) && voce.tipo?.toLowerCase() === "grest" && <>
+                  {voce.stato === "pubblicata" && <>{" "}<button type="button" style={stile.pulsante} onClick={() => setGrestIscrizioni(voce)}>Vedi iscrizioni</button></>}
                   {" "}<button type="button" style={stile.pulsante} onClick={() => setGrestGruppi(voce)}>Gestisci gruppi</button>
                 </>}
               </article>
