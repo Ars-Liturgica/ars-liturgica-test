@@ -68,6 +68,66 @@ for each row execute function public.ars_proteggi_stato_attivita_cancellata();
 revoke all on function public.ars_proteggi_stato_attivita_cancellata()
   from public, anon, authenticated;
 
+-- Impedisce anche alle funzioni GREST esistenti di modificare gruppi,
+-- assegnazioni e immagini quando la relativa attività è già annullata.
+-- Il lock FOR SHARE serializza la modifica con l'annullamento dell'attività.
+create or replace function public.ars_blocca_modifiche_gruppo_annullato()
+returns trigger language plpgsql security definer
+set search_path = public, pg_temp
+as $function$
+declare
+  v_attivita_id uuid;
+  v_stato text;
+  v_gruppo_id uuid;
+begin
+  if tg_table_name = 'grest_gruppi_volontari' then
+    v_gruppo_id := case when tg_op = 'DELETE' then old.gruppo_id else new.gruppo_id end;
+    select attivita_id into v_attivita_id
+    from public.grest_gruppi where id = v_gruppo_id;
+  else
+    v_attivita_id := case when tg_op = 'DELETE' then old.attivita_id else new.attivita_id end;
+  end if;
+
+  select stato into v_stato from public.attivita_parrocchiali
+  where id = v_attivita_id for share;
+  if v_stato = 'annullata' then
+    raise exception 'I gruppi di questa attività annullata non sono più modificabili';
+  end if;
+  if tg_op = 'UPDATE' and tg_table_name = 'grest_gruppi_volontari' then
+    if old.gruppo_id is distinct from new.gruppo_id then
+      select a.stato into v_stato from public.grest_gruppi g
+      join public.attivita_parrocchiali a on a.id = g.attivita_id
+      where g.id = old.gruppo_id for share of a;
+      if v_stato = 'annullata' then
+        raise exception 'I gruppi di questa attività annullata non sono più modificabili';
+      end if;
+    end if;
+  end if;
+  if tg_op = 'UPDATE' and tg_table_name <> 'grest_gruppi_volontari' then
+    if old.attivita_id is distinct from new.attivita_id then
+      select stato into v_stato from public.attivita_parrocchiali
+      where id = old.attivita_id for share;
+      if v_stato = 'annullata' then
+        raise exception 'I gruppi di questa attività annullata non sono più modificabili';
+      end if;
+    end if;
+  end if;
+  if tg_op = 'DELETE' then return old; end if;
+  return new;
+end;
+$function$;
+do $do$
+declare v_tabella text;
+begin
+  foreach v_tabella in array array['grest_gruppi', 'grest_gruppi_ragazzi', 'grest_gruppi_volontari'] loop
+    execute format('drop trigger if exists ars_blocca_gruppo_annullato on public.%I', v_tabella);
+    execute format('create trigger ars_blocca_gruppo_annullato before insert or update or delete on public.%I for each row execute function public.ars_blocca_modifiche_gruppo_annullato()', v_tabella);
+  end loop;
+end;
+$do$;
+revoke all on function public.ars_blocca_modifiche_gruppo_annullato()
+  from public, anon, authenticated;
+
 create or replace function public.ars_cancella_attivita_parroco(
   p_attivita_id uuid, p_messaggio text
 )
