@@ -30,10 +30,19 @@ create table if not exists public.ars_avvisi_cancellazione_famiglie (
 create index if not exists ars_avvisi_cancellazione_stato_idx
   on public.ars_avvisi_cancellazione_famiglie(attivita_id, stato);
 
+create table if not exists public.ars_letture_cancellazione_attivita (
+  attivita_id uuid not null references public.ars_cancellazioni_attivita(attivita_id) on delete restrict,
+  auth_user_id uuid not null references auth.users(id) on delete cascade,
+  letta_at timestamptz not null default now(),
+  primary key (attivita_id, auth_user_id)
+);
+
 alter table public.ars_cancellazioni_attivita enable row level security;
 alter table public.ars_avvisi_cancellazione_famiglie enable row level security;
+alter table public.ars_letture_cancellazione_attivita enable row level security;
 revoke all on public.ars_cancellazioni_attivita,
-  public.ars_avvisi_cancellazione_famiglie from public, anon, authenticated;
+  public.ars_avvisi_cancellazione_famiglie,
+  public.ars_letture_cancellazione_attivita from public, anon, authenticated;
 
 -- Impedisce che la vecchia funzione di salvataggio ripubblichi un'attività
 -- annullata o la porti allo stato annullata senza registrare l'avviso.
@@ -263,7 +272,9 @@ begin
   if auth.uid() is null then return '[]'::jsonb; end if;
   select coalesce(jsonb_agg(jsonb_build_object(
     'attivita_id', a.id, 'titolo', a.titolo,
-    'messaggio', c.messaggio, 'cancellata_at', c.cancellata_at
+    'messaggio', c.messaggio, 'cancellata_at', c.cancellata_at,
+    'letta_at', (select l.letta_at from public.ars_letture_cancellazione_attivita l
+                 where l.attivita_id = a.id and l.auth_user_id = auth.uid())
   ) order by c.cancellata_at desc), '[]'::jsonb) into v_risultato
   from public.ars_cancellazioni_attivita c
   join public.attivita_parrocchiali a on a.id = c.attivita_id
@@ -284,6 +295,32 @@ $function$;
 revoke all on function public.ars_bacheca_cancellazioni_mie_attivita(uuid)
   from public, anon, authenticated;
 grant execute on function public.ars_bacheca_cancellazioni_mie_attivita(uuid)
+  to authenticated;
+
+create or replace function public.ars_segna_avviso_cancellazione_letto(p_attivita_id uuid)
+returns void language plpgsql security definer
+set search_path = public, pg_temp
+as $function$
+begin
+  if auth.uid() is null or not exists (
+    select 1 from public.ars_cancellazioni_attivita c
+    join public.iscrizioni_attivita i on i.attivita_id = c.attivita_id
+    left join public.grest_schede_iscrizione s on s.iscrizione_id = i.id
+    left join public.utenti u on u.id = i.richiedente_utente_id
+    where c.attivita_id = p_attivita_id and i.stato not in ('ritirata', 'annullata')
+      and (i.richiedente_auth_id = auth.uid()
+        or s.richiedente_auth_id = auth.uid()
+        or u.auth_user_id = auth.uid())
+  ) then
+    raise exception 'Avviso non disponibile per questo utente';
+  end if;
+  insert into public.ars_letture_cancellazione_attivita(attivita_id, auth_user_id)
+  values (p_attivita_id, auth.uid()) on conflict do nothing;
+end;
+$function$;
+revoke all on function public.ars_segna_avviso_cancellazione_letto(uuid)
+  from public, anon, authenticated;
+grant execute on function public.ars_segna_avviso_cancellazione_letto(uuid)
   to authenticated;
 
 -- La chiusura amministrativa è una scelta esplicita della parrocchia.
