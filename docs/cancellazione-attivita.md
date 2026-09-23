@@ -39,6 +39,9 @@ un URL indovinabile che esponga dati o avvisi riservati.
 La migrazione include `ars_bacheca_cancellazioni_mie_attivita`: restituisce
 solo il titolo e il messaggio ai richiedenti con un account Supabase associato
 all'iscrizione; la vista del fedele li mostra nella bacheca delle sue attività.
+Lo stesso avviso compare anche nelle Notifiche con il badge e la lettura
+registrata soltanto dall'account del richiedente. «Letto nell'app» non
+equivale a «consegnato» dal fornitore di messaggi esterni.
 I genitori con solo telefono non possono ancora accedervi: il canale diretto
 resta indispensabile. L'accesso completo alla bacheca riservata per genitori
 senza account richiede la verifica di possesso del recapito.
