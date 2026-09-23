@@ -66,8 +66,12 @@ riservato anche ai genitori senza account e un canale di recapito effettivo.
 I vincoli dei pagamenti sono stati verificati: il riferimento a iscrizione e
 attività usa `ON DELETE RESTRICT` e l'archivio indica quanti pagamenti sono
 registrati o in attesa, senza cambiarne importi o stati. Le definizioni delle
-funzioni dei gruppi richiedono ancora la verifica dei controlli sullo stato
-`annullata` per impedire la gestione di gruppi dopo la cancellazione.
+funzioni dei gruppi hanno mostrato che salvataggio ed eliminazione non
+controllano lo stato `annullata`. La migrazione aggiunge trigger su gruppi,
+assegnazioni dei ragazzi e volontari per impedirne le modifiche dopo la
+cancellazione, anche quando una funzione vecchia rimane utilizzabile. La
+futura pulizia dei dati dovrà rimuovere i gruppi tramite una procedura
+controllata compatibile con questa protezione.
 Non applicare la migrazione né unire
 questa branch a `main` fino al completamento e alla prova end-to-end.
 
