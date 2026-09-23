@@ -51,6 +51,7 @@ function moduliCartacei(voce) {
 
 export default function AttivitaGruppiFedele({ parrocchiaId, tornaDashboard }) {
   const [attivita, setAttivita] = useState([]);
+  const [avvisiAttivita, setAvvisiAttivita] = useState([]);
   const [caricamento, setCaricamento] = useState(true);
   const [errore, setErrore] = useState("");
   const [grestSelezionato, setGrestSelezionato] = useState(null);
@@ -83,6 +84,25 @@ export default function AttivitaGruppiFedele({ parrocchiaId, tornaDashboard }) {
 
   useEffect(() => { caricaAttivita(); }, [caricaAttivita]);
 
+  useEffect(() => {
+    let attivo = true;
+    async function caricaAvvisiRiservati() {
+      if (!parrocchiaId) return;
+      const { data: autenticazione } = await supabase.auth.getUser();
+      if (!autenticazione?.user?.id) {
+        if (attivo) setAvvisiAttivita([]);
+        return;
+      }
+      const { data, error } = await supabase.rpc("ars_bacheca_cancellazioni_mie_attivita", {
+        p_parrocchia_id: parrocchiaId,
+      });
+      if (error) console.error("Avvisi riservati delle attività:", error);
+      if (attivo) setAvvisiAttivita(!error && Array.isArray(data) ? data : []);
+    }
+    caricaAvvisiRiservati();
+    return () => { attivo = false; };
+  }, [parrocchiaId]);
+
   return (
     <div style={stile.sfondo}>
     <main style={stile.pagina}>
@@ -99,6 +119,16 @@ export default function AttivitaGruppiFedele({ parrocchiaId, tornaDashboard }) {
       </header>
       {caricamento && <p role="status">Caricamento delle attività…</p>}
       {errore && <p role="alert">{errore}</p>}
+      {avvisiAttivita.length > 0 && <section style={{ marginBottom: 32 }}>
+        <h2>Bacheca delle mie attività</h2>
+        <div style={stile.griglia}>
+          {avvisiAttivita.map((avviso) => <article key={avviso.attivita_id} style={stile.card}>
+            <p style={{ color: "#765c3e", fontWeight: 700 }}>Attività cancellata</p>
+            <h3>{avviso.titolo}</h3>
+            <p>{avviso.messaggio}</p>
+          </article>)}
+        </div>
+      </section>}
       {!caricamento && !errore && attivita.length === 0 && (
         <section style={stile.card}><h2>Nessuna attività aperta</h2><p>Le prossime attività della parrocchia compariranno qui.</p></section>
       )}
