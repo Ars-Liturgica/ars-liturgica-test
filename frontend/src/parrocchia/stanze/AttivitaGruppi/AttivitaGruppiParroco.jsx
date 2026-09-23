@@ -52,6 +52,7 @@ function dataItaliana(valore) {
 
 export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) {
   const [attivita, setAttivita] = useState([]);
+  const [praticheCancellate, setPraticheCancellate] = useState([]);
   const [caricamento, setCaricamento] = useState(true);
   const [errore, setErrore] = useState("");
   const [messaggio, setMessaggio] = useState("");
@@ -78,20 +79,23 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
 
     setCaricamento(true);
     setErrore("");
-    const { data, error } = await supabase.rpc("ars_elenco_attivita_parroco", {
-      p_parrocchia_id: parrocchiaId,
-    });
+    const [{ data, error }, { data: pratiche, error: errorePratiche }] = await Promise.all([
+      supabase.rpc("ars_elenco_attivita_parroco", { p_parrocchia_id: parrocchiaId }),
+      supabase.rpc("ars_elenco_attivita_cancellate_parroco", { p_parrocchia_id: parrocchiaId }),
+    ]);
 
-    if (error) {
-      console.error("Errore caricamento attività:", error);
+    if (error || errorePratiche) {
+      console.error("Errore caricamento attività:", error || errorePratiche);
       setErrore("Impossibile caricare le attività. Riprova tra poco.");
     } else {
       const elenco = elencoDaRisposta(data);
-      if (!elenco) {
-        console.error("Formato elenco attività inatteso:", data);
+      const archivio = elencoDaRisposta(pratiche);
+      if (!elenco || !archivio) {
+        console.error("Formato elenco attività inatteso:", data, pratiche);
         setErrore("Il formato dell'elenco delle attività non è riconosciuto.");
       } else {
-        setAttivita(elenco);
+        setAttivita(elenco.filter((voce) => voce.stato !== "annullata"));
+        setPraticheCancellate(archivio);
       }
     }
     setCaricamento(false);
@@ -225,14 +229,25 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
       p_messaggio: testoCancellazione.trim(),
     });
     setCancellazioneInCorso(false);
-    if (error || data?.stato !== "cancellata") {
+    if (error || data?.stato !== "annullata") {
       setErrore(error?.message || "Non è stato possibile cancellare l'attività. Riprova.");
       return;
     }
     setCancellazione(null);
     setTestoCancellazione("");
     await caricaAttivita();
-    setMessaggio(`Attività cancellata. Avviso salvato nella bacheca dell'attività. ${data.destinatari_in_attesa || 0} famiglie ancora da raggiungere direttamente.`);
+    setMessaggio(`Attività cancellata e avviso registrato. ${data.destinatari_in_attesa || 0} famiglie in attesa di avviso diretto; ${data.destinatari_da_contattare || 0} da contattare dalla parrocchia.`);
+  }
+
+  async function concludiQuestioni(pratica) {
+    if (!window.confirm(`Confermi che tutte le questioni relative a «${pratica.titolo}» sono state risolte? Le informazioni resteranno conservate secondo le scadenze previste.`)) return;
+    setErrore("");
+    const { error } = await supabase.rpc("ars_concludi_questioni_attivita_parroco", {
+      p_attivita_id: pratica.id,
+    });
+    if (error) return setErrore(error.message || "Impossibile chiudere la pratica.");
+    await caricaAttivita();
+    setMessaggio("Questioni concluse registrate. La pratica resta nell'archivio riservato.");
   }
 
   return (
@@ -268,8 +283,8 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
       {cancellazione && (
         <form onSubmit={confermaCancellazione} style={{ ...stile.card, marginBottom: 24 }}>
           <h2>Cancella «{cancellazione.titolo}»</h2>
-          <p>L'attività e i suoi gruppi non saranno più operativi. Le iscrizioni e i pagamenti resteranno consultabili dalla parrocchia fino alla chiusura della pratica.</p>
-          <label style={stile.campo}>Avviso alle famiglie e nella bacheca dell'attività
+          <p>L'attività non accetterà nuove iscrizioni. La pratica e le iscrizioni resteranno conservate per la parrocchia.</p>
+          <label style={stile.campo}>Avviso di cancellazione
             <textarea style={stile.controllo} rows={4} maxLength={2000} required value={testoCancellazione} onChange={(e) => setTestoCancellazione(e.target.value)} />
           </label>
           <button type="submit" style={stile.pulsante} disabled={cancellazioneInCorso || !testoCancellazione.trim()}>
@@ -336,7 +351,7 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
       {caricamento && <p role="status">Caricamento delle attività…</p>}
       {errore && <p role="alert">{errore}</p>}
       {messaggio && <p role="status">{messaggio}</p>}
-      {!caricamento && !errore && attivita.length === 0 && (
+      {!caricamento && !errore && attivita.length === 0 && praticheCancellate.length === 0 && (
         <section style={stile.card}>
           <h2>Nessuna attività ancora creata</h2>
           <p>Qui appariranno GREST, catechismo, gruppi e altre attività quando saranno salvate dalla parrocchia.</p>
@@ -369,6 +384,23 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
             );
           })}
         </div>
+      )}
+      {!caricamento && !errore && praticheCancellate.length > 0 && (
+        <section style={{ marginTop: 32 }}>
+          <h2>Attività cancellate</h2>
+          <p>Pratiche riservate alla parrocchia. Gli avvisi in attesa non sono ancora stati consegnati.</p>
+          <div style={stile.griglia}>
+            {praticheCancellate.map((pratica) => <article key={pratica.id} style={stile.card}>
+              <span style={stile.etichetta}>Annullata</span>
+              <h3>{pratica.titolo}</h3>
+              <p>{pratica.messaggio}</p>
+              <p>Iscrizioni: {pratica.iscrizioni} · Avvisi in attesa: {pratica.avvisi_in_attesa} · Da contattare: {pratica.da_contattare}</p>
+              {pratica.questioni_concluse_at
+                ? <p>Questioni concluse dalla parrocchia.</p>
+                : <button type="button" style={stile.pulsante} onClick={() => concludiQuestioni(pratica)}>Questioni concluse</button>}
+            </article>)}
+          </div>
+        </section>
       )}
     </main>
   );
