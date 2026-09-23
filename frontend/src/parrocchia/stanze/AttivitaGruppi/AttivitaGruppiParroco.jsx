@@ -50,6 +50,15 @@ function dataItaliana(valore) {
   return Number.isNaN(data.getTime()) ? null : new Intl.DateTimeFormat("it-IT", { day: "numeric", month: "long", year: "numeric" }).format(data);
 }
 
+function numeroWhatsApp(valore) {
+  const numero = String(valore || "").replace(/[^\d+]/g, "");
+  if (numero.startsWith("+")) return /^\+[1-9]\d{7,14}$/.test(numero) ? numero.slice(1) : null;
+  if (numero.startsWith("00")) return /^00[1-9]\d{7,14}$/.test(numero) ? numero.slice(2) : null;
+  if (/^39\d{9,10}$/.test(numero)) return numero;
+  if (/^3\d{9}$/.test(numero)) return `39${numero}`;
+  return null;
+}
+
 export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) {
   const [attivita, setAttivita] = useState([]);
   const [praticheCancellate, setPraticheCancellate] = useState([]);
@@ -65,6 +74,9 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
   const [cancellazione, setCancellazione] = useState(null);
   const [testoCancellazione, setTestoCancellazione] = useState("");
   const [cancellazioneInCorso, setCancellazioneInCorso] = useState(false);
+  const [praticaAperta, setPraticaAperta] = useState(null);
+  const [famiglie, setFamiglie] = useState([]);
+  const [avvisoInCorso, setAvvisoInCorso] = useState(null);
   const grest2027InBozza = attivita.find((voce) =>
     voce.tipo?.toLowerCase() === "grest" &&
     voce.titolo?.trim().toLowerCase() === "grest 2027" &&
@@ -236,7 +248,40 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
     setCancellazione(null);
     setTestoCancellazione("");
     await caricaAttivita();
-    setMessaggio(`Attività cancellata e avviso registrato. ${data.destinatari_in_attesa || 0} famiglie in attesa di avviso diretto; ${data.destinatari_da_contattare || 0} da contattare dalla parrocchia.`);
+    setMessaggio(`Attività cancellata e avviso pubblicato. ${data.destinatari_in_attesa || 0} recapiti telefonici da verificare e avvisare; ${data.destinatari_da_contattare || 0} famiglie senza telefono da contattare con altro mezzo.`);
+  }
+
+  async function apriFamiglie(pratica) {
+    if (praticaAperta?.id === pratica.id) {
+      setPraticaAperta(null);
+      setFamiglie([]);
+      return;
+    }
+    setErrore("");
+    const { data, error } = await supabase.rpc("ars_famiglie_cancellazione_parroco", {
+      p_attivita_id: pratica.id,
+    });
+    if (error || !Array.isArray(data)) {
+      setErrore(error?.message || "Impossibile caricare i recapiti delle famiglie.");
+      return;
+    }
+    setPraticaAperta(pratica);
+    setFamiglie(data);
+  }
+
+  async function confermaAvviso(avviso) {
+    if (!praticaAperta || avvisoInCorso) return;
+    setAvvisoInCorso(avviso.id);
+    setErrore("");
+    const { error } = await supabase.rpc("ars_conferma_avviso_whatsapp_parroco", {
+      p_attivita_id: praticaAperta.id,
+      p_avviso_id: avviso.id,
+    });
+    setAvvisoInCorso(null);
+    if (error) return setErrore(error.message || "Impossibile registrare la conferma.");
+    setFamiglie((precedenti) => precedenti.map((f) => f.id === avviso.id ? { ...f, stato: "inviato" } : f));
+    await caricaAttivita();
+    setMessaggio("Invio WhatsApp registrato su tua conferma.");
   }
 
   async function concludiQuestioni(pratica) {
@@ -388,14 +433,34 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
       {!caricamento && !errore && praticheCancellate.length > 0 && (
         <section style={{ marginTop: 32 }}>
           <h2>Attività cancellate</h2>
-          <p>Pratiche riservate alla parrocchia. Gli avvisi in attesa non sono ancora stati consegnati.</p>
+          <p>Pratiche riservate alla parrocchia. Apri le chat e invia gli avvisi alle famiglie che hanno accettato comunicazioni WhatsApp dalla parrocchia.</p>
           <div style={stile.griglia}>
             {praticheCancellate.map((pratica) => <article key={pratica.id} style={stile.card}>
               <span style={stile.etichetta}>Annullata</span>
               <h3>{pratica.titolo}</h3>
               <p>{pratica.messaggio}</p>
               <p>Iscrizioni: {pratica.iscrizioni} · Pagamenti registrati: {pratica.pagamenti_registrati} (in attesa: {pratica.pagamenti_in_attesa})</p>
-              <p>Avvisi in attesa: {pratica.avvisi_in_attesa} · Da contattare: {pratica.da_contattare}</p>
+              <p>Recapiti telefonici da verificare: {pratica.avvisi_in_attesa} · Senza telefono: {pratica.da_contattare}</p>
+              <button type="button" style={stile.pulsante} onClick={() => apriFamiglie(pratica)}>
+                {praticaAperta?.id === pratica.id ? "Chiudi recapiti" : "Avvisa le famiglie"}
+              </button>
+              {praticaAperta?.id === pratica.id && <div style={{ marginTop: 16 }}>
+                {famiglie.length === 0 && <p>Nessuna famiglia da avvisare.</p>}
+                {famiglie.map((famiglia, indice) => {
+                  const numero = numeroWhatsApp(famiglia.telefono);
+                  return <div key={famiglia.id} style={{ borderTop: "1px solid #ded5c6", padding: "12px 0" }}>
+                    <strong>Famiglia {indice + 1}</strong> · {famiglia.telefono || famiglia.email || "Recapito assente"}
+                    <p>{famiglia.stato === "inviato" ? "Invio confermato dalla parrocchia" : numero ? "Da inviare" : "Da contattare con altro mezzo"}</p>
+                    {numero && famiglia.stato !== "inviato" && <>
+                      <a href={`https://wa.me/${numero}?text=${encodeURIComponent(pratica.messaggio)}`}
+                        target="_blank" rel="noopener noreferrer" style={stile.pulsante}>Apri WhatsApp</a>{" "}
+                      <button type="button" style={stile.pulsante} disabled={Boolean(avvisoInCorso)} onClick={() => confermaAvviso(famiglia)}>
+                        {avvisoInCorso === famiglia.id ? "Registrazione…" : "Conferma che hai inviato"}
+                      </button>
+                    </>}
+                  </div>;
+                })}
+              </div>}
               {pratica.questioni_concluse_at
                 ? <p>Questioni concluse dalla parrocchia.</p>
                 : <button type="button" style={stile.pulsante} onClick={() => concludiQuestioni(pratica)}>Questioni concluse</button>}
