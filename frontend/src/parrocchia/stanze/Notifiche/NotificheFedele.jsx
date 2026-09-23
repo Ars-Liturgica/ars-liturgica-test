@@ -12,7 +12,7 @@ export default function NotificheFedele({
   const [errore, setErrore] = useState("");
 
   const caricaNotifiche = useCallback(async () => {
-    if (!parrocchiaId || !utenteId) {
+    if (!parrocchiaId) {
       setNotifiche([]);
       setCaricamento(false);
       return;
@@ -21,13 +21,15 @@ export default function NotificheFedele({
     setCaricamento(true);
     setErrore("");
 
-    const { data, error } = await supabase.rpc(
-      "ars_elenco_notifiche_fedele",
-      {
-        p_utente_id: utenteId,
+    const { data: autenticazione } = await supabase.auth.getUser();
+    const [{ data, error }, { data: avvisi, error: erroreAvvisi }] = await Promise.all([
+      utenteId ? supabase.rpc("ars_elenco_notifiche_fedele", {
+        p_utente_id: utenteId, p_parrocchia_id: parrocchiaId,
+      }) : Promise.resolve({ data: [], error: null }),
+      autenticazione?.user?.id ? supabase.rpc("ars_bacheca_cancellazioni_mie_attivita", {
         p_parrocchia_id: parrocchiaId,
-      }
-    );
+      }) : Promise.resolve({ data: [], error: null }),
+    ]);
 
     if (error) {
       console.error("Errore caricamento notifiche del fedele:", error);
@@ -37,7 +39,16 @@ export default function NotificheFedele({
       return;
     }
 
-    const elenco = data || [];
+    if (erroreAvvisi) console.error("Avvisi di cancellazione:", erroreAvvisi);
+    const elenco = [...(data || []), ...(!erroreAvvisi && Array.isArray(avvisi) ? avvisi.map((avviso) => ({
+      id: `cancellazione:${avviso.attivita_id}`,
+      attivita_id: avviso.attivita_id,
+      titolo: `Attività cancellata: ${avviso.titolo}`,
+      messaggio: avviso.messaggio,
+      tipo: "annullamento",
+      created_at: avviso.cancellata_at,
+      letta: Boolean(avviso.letta_at),
+    })) : [])].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
 
     setNotifiche(elenco);
 
@@ -57,17 +68,17 @@ export default function NotificheFedele({
   async function segnaComeLetta(notificaId) {
     const notifica = notifiche.find((item) => item.id === notificaId);
 
-    if (!notifica || notifica.letta || !utenteId) return;
+    if (!notifica || notifica.letta || (!utenteId && !notifica.attivita_id)) return;
 
     setErrore("");
 
-    const { error } = await supabase.rpc(
-      "ars_segna_notifica_letta_fedele",
-      {
-        p_utente_id: utenteId,
-        p_notifica_id: notificaId,
-      }
-    );
+    const { error } = notifica.attivita_id
+      ? await supabase.rpc("ars_segna_avviso_cancellazione_letto", {
+        p_attivita_id: notifica.attivita_id,
+      })
+      : await supabase.rpc("ars_segna_notifica_letta_fedele", {
+        p_utente_id: utenteId, p_notifica_id: notificaId,
+      });
 
     if (error) {
       console.error(
@@ -94,27 +105,29 @@ export default function NotificheFedele({
   }
 
   async function segnaTutteComeLette() {
-    const numeroNonLette = notifiche.filter(
+    const nonLette = notifiche.filter(
       (notifica) => !notifica.letta
-    ).length;
+    );
 
-    if (
-      numeroNonLette === 0 ||
-      !utenteId ||
-      !parrocchiaId
-    ) {
+    if (nonLette.length === 0 || !parrocchiaId) {
       return;
     }
 
     setErrore("");
 
-    const { error } = await supabase.rpc(
-      "ars_segna_tutte_notifiche_lette_fedele",
-      {
-        p_utente_id: utenteId,
-        p_parrocchia_id: parrocchiaId,
-      }
-    );
+    const richieste = [];
+    if (utenteId && nonLette.some((notifica) => !notifica.attivita_id)) {
+      richieste.push(supabase.rpc("ars_segna_tutte_notifiche_lette_fedele", {
+        p_utente_id: utenteId, p_parrocchia_id: parrocchiaId,
+      }));
+    }
+    for (const avviso of nonLette.filter((notifica) => notifica.attivita_id)) {
+      richieste.push(supabase.rpc("ars_segna_avviso_cancellazione_letto", {
+        p_attivita_id: avviso.attivita_id,
+      }));
+    }
+    const risultati = await Promise.all(richieste);
+    const error = risultati.find((risultato) => risultato.error)?.error;
 
     if (error) {
       console.error(

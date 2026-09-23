@@ -50,8 +50,18 @@ function dataItaliana(valore) {
   return Number.isNaN(data.getTime()) ? null : new Intl.DateTimeFormat("it-IT", { day: "numeric", month: "long", year: "numeric" }).format(data);
 }
 
+function numeroWhatsApp(valore) {
+  const numero = String(valore || "").replace(/[^\d+]/g, "");
+  if (numero.startsWith("+")) return /^\+[1-9]\d{7,14}$/.test(numero) ? numero.slice(1) : null;
+  if (numero.startsWith("00")) return /^00[1-9]\d{7,14}$/.test(numero) ? numero.slice(2) : null;
+  if (/^39\d{9,10}$/.test(numero)) return numero;
+  if (/^3\d{9}$/.test(numero)) return `39${numero}`;
+  return null;
+}
+
 export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) {
   const [attivita, setAttivita] = useState([]);
+  const [praticheCancellate, setPraticheCancellate] = useState([]);
   const [caricamento, setCaricamento] = useState(true);
   const [errore, setErrore] = useState("");
   const [messaggio, setMessaggio] = useState("");
@@ -61,6 +71,12 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
   const [pdfParrocchia, setPdfParrocchia] = useState(null);
   const [grestIscrizioni, setGrestIscrizioni] = useState(null);
   const [grestGruppi, setGrestGruppi] = useState(null);
+  const [cancellazione, setCancellazione] = useState(null);
+  const [testoCancellazione, setTestoCancellazione] = useState("");
+  const [cancellazioneInCorso, setCancellazioneInCorso] = useState(false);
+  const [praticaAperta, setPraticaAperta] = useState(null);
+  const [famiglie, setFamiglie] = useState([]);
+  const [avvisoInCorso, setAvvisoInCorso] = useState(null);
   const grest2027InBozza = attivita.find((voce) =>
     voce.tipo?.toLowerCase() === "grest" &&
     voce.titolo?.trim().toLowerCase() === "grest 2027" &&
@@ -75,20 +91,23 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
 
     setCaricamento(true);
     setErrore("");
-    const { data, error } = await supabase.rpc("ars_elenco_attivita_parroco", {
-      p_parrocchia_id: parrocchiaId,
-    });
+    const [{ data, error }, { data: pratiche, error: errorePratiche }] = await Promise.all([
+      supabase.rpc("ars_elenco_attivita_parroco", { p_parrocchia_id: parrocchiaId }),
+      supabase.rpc("ars_elenco_attivita_cancellate_parroco", { p_parrocchia_id: parrocchiaId }),
+    ]);
 
-    if (error) {
-      console.error("Errore caricamento attività:", error);
+    if (error || errorePratiche) {
+      console.error("Errore caricamento attività:", error || errorePratiche);
       setErrore("Impossibile caricare le attività. Riprova tra poco.");
     } else {
       const elenco = elencoDaRisposta(data);
-      if (!elenco) {
-        console.error("Formato elenco attività inatteso:", data);
+      const archivio = elencoDaRisposta(pratiche);
+      if (!elenco || !archivio) {
+        console.error("Formato elenco attività inatteso:", data, pratiche);
         setErrore("Il formato dell'elenco delle attività non è riconosciuto.");
       } else {
-        setAttivita(elenco);
+        setAttivita(elenco.filter((voce) => voce.stato !== "annullata"));
+        setPraticheCancellate(archivio);
       }
     }
     setCaricamento(false);
@@ -203,6 +222,79 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
       : "Bozza salvata. L'attività non è ancora visibile ai fedeli.");
   }
 
+  function preparaCancellazione(voce) {
+    setMostraModulo(false);
+    setErrore("");
+    setMessaggio("");
+    setCancellazione(voce);
+    setTestoCancellazione(`L’attività ${voce.titolo} è stata cancellata. Per informazioni, vi invitiamo a contattare il parroco o la segreteria parrocchiale.`);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function confermaCancellazione(evento) {
+    evento.preventDefault();
+    if (!cancellazione || !testoCancellazione.trim() || cancellazioneInCorso) return;
+    setCancellazioneInCorso(true);
+    setErrore("");
+    const { data, error } = await supabase.rpc("ars_cancella_attivita_parroco", {
+      p_attivita_id: cancellazione.id,
+      p_messaggio: testoCancellazione.trim(),
+    });
+    setCancellazioneInCorso(false);
+    if (error || data?.stato !== "annullata") {
+      setErrore(error?.message || "Non è stato possibile cancellare l'attività. Riprova.");
+      return;
+    }
+    setCancellazione(null);
+    setTestoCancellazione("");
+    await caricaAttivita();
+    setMessaggio(`Attività cancellata e avviso pubblicato. ${data.destinatari_in_attesa || 0} recapiti telefonici da verificare e avvisare; ${data.destinatari_da_contattare || 0} famiglie senza telefono da contattare con altro mezzo.`);
+  }
+
+  async function apriFamiglie(pratica) {
+    if (praticaAperta?.id === pratica.id) {
+      setPraticaAperta(null);
+      setFamiglie([]);
+      return;
+    }
+    setErrore("");
+    const { data, error } = await supabase.rpc("ars_famiglie_cancellazione_parroco", {
+      p_attivita_id: pratica.id,
+    });
+    if (error || !Array.isArray(data)) {
+      setErrore(error?.message || "Impossibile caricare i recapiti delle famiglie.");
+      return;
+    }
+    setPraticaAperta(pratica);
+    setFamiglie(data);
+  }
+
+  async function confermaAvviso(avviso) {
+    if (!praticaAperta || avvisoInCorso) return;
+    setAvvisoInCorso(avviso.id);
+    setErrore("");
+    const { error } = await supabase.rpc("ars_conferma_avviso_whatsapp_parroco", {
+      p_attivita_id: praticaAperta.id,
+      p_avviso_id: avviso.id,
+    });
+    setAvvisoInCorso(null);
+    if (error) return setErrore(error.message || "Impossibile registrare la conferma.");
+    setFamiglie((precedenti) => precedenti.map((f) => f.id === avviso.id ? { ...f, stato: "inviato" } : f));
+    await caricaAttivita();
+    setMessaggio("Invio WhatsApp registrato su tua conferma.");
+  }
+
+  async function concludiQuestioni(pratica) {
+    if (!window.confirm(`Confermi che tutte le questioni relative a «${pratica.titolo}» sono state risolte? Le informazioni resteranno conservate secondo le scadenze previste.`)) return;
+    setErrore("");
+    const { error } = await supabase.rpc("ars_concludi_questioni_attivita_parroco", {
+      p_attivita_id: pratica.id,
+    });
+    if (error) return setErrore(error.message || "Impossibile chiudere la pratica.");
+    await caricaAttivita();
+    setMessaggio("Questioni concluse registrate. La pratica resta nell'archivio riservato.");
+  }
+
   return (
     grestIscrizioni ? <ElencoIscrizioniGrestParroco
       attivita={grestIscrizioni}
@@ -232,6 +324,20 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
           {grest2027InBozza ? "Riprendi GREST 2027" : "+ Prepara GREST"}
         </button>}
       </header>
+
+      {cancellazione && (
+        <form onSubmit={confermaCancellazione} style={{ ...stile.card, marginBottom: 24 }}>
+          <h2>Cancella «{cancellazione.titolo}»</h2>
+          <p>L'attività non accetterà nuove iscrizioni. La pratica e le iscrizioni resteranno conservate per la parrocchia.</p>
+          <label style={stile.campo}>Avviso di cancellazione
+            <textarea style={stile.controllo} rows={4} maxLength={2000} required value={testoCancellazione} onChange={(e) => setTestoCancellazione(e.target.value)} />
+          </label>
+          <button type="submit" style={stile.pulsante} disabled={cancellazioneInCorso || !testoCancellazione.trim()}>
+            {cancellazioneInCorso ? "Cancellazione…" : "Conferma cancellazione"}
+          </button>{" "}
+          <button type="button" style={stile.pulsante} disabled={cancellazioneInCorso} onClick={() => setCancellazione(null)}>Torna indietro</button>
+        </form>
+      )}
 
       {mostraModulo && (
         <form onSubmit={(evento) => salvaAttivita(evento)} style={{ ...stile.card, marginBottom: 24 }}>
@@ -290,7 +396,7 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
       {caricamento && <p role="status">Caricamento delle attività…</p>}
       {errore && <p role="alert">{errore}</p>}
       {messaggio && <p role="status">{messaggio}</p>}
-      {!caricamento && !errore && attivita.length === 0 && (
+      {!caricamento && !errore && attivita.length === 0 && praticheCancellate.length === 0 && (
         <section style={stile.card}>
           <h2>Nessuna attività ancora creata</h2>
           <p>Qui appariranno GREST, catechismo, gruppi e altre attività quando saranno salvate dalla parrocchia.</p>
@@ -316,10 +422,51 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
                   {voce.stato === "pubblicata" && <>{" "}<button type="button" style={stile.pulsante} onClick={() => setGrestIscrizioni(voce)}>Vedi iscrizioni</button></>}
                   {" "}<button type="button" style={stile.pulsante} onClick={() => setGrestGruppi(voce)}>Gestisci gruppi</button>
                 </>}
+                {["bozza", "pubblicata"].includes(voce.stato) && <>{" "}
+                  <button type="button" style={stile.pulsante} onClick={() => preparaCancellazione(voce)}>Cancella attività</button>
+                </>}
               </article>
             );
           })}
         </div>
+      )}
+      {!caricamento && !errore && praticheCancellate.length > 0 && (
+        <section style={{ marginTop: 32 }}>
+          <h2>Attività cancellate</h2>
+          <p>Pratiche riservate alla parrocchia. Apri le chat e invia gli avvisi alle famiglie che hanno accettato comunicazioni WhatsApp dalla parrocchia.</p>
+          <div style={stile.griglia}>
+            {praticheCancellate.map((pratica) => <article key={pratica.id} style={stile.card}>
+              <span style={stile.etichetta}>Annullata</span>
+              <h3>{pratica.titolo}</h3>
+              <p>{pratica.messaggio}</p>
+              <p>Iscrizioni: {pratica.iscrizioni} · Pagamenti registrati: {pratica.pagamenti_registrati} (in attesa: {pratica.pagamenti_in_attesa})</p>
+              <p>Recapiti telefonici da verificare: {pratica.avvisi_in_attesa} · Senza telefono: {pratica.da_contattare}</p>
+              <button type="button" style={stile.pulsante} onClick={() => apriFamiglie(pratica)}>
+                {praticaAperta?.id === pratica.id ? "Chiudi recapiti" : "Avvisa le famiglie"}
+              </button>
+              {praticaAperta?.id === pratica.id && <div style={{ marginTop: 16 }}>
+                {famiglie.length === 0 && <p>Nessuna famiglia da avvisare.</p>}
+                {famiglie.map((famiglia, indice) => {
+                  const numero = numeroWhatsApp(famiglia.telefono);
+                  return <div key={famiglia.id} style={{ borderTop: "1px solid #ded5c6", padding: "12px 0" }}>
+                    <strong>Famiglia {indice + 1}</strong> · {famiglia.telefono || famiglia.email || "Recapito assente"}
+                    <p>{famiglia.stato === "inviato" ? "Invio confermato dalla parrocchia" : numero ? "Da inviare" : "Da contattare con altro mezzo"}</p>
+                    {numero && famiglia.stato !== "inviato" && <>
+                      <a href={`https://wa.me/${numero}?text=${encodeURIComponent(pratica.messaggio)}`}
+                        target="_blank" rel="noopener noreferrer" style={stile.pulsante}>Apri WhatsApp</a>{" "}
+                      <button type="button" style={stile.pulsante} disabled={Boolean(avvisoInCorso)} onClick={() => confermaAvviso(famiglia)}>
+                        {avvisoInCorso === famiglia.id ? "Registrazione…" : "Conferma che hai inviato"}
+                      </button>
+                    </>}
+                  </div>;
+                })}
+              </div>}
+              {pratica.questioni_concluse_at
+                ? <p>Questioni concluse dalla parrocchia.</p>
+                : <button type="button" style={stile.pulsante} onClick={() => concludiQuestioni(pratica)}>Questioni concluse</button>}
+            </article>)}
+          </div>
+        </section>
       )}
     </main>
   );
