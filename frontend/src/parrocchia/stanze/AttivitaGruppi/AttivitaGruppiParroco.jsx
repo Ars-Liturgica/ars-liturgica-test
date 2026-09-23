@@ -61,6 +61,9 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
   const [pdfParrocchia, setPdfParrocchia] = useState(null);
   const [grestIscrizioni, setGrestIscrizioni] = useState(null);
   const [grestGruppi, setGrestGruppi] = useState(null);
+  const [cancellazione, setCancellazione] = useState(null);
+  const [testoCancellazione, setTestoCancellazione] = useState("");
+  const [cancellazioneInCorso, setCancellazioneInCorso] = useState(false);
   const grest2027InBozza = attivita.find((voce) =>
     voce.tipo?.toLowerCase() === "grest" &&
     voce.titolo?.trim().toLowerCase() === "grest 2027" &&
@@ -203,6 +206,35 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
       : "Bozza salvata. L'attività non è ancora visibile ai fedeli.");
   }
 
+  function preparaCancellazione(voce) {
+    setMostraModulo(false);
+    setErrore("");
+    setMessaggio("");
+    setCancellazione(voce);
+    setTestoCancellazione(`L’attività ${voce.titolo} è stata cancellata. Per informazioni, vi invitiamo a contattare il parroco o la segreteria parrocchiale.`);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function confermaCancellazione(evento) {
+    evento.preventDefault();
+    if (!cancellazione || !testoCancellazione.trim() || cancellazioneInCorso) return;
+    setCancellazioneInCorso(true);
+    setErrore("");
+    const { data, error } = await supabase.rpc("ars_cancella_attivita_parroco", {
+      p_attivita_id: cancellazione.id,
+      p_messaggio: testoCancellazione.trim(),
+    });
+    setCancellazioneInCorso(false);
+    if (error || data?.stato !== "cancellata") {
+      setErrore(error?.message || "Non è stato possibile cancellare l'attività. Riprova.");
+      return;
+    }
+    setCancellazione(null);
+    setTestoCancellazione("");
+    await caricaAttivita();
+    setMessaggio(`Attività cancellata. Avviso salvato nella bacheca dell'attività. ${data.destinatari_in_attesa || 0} famiglie ancora da raggiungere direttamente.`);
+  }
+
   return (
     grestIscrizioni ? <ElencoIscrizioniGrestParroco
       attivita={grestIscrizioni}
@@ -232,6 +264,20 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
           {grest2027InBozza ? "Riprendi GREST 2027" : "+ Prepara GREST"}
         </button>}
       </header>
+
+      {cancellazione && (
+        <form onSubmit={confermaCancellazione} style={{ ...stile.card, marginBottom: 24 }}>
+          <h2>Cancella «{cancellazione.titolo}»</h2>
+          <p>L'attività e i suoi gruppi non saranno più operativi. Le iscrizioni e i pagamenti resteranno consultabili dalla parrocchia fino alla chiusura della pratica.</p>
+          <label style={stile.campo}>Avviso alle famiglie e nella bacheca dell'attività
+            <textarea style={stile.controllo} rows={4} maxLength={2000} required value={testoCancellazione} onChange={(e) => setTestoCancellazione(e.target.value)} />
+          </label>
+          <button type="submit" style={stile.pulsante} disabled={cancellazioneInCorso || !testoCancellazione.trim()}>
+            {cancellazioneInCorso ? "Cancellazione…" : "Conferma cancellazione"}
+          </button>{" "}
+          <button type="button" style={stile.pulsante} disabled={cancellazioneInCorso} onClick={() => setCancellazione(null)}>Torna indietro</button>
+        </form>
+      )}
 
       {mostraModulo && (
         <form onSubmit={(evento) => salvaAttivita(evento)} style={{ ...stile.card, marginBottom: 24 }}>
@@ -315,6 +361,9 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
                 {["bozza", "pubblicata"].includes(voce.stato) && voce.tipo?.toLowerCase() === "grest" && <>
                   {voce.stato === "pubblicata" && <>{" "}<button type="button" style={stile.pulsante} onClick={() => setGrestIscrizioni(voce)}>Vedi iscrizioni</button></>}
                   {" "}<button type="button" style={stile.pulsante} onClick={() => setGrestGruppi(voce)}>Gestisci gruppi</button>
+                </>}
+                {["bozza", "pubblicata"].includes(voce.stato) && <>{" "}
+                  <button type="button" style={stile.pulsante} onClick={() => preparaCancellazione(voce)}>Cancella attività</button>
                 </>}
               </article>
             );
