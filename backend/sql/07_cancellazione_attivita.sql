@@ -251,6 +251,41 @@ revoke all on function public.ars_elenco_attivita_cancellate_parroco(uuid)
 grant execute on function public.ars_elenco_attivita_cancellate_parroco(uuid)
   to authenticated;
 
+-- Bacheca dell'attività: solo il richiedente autenticato che risulta
+-- nell'iscrizione può leggere l'avviso. Non espone nominativi di minori,
+-- recapiti, pagamenti o iscrizioni di altre famiglie.
+create or replace function public.ars_bacheca_cancellazioni_mie_attivita(p_parrocchia_id uuid)
+returns jsonb language plpgsql stable security definer
+set search_path = public, pg_temp
+as $function$
+declare v_risultato jsonb;
+begin
+  if auth.uid() is null then return '[]'::jsonb; end if;
+  select coalesce(jsonb_agg(jsonb_build_object(
+    'attivita_id', a.id, 'titolo', a.titolo,
+    'messaggio', c.messaggio, 'cancellata_at', c.cancellata_at
+  ) order by c.cancellata_at desc), '[]'::jsonb) into v_risultato
+  from public.ars_cancellazioni_attivita c
+  join public.attivita_parrocchiali a on a.id = c.attivita_id
+  where c.parrocchia_id = p_parrocchia_id
+    and exists (
+      select 1 from public.iscrizioni_attivita i
+      left join public.grest_schede_iscrizione s on s.iscrizione_id = i.id
+      left join public.utenti u on u.id = i.richiedente_utente_id
+      where i.attivita_id = c.attivita_id
+        and i.stato not in ('ritirata', 'annullata')
+        and (i.richiedente_auth_id = auth.uid()
+          or s.richiedente_auth_id = auth.uid()
+          or u.auth_user_id = auth.uid())
+    );
+  return v_risultato;
+end;
+$function$;
+revoke all on function public.ars_bacheca_cancellazioni_mie_attivita(uuid)
+  from public, anon, authenticated;
+grant execute on function public.ars_bacheca_cancellazioni_mie_attivita(uuid)
+  to authenticated;
+
 -- La chiusura amministrativa è una scelta esplicita della parrocchia.
 -- Non elimina iscrizioni o pagamenti: la conservazione sarà gestita
 -- separatamente secondo i termini stabiliti per ogni tipo di dato.
