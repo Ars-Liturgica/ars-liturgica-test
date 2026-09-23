@@ -21,7 +21,8 @@ bacheca riservata dell'attività. Il testo inviato direttamente a ogni famiglia
 
 `ars_cancella_attivita_parroco(p_attivita_id uuid, p_messaggio text) → jsonb`
 
-Risposta minima: `{ "stato": "cancellata", "destinatari_in_attesa": N }`.
+Risposta minima: `{ "stato": "annullata", "destinatari_in_attesa": N,
+"destinatari_da_contattare": M }`.
 Autorizzazione lato database con `ars_puo_gestire_attivita`, controllo della
 parrocchia e blocco della riga dell'attività. Un solo commit registra lo stato
 cancellato, l'avviso e le consegne individuali in attesa. La seconda chiamata
@@ -55,13 +56,16 @@ Non introdurre in codice un unico termine indiscriminato.
 
 ## Verifiche prima della migrazione
 
-Il repository non contiene le definizioni SQL aggiornate di
-`attivita_parrocchiali`, `iscrizioni_attivita`, degli elenchi delle attività e
-dei vincoli di `pagamenti_parrocchia`. Non applicare una migrazione che
-modifichi `stato`, cancelli attività o invii messaggi finché non sono verificati
-schema reale, vincoli, politiche RLS e funzioni in produzione. Il form frontend
-in questa branch è preparatorio; non unirlo a `main` prima della migrazione e
-della prova di consegna ai recapiti.
+La query ricevuta il 23 settembre 2026 ha confermato lo stato `annullata`,
+l'elenco pubblico limitato a `pubblicata`, il vincolo che preserva le iscrizioni
+e le colonne dei recapiti GREST. La migrazione proposta in
+`backend/sql/07_cancellazione_attivita.sql` prepara l'annullamento atomico,
+il registro riservato e una coda degli avvisi. Non pubblica ancora l'avviso
+nella bacheca dei partecipanti e non spedisce messaggi: servono l'accesso
+riservato anche ai genitori senza account e un canale di recapito effettivo.
+Mancano inoltre i vincoli dei pagamenti e le funzioni dei gruppi per verificare
+completamente la chiusura operativa. Non applicare la migrazione né unire
+questa branch a `main` fino al completamento e alla prova end-to-end.
 
 Query diagnostica di sola lettura per l'editor SQL di Supabase:
 
