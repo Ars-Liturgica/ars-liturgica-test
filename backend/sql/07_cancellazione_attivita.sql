@@ -170,6 +170,11 @@ begin
     'messaggio', c.messaggio, 'cancellata_at', c.cancellata_at,
     'questioni_concluse_at', c.questioni_concluse_at,
     'iscrizioni', (select count(*) from public.iscrizioni_attivita i where i.attivita_id = a.id),
+    'pagamenti_registrati', (select count(*) from public.pagamenti_parrocchia p
+                             where p.attivita_id = a.id and p.parrocchia_id = a.parrocchia_id),
+    'pagamenti_in_attesa', (select count(*) from public.pagamenti_parrocchia p
+                           where p.attivita_id = a.id and p.parrocchia_id = a.parrocchia_id
+                             and p.stato = 'in_attesa'),
     'avvisi_in_attesa', (select count(*) from public.ars_avvisi_cancellazione_famiglie f
                         where f.attivita_id = a.id and f.stato = 'in_attesa'),
     'da_contattare', (select count(*) from public.ars_avvisi_cancellazione_famiglie f
