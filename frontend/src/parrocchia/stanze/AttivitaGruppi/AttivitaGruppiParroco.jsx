@@ -394,7 +394,8 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
               <span style={stile.etichetta}>Annullata</span>
               <h3>{pratica.titolo}</h3>
               <p>{pratica.messaggio}</p>
-              <p>Iscrizioni: {pratica.iscrizioni} · Avvisi in attesa: {pratica.avvisi_in_attesa} · Da contattare: {pratica.da_contattare}</p>
+              <p>Iscrizioni: {pratica.iscrizioni} · Pagamenti registrati: {pratica.pagamenti_registrati} (in attesa: {pratica.pagamenti_in_attesa})</p>
+              <p>Avvisi in attesa: {pratica.avvisi_in_attesa} · Da contattare: {pratica.da_contattare}</p>
               {pratica.questioni_concluse_at
                 ? <p>Questioni concluse dalla parrocchia.</p>
                 : <button type="button" style={stile.pulsante} onClick={() => concludiQuestioni(pratica)}>Questioni concluse</button>}
