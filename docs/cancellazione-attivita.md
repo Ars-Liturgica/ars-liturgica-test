@@ -63,8 +63,12 @@ e le colonne dei recapiti GREST. La migrazione proposta in
 il registro riservato e una coda degli avvisi. Non pubblica ancora l'avviso
 nella bacheca dei partecipanti e non spedisce messaggi: servono l'accesso
 riservato anche ai genitori senza account e un canale di recapito effettivo.
-Mancano inoltre i vincoli dei pagamenti e le funzioni dei gruppi per verificare
-completamente la chiusura operativa. Non applicare la migrazione né unire
+I vincoli dei pagamenti sono stati verificati: il riferimento a iscrizione e
+attività usa `ON DELETE RESTRICT` e l'archivio indica quanti pagamenti sono
+registrati o in attesa, senza cambiarne importi o stati. Le definizioni delle
+funzioni dei gruppi richiedono ancora la verifica dei controlli sullo stato
+`annullata` per impedire la gestione di gruppi dopo la cancellazione.
+Non applicare la migrazione né unire
 questa branch a `main` fino al completamento e alla prova end-to-end.
 
 Query diagnostica di sola lettura per l'editor SQL di Supabase:
