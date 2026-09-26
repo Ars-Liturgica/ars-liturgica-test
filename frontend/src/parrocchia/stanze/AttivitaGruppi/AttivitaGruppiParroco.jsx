@@ -51,12 +51,41 @@ function dataItaliana(valore) {
   return Number.isNaN(data.getTime()) ? null : new Intl.DateTimeFormat("it-IT", { day: "numeric", month: "long", year: "numeric" }).format(data);
 }
 
+function modelloInformativaGrest(parrocchia, titolo) {
+  const pulisci = (valore) => String(valore || "").trim();
+  const localita = [pulisci(parrocchia.cap), pulisci(parrocchia.comune), pulisci(parrocchia.provincia) ? `(${pulisci(parrocchia.provincia)})` : ""]
+    .filter(Boolean).join(" ");
+  const sede = [pulisci(parrocchia.indirizzo), localita].filter(Boolean).join(", ");
+  const contatti = [pulisci(parrocchia.email) ? `email ${pulisci(parrocchia.email)}` : "",
+    pulisci(parrocchia.telefono) ? `telefono ${pulisci(parrocchia.telefono)}` : ""].filter(Boolean).join(", ");
+  const attivita = pulisci(titolo) || "GREST";
+
+  return `INFORMATIVA PER L'ISCRIZIONE A ${attivita.toUpperCase()}
+
+La Parrocchia ${pulisci(parrocchia.nome)}, rappresentata dalla persona del parroco, con sede in ${sede}, ${contatti}, è il titolare del trattamento dei dati forniti per l'iscrizione a ${attivita}. Puoi contattarla agli stessi recapiti per domande sull'uso dei dati personali.
+
+Quali dati raccogliamo. Per organizzare l'attività raccogliamo nome, cognome, data di nascita e taglia della maglietta del ragazzo; nome, cognome, rapporto con il ragazzo e telefono del genitore o tutore; l'eventuale indirizzo email; le persone delegate al ritiro e le autorizzazioni indicate nel modulo. Usiamo questi dati per ricevere e gestire le iscrizioni, seguire i partecipanti, comunicare con le famiglie e gestire l'eventuale quota e i pagamenti. Il telefono è necessario per poter contattare la famiglia; l'email è facoltativa. Questi dati sono trattati nell'ambito dell'attività pastorale ed educativa della parrocchia e degli obblighi amministrativi connessi.
+
+Informazioni sulla salute. Il genitore o tutore può segnalare farmaci, patologie, intolleranze e altre indicazioni utili alla sicurezza e all'assistenza del ragazzo. Queste informazioni sono usate soltanto dalle persone autorizzate che ne hanno bisogno per assisterlo durante l'attività. Per trattare questi dati viene richiesto un consenso specifico, distinto dalla conferma di lettura di questa informativa.
+
+Fotografia del partecipante. Se verrà attivato il caricamento della fotografia, la parrocchia potrà usarla per riconoscere il ragazzo nell'elenco delle iscrizioni e negli elenchi dei gruppi consegnati agli animatori e accompagnatori autorizzati. Il relativo consenso sarà chiesto separatamente. La pubblicazione di immagini o video su siti, bacheche pubbliche o social richiede un'ulteriore autorizzazione, distinta dall'uso interno. La mancata autorizzazione alle immagini non impedisce l'iscrizione.
+
+Chi può accedere ai dati. Il parroco e le persone autorizzate dalla parrocchia possono vedere i dati necessari ai rispettivi compiti. Agli animatori e accompagnatori sono comunicati solo i dati utili alla gestione del gruppo e alla sicurezza dei ragazzi. I fornitori tecnici dell'app e degli eventuali servizi di pagamento trattano i dati soltanto per erogare i servizi necessari, secondo gli accordi applicabili. [INDICARE EVENTUALI ALTRI DESTINATARI O TRASFERIMENTI PREVISTI DALLA PARROCCHIA.]
+
+Per quanto tempo conserviamo i dati. I dati dell'iscrizione sono conservati fino alla successiva edizione dell'attività, salvo cancellazione anticipata decisa dalla parrocchia o ulteriore conservazione necessaria per obblighi di legge o per gestire richieste e contestazioni. La documentazione contabile relativa ai pagamenti è conservata per i termini previsti dalle norme applicabili. Se sarà raccolta una fotografia, la parrocchia indicherà quando verrà cancellata: [CRITERIO PER LE FOTO].
+
+I tuoi diritti. Puoi chiedere alla parrocchia accesso, correzione o cancellazione dei dati, limitazione del loro uso e le altre tutele previste dalle norme applicabili. Quando il trattamento si basa su un consenso, puoi revocarlo per il futuro contattando la parrocchia. Puoi anche presentare reclamo al Garante per la protezione dei dati personali.
+
+Confermare la lettura di questa informativa permette di passare al modulo d'iscrizione. Le autorizzazioni e gli eventuali consensi specifici vengono richiesti separatamente.`;
+}
+
 export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) {
   const [attivita, setAttivita] = useState([]);
   const [caricamento, setCaricamento] = useState(true);
   const [errore, setErrore] = useState("");
   const [messaggio, setMessaggio] = useState("");
   const [salvataggio, setSalvataggio] = useState(false);
+  const [caricamentoInformativa, setCaricamentoInformativa] = useState(false);
   const [mostraModulo, setMostraModulo] = useState(false);
   const [bozza, setBozza] = useState(bozzaIniziale);
   const [pdfParrocchia, setPdfParrocchia] = useState(null);
@@ -121,6 +150,27 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
     setMessaggio("");
     setMostraModulo(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function inserisciModelloInformativa() {
+    if (!parrocchiaId) return setErrore("La parrocchia non è ancora disponibile.");
+    if (bozza.informativaPrivacy.trim() && !window.confirm("Il modello sostituirà il testo che hai scritto. Vuoi continuare?")) return;
+    setErrore("");
+    setMessaggio("");
+    setCaricamentoInformativa(true);
+    const { data, error } = await supabase.rpc("ars_dati_parrocchia_informativa", {
+      p_parrocchia_id: parrocchiaId,
+    });
+    setCaricamentoInformativa(false);
+    if (error || !data) {
+      console.error("Caricamento dati parrocchia per informativa:", error || data);
+      return setErrore("Non riesco a leggere i dati della parrocchia. Controlla che la funzione SQL per l'informativa sia stata installata.");
+    }
+    if (!data.nome?.trim() || !data.indirizzo?.trim() || !data.comune?.trim() || !(data.email?.trim() || data.telefono?.trim())) {
+      return setErrore("Per preparare il modello, completa nome, indirizzo, comune e almeno un recapito nella scheda della parrocchia.");
+    }
+    setBozza((corrente) => ({ ...corrente, informativaPrivacy: modelloInformativaGrest(data, corrente.titolo) }));
+    setMessaggio("Modello inserito con i dati della parrocchia. Controlla le indicazioni tra parentesi quadre, poi salva l'attività.");
   }
 
   async function salvaAttivita(evento, stato = bozza.statoOriginale || "bozza") {
@@ -258,7 +308,11 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
           </>}
           <fieldset style={{ border: "1px solid #ded5c6", borderRadius: 10, margin: "16px 0", padding: 16 }}>
             <legend>Informativa privacy per le iscrizioni online</legend>
-            <p>Inserisci qui il testo approvato dalla parrocchia per questa attività.</p>
+            <p>Puoi partire dal modello compilato con i dati già registrati dalla parrocchia o scrivere il tuo testo. Potrai modificarlo quando vuoi; le iscrizioni già inviate conserveranno la versione letta al momento dell’invio.</p>
+            <button type="button" style={stile.pulsante} disabled={caricamentoInformativa || salvataggio} onClick={inserisciModelloInformativa}>
+              {caricamentoInformativa ? "Carico i dati della parrocchia…" : "Inserisci modello con i dati della parrocchia"}
+            </button>
+            <p>Controlla destinatari e tempi di conservazione indicati tra parentesi quadre prima di usare il modello per le iscrizioni.</p>
             <label style={stile.campo}>Testo dell’informativa
               <textarea style={stile.controllo} rows={10} maxLength={30000} value={bozza.informativaPrivacy}
                 onChange={(e) => setBozza({ ...bozza, informativaPrivacy: e.target.value })}
