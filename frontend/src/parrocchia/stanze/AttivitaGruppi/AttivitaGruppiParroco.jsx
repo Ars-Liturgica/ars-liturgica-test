@@ -18,6 +18,7 @@ const bozzaIniziale = {
   id: null, titolo: "GREST 2027", descrizione: "", luogo: "", dataInizio: "", dataFine: "",
   modelloQuota: "gratuita", importoQuota: "", scadenzaQuota: "", configurazioneModulo: { versione: 1, tipo: "grest" },
   iscrizioniOnline: false, moduloScelto: "ars", statoOriginale: "bozza",
+  informativaPrivacy: "",
 };
 
 const bucketModuli = "ars-grest-moduli";
@@ -111,6 +112,7 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
       scadenzaQuota: voce.scadenza_quota || "",
       configurazioneModulo: voce.configurazione_modulo || { versione: 1, tipo: "grest" },
       iscrizioniOnline: voce.configurazione_modulo?.abilita_iscrizioni_grest === true,
+      informativaPrivacy: voce.configurazione_modulo?.informativa_privacy_testo || "",
       moduloScelto: voce.configurazione_modulo?.modulo_cartaceo_modalita || (voce.configurazione_modulo?.modulo_cartaceo_url ? "parrocchia" : "ars"),
       statoOriginale: voce.stato,
     });
@@ -166,6 +168,7 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
       urlPersonalizzato = `${pubblico.publicUrl}?v=${Date.now()}`;
     }
     const configurazioneModulo = { ...bozza.configurazioneModulo,
+      informativa_privacy_testo: bozza.informativaPrivacy.trim(),
       abilita_iscrizioni_grest: stato === "pubblicata" && bozza.iscrizioniOnline,
       modulo_cartaceo_modalita: bozza.moduloScelto,
     };
@@ -253,6 +256,15 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
             <label style={stile.campo}>Quota fissa in euro <input style={stile.controllo} type="number" min="0.01" step="0.01" required value={bozza.importoQuota} onChange={(e) => setBozza({ ...bozza, importoQuota: e.target.value })} /></label>
             <label style={stile.campo}>Scadenza quota <input style={stile.controllo} type="date" value={bozza.scadenzaQuota} onChange={(e) => setBozza({ ...bozza, scadenzaQuota: e.target.value })} /></label>
           </>}
+          <fieldset style={{ border: "1px solid #ded5c6", borderRadius: 10, margin: "16px 0", padding: 16 }}>
+            <legend>Informativa privacy per le iscrizioni online</legend>
+            <p>Inserisci qui il testo approvato dalla parrocchia per questa attività.</p>
+            <label style={stile.campo}>Testo dell’informativa
+              <textarea style={stile.controllo} rows={10} maxLength={30000} value={bozza.informativaPrivacy}
+                onChange={(e) => setBozza({ ...bozza, informativaPrivacy: e.target.value })}
+                placeholder="Incolla l’informativa della parrocchia per questa attività" />
+            </label>
+          </fieldset>
           <fieldset style={{ border: "1px solid #ded5c6", borderRadius: 10, margin: "16px 0", padding: 16 }}>
             <legend>Modulo cartaceo per chi non ha email</legend>
             <label style={{ display: "block", marginBottom: 10 }}>
