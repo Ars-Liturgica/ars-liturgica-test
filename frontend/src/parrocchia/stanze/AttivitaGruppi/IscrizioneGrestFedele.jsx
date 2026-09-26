@@ -6,6 +6,9 @@ const input = { width: "100%", boxSizing: "border-box", padding: 10, border: "1p
 const pulsante = { padding: "10px 16px", border: "1px solid #765c3e", borderRadius: 9, background: "#fffaf0", color: "#173955", cursor: "pointer", font: "inherit" };
 
 export default function IscrizioneGrestFedele({ attivita, onIndietro }) {
+  const informativa = attivita.configurazione_modulo?.informativa_privacy_testo?.trim() || "";
+  const [presaVisione, setPresaVisione] = useState(null);
+  const [confermaLettura, setConfermaLettura] = useState(false);
   const [genitore, setGenitore] = useState({ nome: "", cognome: "", rapporto: "", telefono: "", email: "" });
   const [ragazzo, setRagazzo] = useState({ nome: "", cognome: "", data_nascita: "" });
   const [delegato, setDelegato] = useState({ nome: "", cognome: "", telefono: "" });
@@ -19,6 +22,10 @@ export default function IscrizioneGrestFedele({ attivita, onIndietro }) {
   async function invia(evento) {
     evento.preventDefault();
     setErrore("");
+    if (!informativa || !presaVisione) {
+      setErrore("Leggi l’informativa della parrocchia prima di proseguire.");
+      return;
+    }
     if (salute.assume_farmaci_quotidiani && !salute.medicinali.trim()) {
       setErrore("Indica quali medicinali vengono assunti ogni giorno.");
       return;
@@ -38,7 +45,8 @@ export default function IscrizioneGrestFedele({ attivita, onIndietro }) {
         genitore: { ...genitore, telefono: genitore.telefono.trim(), email: genitore.email.trim() || null },
         ragazzo, taglia_maglietta: taglia,
         delegati_ritiro: delegato.nome.trim() ? [delegato] : [],
-        salute, consensi,
+        salute,
+        consensi: { ...consensi, informativa_privacy_presa_visione: true, informativa_privacy_versione: attivita.versione_modulo },
       },
     });
     setOccupato(false);
@@ -46,7 +54,9 @@ export default function IscrizioneGrestFedele({ attivita, onIndietro }) {
       console.error("Invio iscrizione GREST:", error);
       setErrore(error.message?.toLowerCase().includes("duplicat") || error.code === "23505"
         ? "Per questo ragazzo risulta già una domanda di iscrizione al GREST. Contatta la parrocchia se devi correggerla."
-        : "Non siamo riusciti a inviare l'iscrizione. Controlla i dati e riprova.");
+        : error.message?.toLowerCase().includes("informativa")
+          ? "L’informativa è stata aggiornata. Torna alle attività e riapri l’iscrizione per leggerla."
+          : "Non siamo riusciti a inviare l'iscrizione. Controlla i dati e riprova.");
       return;
     }
     setRicevuta(data);
@@ -63,6 +73,28 @@ export default function IscrizioneGrestFedele({ attivita, onIndietro }) {
       <input type="checkbox" checked={consensi[chiave]} required={obbligatoria} onChange={(e) => setConsensi({ ...consensi, [chiave]: e.target.checked })} />{etichetta}
     </label>;
   }
+
+  if (!ricevuta && !presaVisione) return <section style={{ maxWidth: 760 }}>
+    <button type="button" style={pulsante} onClick={onIndietro}>← Torna alle attività</button>
+    <h1>Iscrizione a {attivita.titolo}</h1>
+    {informativa ? <>
+      <h2>Informativa privacy</h2>
+      <p>Leggi l’informativa della parrocchia prima di compilare la domanda.</p>
+      <div style={{ ...input, whiteSpace: "pre-wrap", maxHeight: 400, overflowY: "auto", marginBottom: 16 }}>{informativa}</div>
+      <label style={{ display: "flex", gap: 9, alignItems: "flex-start", marginBottom: 16 }}>
+        <input type="checkbox" checked={confermaLettura} onChange={(e) => setConfermaLettura(e.target.checked)} /> Ho letto l’informativa per questa attività.
+      </label>
+      <button type="button" style={pulsante} onClick={() => {
+        if (!confermaLettura) {
+          setErrore("Conferma di aver letto l’informativa per proseguire.");
+          return;
+        }
+        setErrore("");
+        setPresaVisione(new Date().toISOString());
+      }}>Continua con l’iscrizione</button>
+    </> : <p role="alert">La parrocchia deve aggiungere l’informativa privacy prima di aprire le iscrizioni online.</p>}
+    {errore && <p role="alert">{errore}</p>}
+  </section>;
 
   return <section style={{ maxWidth: 760 }}>
     <button type="button" style={pulsante} onClick={onIndietro}>← Torna alle attività</button>
@@ -105,7 +137,6 @@ export default function IscrizioneGrestFedele({ attivita, onIndietro }) {
       {spunta("Autorizzo il ragazzo a tornare a casa autonomamente a fine giornata.", "uscita_autonoma")}
       <p>L'eventuale autorizzazione per foto e video sarà richiesta quando la parrocchia avrà fornito la relativa informativa.</p>
       <p>Per ogni gita, escursione o visita, la parrocchia comunicherà programma e dettagli e richiederà un consenso specifico prima della partecipazione.</p>
-      <p>Il modulo e le informative definitive saranno completati con la documentazione della parrocchia prima dell'apertura delle iscrizioni.</p>
       {errore && <p role="alert">{errore}</p>}
       <button type="submit" style={pulsante} disabled={occupato}>{occupato ? "Invio in corso…" : "Invia iscrizione"}</button>
     </form>}
