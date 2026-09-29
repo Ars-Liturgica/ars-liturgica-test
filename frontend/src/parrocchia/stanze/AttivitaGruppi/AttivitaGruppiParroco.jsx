@@ -18,7 +18,7 @@ const bozzaIniziale = {
   id: null, titolo: "GREST 2027", descrizione: "", luogo: "", dataInizio: "", dataFine: "",
   modelloQuota: "gratuita", importoQuota: "", scadenzaQuota: "", configurazioneModulo: { versione: 1, tipo: "grest" },
   iscrizioniOnline: false, moduloScelto: "ars", statoOriginale: "bozza",
-  informativaPrivacy: "",
+  informativaPrivacy: "", usaInformativaDiversa: false,
 };
 
 const bucketModuli = "ars-grest-moduli";
@@ -53,7 +53,7 @@ function dataItaliana(valore) {
 
 function modelloInformativaGrest(parrocchia, titolo) {
   const pulisci = (valore) => String(valore || "").trim();
-  const localita = [pulisci(parrocchia.cap), pulisci(parrocchia.comune), pulisci(parrocchia.provincia) ? `(${pulisci(parrocchia.provincia)})` : ""]
+  const localita = [pulisci(parrocchia.cap), pulisci(parrocchia.comune), pulisci(parrocchia.provincia) ? `provincia di ${pulisci(parrocchia.provincia)}` : ""]
     .filter(Boolean).join(" ");
   const sede = [pulisci(parrocchia.indirizzo), localita].filter(Boolean).join(", ");
   const contatti = [pulisci(parrocchia.email) ? `email ${pulisci(parrocchia.email)}` : "",
@@ -68,11 +68,11 @@ Quali dati raccogliamo. Per organizzare l'attività raccogliamo nome, cognome, d
 
 Informazioni sulla salute. Il genitore o tutore può segnalare farmaci, patologie, intolleranze e altre indicazioni utili alla sicurezza e all'assistenza del ragazzo. Queste informazioni sono usate soltanto dalle persone autorizzate che ne hanno bisogno per assisterlo durante l'attività. Per trattare questi dati viene richiesto un consenso specifico, distinto dalla conferma di lettura di questa informativa.
 
-Fotografia del partecipante. Se verrà attivato il caricamento della fotografia, la parrocchia potrà usarla per riconoscere il ragazzo nell'elenco delle iscrizioni e negli elenchi dei gruppi consegnati agli animatori e accompagnatori autorizzati. Il relativo consenso sarà chiesto separatamente. La pubblicazione di immagini o video su siti, bacheche pubbliche o social richiede un'ulteriore autorizzazione, distinta dall'uso interno. La mancata autorizzazione alle immagini non impedisce l'iscrizione.
+Fotografia del partecipante. La fotografia del ragazzo è facoltativa. Se viene fornita con specifica autorizzazione, è usata per riconoscerlo negli elenchi delle iscrizioni e dei gruppi accessibili agli animatori e accompagnatori autorizzati. La pubblicazione di immagini o video su siti o social richiede una diversa autorizzazione. La mancata autorizzazione alle immagini non impedisce l'iscrizione.
 
-Chi può accedere ai dati. Il parroco e le persone autorizzate dalla parrocchia possono vedere i dati necessari ai rispettivi compiti. Agli animatori e accompagnatori sono comunicati solo i dati utili alla gestione del gruppo e alla sicurezza dei ragazzi. I fornitori tecnici dell'app e degli eventuali servizi di pagamento trattano i dati soltanto per erogare i servizi necessari, secondo gli accordi applicabili. [INDICARE EVENTUALI ALTRI DESTINATARI O TRASFERIMENTI PREVISTI DALLA PARROCCHIA.]
+Chi può accedere ai dati. Il parroco e le persone autorizzate dalla parrocchia possono vedere i dati necessari ai rispettivi compiti. Agli animatori e accompagnatori sono comunicati solo i dati utili alla gestione del gruppo e alla sicurezza dei ragazzi. I fornitori tecnici dell'app e degli eventuali servizi di pagamento trattano i dati per erogare i rispettivi servizi.
 
-Per quanto tempo conserviamo i dati. I dati dell'iscrizione sono conservati fino alla successiva edizione dell'attività, salvo cancellazione anticipata decisa dalla parrocchia o ulteriore conservazione necessaria per obblighi di legge o per gestire richieste e contestazioni. La documentazione contabile relativa ai pagamenti è conservata per i termini previsti dalle norme applicabili. Se sarà raccolta una fotografia, la parrocchia indicherà quando verrà cancellata: [CRITERIO PER LE FOTO].
+Per quanto tempo conserviamo i dati. I dati dell'iscrizione e l'eventuale fotografia del partecipante sono conservati fino alla successiva edizione dell'attività, salvo cancellazione anticipata decisa dalla parrocchia o ulteriore conservazione necessaria per obblighi di legge o per gestire richieste e contestazioni. La documentazione contabile relativa ai pagamenti è conservata per i termini previsti dalle norme applicabili.
 
 I tuoi diritti. Puoi chiedere alla parrocchia accesso, correzione o cancellazione dei dati, limitazione del loro uso e le altre tutele previste dalle norme applicabili. Quando il trattamento si basa su un consenso, puoi revocarlo per il futuro contattando la parrocchia. Puoi anche presentare reclamo al Garante per la protezione dei dati personali.
 
@@ -88,6 +88,9 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
   const [caricamentoInformativa, setCaricamentoInformativa] = useState(false);
   const [mostraModulo, setMostraModulo] = useState(false);
   const [bozza, setBozza] = useState(bozzaIniziale);
+  const [datiInformativa, setDatiInformativa] = useState(null);
+  const [testoInformativaDiversa, setTestoInformativaDiversa] = useState("");
+  const [informativaAutomatica, setInformativaAutomatica] = useState(false);
   const [pdfParrocchia, setPdfParrocchia] = useState(null);
   const [grestIscrizioni, setGrestIscrizioni] = useState(null);
   const [grestGruppi, setGrestGruppi] = useState(null);
@@ -128,8 +131,36 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
     caricaAttivita();
   }, [caricaAttivita]);
 
-  function modificaBozza(voce) {
-    setBozza({
+  async function apriModulo(voce = null) {
+    setErrore("");
+    setMessaggio("");
+    const configurazione = voce?.configurazione_modulo || { versione: 1, tipo: "grest" };
+    let informativaPrivacy = configurazione.informativa_privacy_testo || "";
+    let datiParrocchia = null;
+    const usaInformativaDiversa = Boolean(informativaPrivacy.trim()) &&
+      configurazione.informativa_privacy_modalita !== "standard";
+
+    if (!parrocchiaId) return setErrore("La parrocchia non è ancora disponibile.");
+    setCaricamentoInformativa(true);
+    const { data, error } = await supabase.rpc("ars_dati_parrocchia_informativa", {
+      p_parrocchia_id: parrocchiaId,
+    });
+    setCaricamentoInformativa(false);
+    if (!error && data?.nome?.trim() && data?.indirizzo?.trim() && data?.comune?.trim() && (data?.email?.trim() || data?.telefono?.trim())) {
+      datiParrocchia = data;
+    } else if (!informativaPrivacy.trim()) {
+      console.error("Caricamento dati parrocchia per informativa:", error || data);
+      return setErrore("Per preparare l'informativa, completa nome, indirizzo, comune e almeno un recapito nella scheda della parrocchia.");
+    }
+    // Un testo già salvato non viene rigenerato all'apertura.
+    if (!informativaPrivacy.trim()) {
+      informativaPrivacy = modelloInformativaGrest(datiParrocchia, voce?.titolo || bozzaIniziale.titolo);
+    }
+
+    setDatiInformativa(datiParrocchia);
+    setTestoInformativaDiversa(usaInformativaDiversa ? informativaPrivacy : "");
+    setInformativaAutomatica(Boolean(datiParrocchia) && !usaInformativaDiversa);
+    setBozza(voce ? {
       id: voce.id,
       titolo: voce.titolo || "GREST 2027",
       descrizione: voce.descrizione || "",
@@ -139,38 +170,18 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
       modelloQuota: voce.modello_quota || "gratuita",
       importoQuota: voce.importo_quota == null ? "" : String(voce.importo_quota),
       scadenzaQuota: voce.scadenza_quota || "",
-      configurazioneModulo: voce.configurazione_modulo || { versione: 1, tipo: "grest" },
-      iscrizioniOnline: voce.configurazione_modulo?.abilita_iscrizioni_grest === true,
-      informativaPrivacy: voce.configurazione_modulo?.informativa_privacy_testo || "",
-      moduloScelto: voce.configurazione_modulo?.modulo_cartaceo_modalita || (voce.configurazione_modulo?.modulo_cartaceo_url ? "parrocchia" : "ars"),
+      configurazioneModulo: configurazione,
+      iscrizioniOnline: configurazione.abilita_iscrizioni_grest === true,
+      informativaPrivacy,
+      usaInformativaDiversa,
+      moduloScelto: configurazione.modulo_cartaceo_modalita === "parrocchia" ||
+        (configurazione.modulo_cartaceo_modalita === "entrambi" && configurazione.modulo_cartaceo_url) ||
+        (!configurazione.modulo_cartaceo_modalita && configurazione.modulo_cartaceo_url) ? "parrocchia" : "ars",
       statoOriginale: voce.stato,
-    });
+    } : { ...bozzaIniziale, configurazioneModulo: { ...bozzaIniziale.configurazioneModulo }, informativaPrivacy });
     setPdfParrocchia(null);
-    setErrore("");
-    setMessaggio("");
     setMostraModulo(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
-  }
-
-  async function inserisciModelloInformativa() {
-    if (!parrocchiaId) return setErrore("La parrocchia non è ancora disponibile.");
-    if (bozza.informativaPrivacy.trim() && !window.confirm("Il modello sostituirà il testo che hai scritto. Vuoi continuare?")) return;
-    setErrore("");
-    setMessaggio("");
-    setCaricamentoInformativa(true);
-    const { data, error } = await supabase.rpc("ars_dati_parrocchia_informativa", {
-      p_parrocchia_id: parrocchiaId,
-    });
-    setCaricamentoInformativa(false);
-    if (error || !data) {
-      console.error("Caricamento dati parrocchia per informativa:", error || data);
-      return setErrore("Non riesco a leggere i dati della parrocchia. Controlla che la funzione SQL per l'informativa sia stata installata.");
-    }
-    if (!data.nome?.trim() || !data.indirizzo?.trim() || !data.comune?.trim() || !(data.email?.trim() || data.telefono?.trim())) {
-      return setErrore("Per preparare il modello, completa nome, indirizzo, comune e almeno un recapito nella scheda della parrocchia.");
-    }
-    setBozza((corrente) => ({ ...corrente, informativaPrivacy: modelloInformativaGrest(data, corrente.titolo) }));
-    setMessaggio("Modello inserito con i dati della parrocchia. Controlla le indicazioni tra parentesi quadre, poi salva l'attività.");
   }
 
   async function salvaAttivita(evento, stato = bozza.statoOriginale || "bozza") {
@@ -180,6 +191,9 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
     if (stato === "pubblicata" && !bozza.id) return setErrore("Salva prima la bozza, poi pubblicala.");
     if (!parrocchiaId) return setErrore("La parrocchia non è ancora disponibile.");
     if (!bozza.titolo.trim()) return setErrore("Inserisci il titolo.");
+    if (stato === "pubblicata" && bozza.iscrizioniOnline && !bozza.informativaPrivacy.trim()) {
+      return setErrore("Controlla e completa l'informativa prima di aprire le iscrizioni online.");
+    }
     if (bozza.dataInizio && bozza.dataFine && new Date(bozza.dataFine) < new Date(bozza.dataInizio)) {
       return setErrore("La data finale deve seguire quella iniziale.");
     }
@@ -219,6 +233,7 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
     }
     const configurazioneModulo = { ...bozza.configurazioneModulo,
       informativa_privacy_testo: bozza.informativaPrivacy.trim(),
+      informativa_privacy_modalita: bozza.usaInformativaDiversa ? "diversa" : "standard",
       abilita_iscrizioni_grest: stato === "pubblicata" && bozza.iscrizioniOnline,
       modulo_cartaceo_modalita: bozza.moduloScelto,
     };
@@ -278,19 +293,20 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
         <button type="button" style={stile.pulsante} onClick={caricaAttivita} disabled={caricamento || !parrocchiaId}>
           Aggiorna elenco
         </button>
-        {!mostraModulo && <button type="button" style={stile.pulsante} disabled={!parrocchiaId || caricamento || Boolean(errore)} onClick={() => {
-          if (grest2027InBozza) modificaBozza(grest2027InBozza);
-          else { setBozza(bozzaIniziale); setPdfParrocchia(null); setMostraModulo(true); setErrore(""); setMessaggio(""); }
-        }}>
-          {grest2027InBozza ? "Riprendi GREST 2027" : "+ Prepara GREST"}
+        {!mostraModulo && <button type="button" style={stile.pulsante} disabled={!parrocchiaId || caricamento || caricamentoInformativa} onClick={() => apriModulo(grest2027InBozza)}>
+          {caricamentoInformativa ? "Preparo l'informativa…" : grest2027InBozza ? "Riprendi GREST 2027" : "+ Prepara GREST"}
         </button>}
       </header>
 
       {mostraModulo && (
         <form onSubmit={(evento) => salvaAttivita(evento)} style={{ ...stile.card, marginBottom: 24 }}>
           <h2>{bozza.statoOriginale === "pubblicata" ? "Gestisci GREST pubblicato" : bozza.id ? "Modifica GREST in bozza" : "Nuovo GREST in bozza"}</h2>
-          <p>Seleziona i moduli cartacei da mostrare ai fedeli. Le iscrizioni online si gestiscono separatamente.</p>
-          <label style={stile.campo}>Titolo <input style={stile.controllo} required value={bozza.titolo} onChange={(e) => setBozza({ ...bozza, titolo: e.target.value })} /></label>
+          <p>Scegli il modulo cartaceo da mostrare ai fedeli. Le iscrizioni online si gestiscono separatamente.</p>
+          <label style={stile.campo}>Titolo <input style={stile.controllo} required value={bozza.titolo} onChange={(e) => {
+            const titolo = e.target.value;
+            setBozza({ ...bozza, titolo, informativaPrivacy: informativaAutomatica && !bozza.usaInformativaDiversa && datiInformativa
+              ? modelloInformativaGrest(datiInformativa, titolo) : bozza.informativaPrivacy });
+          }} /></label>
           <label style={stile.campo}>Descrizione <textarea style={stile.controllo} rows={4} value={bozza.descrizione} onChange={(e) => setBozza({ ...bozza, descrizione: e.target.value })} /></label>
           <label style={stile.campo}>Luogo <input style={stile.controllo} value={bozza.luogo} onChange={(e) => setBozza({ ...bozza, luogo: e.target.value })} /></label>
           <label style={stile.campo}>Inizio <input style={stile.controllo} type="datetime-local" value={bozza.dataInizio} onChange={(e) => setBozza({ ...bozza, dataInizio: e.target.value })} /></label>
@@ -308,14 +324,30 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
           </>}
           <fieldset style={{ border: "1px solid #ded5c6", borderRadius: 10, margin: "16px 0", padding: 16 }}>
             <legend>Informativa privacy per le iscrizioni online</legend>
-            <p>Puoi partire dal modello compilato con i dati già registrati dalla parrocchia o scrivere il tuo testo. Potrai modificarlo quando vuoi; le iscrizioni già inviate conserveranno la versione letta al momento dell’invio.</p>
-            <button type="button" style={stile.pulsante} disabled={caricamentoInformativa || salvataggio} onClick={inserisciModelloInformativa}>
-              {caricamentoInformativa ? "Carico i dati della parrocchia…" : "Inserisci modello con i dati della parrocchia"}
-            </button>
-            <p>Controlla destinatari e tempi di conservazione indicati tra parentesi quadre prima di usare il modello per le iscrizioni.</p>
+            <p>L'informativa standard usa i dati della parrocchia. Verifica che i recapiti e le modalità descritte corrispondano alla tua attività.</p>
+            <label style={{ display: "block", marginBottom: 12 }}>
+              <input type="checkbox" checked={bozza.usaInformativaDiversa} onChange={(e) => {
+                if (e.target.checked) {
+                  setBozza({ ...bozza, usaInformativaDiversa: true,
+                    informativaPrivacy: testoInformativaDiversa || bozza.informativaPrivacy });
+                  setInformativaAutomatica(false);
+                  return;
+                }
+                if (!datiInformativa) {
+                  setErrore("Per usare l'informativa standard riapri l'attività: servono i dati aggiornati della parrocchia.");
+                  return;
+                }
+                setTestoInformativaDiversa(bozza.informativaPrivacy);
+                setBozza({ ...bozza, usaInformativaDiversa: false,
+                  informativaPrivacy: modelloInformativaGrest(datiInformativa, bozza.titolo) });
+                setInformativaAutomatica(true);
+                setErrore("");
+              }} /> Usa un'informativa diversa
+            </label>
             <label style={stile.campo}>Testo dell’informativa
               <textarea style={stile.controllo} rows={10} maxLength={30000} value={bozza.informativaPrivacy}
-                onChange={(e) => setBozza({ ...bozza, informativaPrivacy: e.target.value })}
+                readOnly={!bozza.usaInformativaDiversa}
+                onChange={(e) => { setBozza({ ...bozza, informativaPrivacy: e.target.value }); }}
                 placeholder="Incolla l’informativa della parrocchia per questa attività" />
             </label>
           </fieldset>
@@ -326,9 +358,6 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
             </label>
             <label style={{ display: "block", marginBottom: 10 }}>
               <input type="radio" name="moduloCartaceo" checked={bozza.moduloScelto === "parrocchia"} onChange={() => setBozza({ ...bozza, moduloScelto: "parrocchia" })} /> Usa il modulo della parrocchia
-            </label>
-            <label style={{ display: "block", marginBottom: 10 }}>
-              <input type="radio" name="moduloCartaceo" checked={bozza.moduloScelto === "entrambi"} onChange={() => setBozza({ ...bozza, moduloScelto: "entrambi" })} /> Mostra entrambi i moduli
             </label>
             {bozza.moduloScelto !== "ars" && (
               bozza.id ? <>
@@ -376,7 +405,7 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
                 {voce.luogo && <p>Luogo: {voce.luogo}</p>}
                 <p>{voce.modello_quota === "quota_fissa" ? `Quota: ${Number(voce.importo_quota).toLocaleString("it-IT", { style: "currency", currency: "EUR" })}` : voce.modello_quota === "contributo_libero" ? "Contributo libero" : "Gratuita"}</p>
                 {["bozza", "pubblicata"].includes(voce.stato) && voce.tipo?.toLowerCase() === "grest" && (
-                  <button type="button" style={stile.pulsante} onClick={() => modificaBozza(voce)}>{voce.stato === "bozza" ? "Modifica bozza" : "Gestisci attività e moduli"}</button>
+                  <button type="button" style={stile.pulsante} disabled={caricamentoInformativa} onClick={() => apriModulo(voce)}>{voce.stato === "bozza" ? "Modifica bozza" : "Gestisci attività e moduli"}</button>
                 )}
                 {["bozza", "pubblicata"].includes(voce.stato) && voce.tipo?.toLowerCase() === "grest" && <>
                   {voce.stato === "pubblicata" && <>{" "}<button type="button" style={stile.pulsante} onClick={() => setGrestIscrizioni(voce)}>Vedi iscrizioni</button></>}
