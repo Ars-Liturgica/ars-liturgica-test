@@ -15,8 +15,8 @@ const stile = {
 };
 
 const bozzaIniziale = {
-  id: null, titolo: "GREST 2027", descrizione: "", luogo: "", dataInizio: "", dataFine: "",
-  modelloQuota: "gratuita", importoQuota: "", scadenzaQuota: "", configurazioneModulo: { versione: 1, tipo: "grest" },
+  id: null, tipo: "altro", attivitaPrincipaleId: null, titolo: "", descrizione: "", luogo: "", dataInizio: "", dataFine: "",
+  modelloQuota: "gratuita", importoQuota: "", scadenzaQuota: "", configurazioneModulo: { versione: 1, tipo: "altro" },
   iscrizioniOnline: false, moduloScelto: "ars", statoOriginale: "bozza",
   informativaPrivacy: "", usaInformativaDiversa: false,
 };
@@ -47,8 +47,8 @@ function elencoDaRisposta(valore) {
 
 function dataItaliana(valore) {
   if (!valore) return null;
-  const data = new Date(`${String(valore).slice(0, 10)}T12:00:00`);
-  return Number.isNaN(data.getTime()) ? null : new Intl.DateTimeFormat("it-IT", { day: "numeric", month: "long", year: "numeric" }).format(data);
+  const data = new Date(valore);
+  return Number.isNaN(data.getTime()) ? null : new Intl.DateTimeFormat("it-IT", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(data);
 }
 
 function modelloInformativaGrest(parrocchia, titolo) {
@@ -94,11 +94,50 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
   const [pdfParrocchia, setPdfParrocchia] = useState(null);
   const [grestIscrizioni, setGrestIscrizioni] = useState(null);
   const [grestGruppi, setGrestGruppi] = useState(null);
-  const grest2027InBozza = attivita.find((voce) =>
-    voce.tipo?.toLowerCase() === "grest" &&
-    voce.titolo?.trim().toLowerCase() === "grest 2027" &&
-    voce.stato === "bozza"
+  const [cartellaId, setCartellaId] = useState(null);
+  const cartella = attivita.find((voce) => voce.id === cartellaId) || null;
+  const elencoVisibile = attivita.filter((voce) =>
+    cartella ? voce.attivita_principale_id === cartella.id : !voce.attivita_principale_id
   );
+
+  function apriCartella(voce) {
+    setCartellaId(voce.id);
+    setMostraModulo(false);
+    setErrore("");
+    setMessaggio("");
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  function chiudiCartella() {
+    setCartellaId(null);
+    setMostraModulo(false);
+    setErrore("");
+    setMessaggio("");
+  }
+
+  async function cambiaTipo(tipo) {
+    if (tipo !== "grest") {
+      setBozza((precedente) => ({ ...precedente, tipo, iscrizioniOnline: false }));
+      return;
+    }
+    setCaricamentoInformativa(true);
+    const { data, error } = await supabase.rpc("ars_dati_parrocchia_informativa", {
+      p_parrocchia_id: parrocchiaId,
+    });
+    setCaricamentoInformativa(false);
+    if (error || !data?.nome?.trim() || !data?.indirizzo?.trim() || !data?.comune?.trim() ||
+        !(data?.email?.trim() || data?.telefono?.trim())) {
+      setErrore("Per preparare il GREST, completa nome, indirizzo, comune e almeno un recapito nella scheda della parrocchia.");
+      return;
+    }
+    setDatiInformativa(data);
+    setInformativaAutomatica(true);
+    setErrore("");
+    setBozza((precedente) => ({ ...precedente, tipo,
+      usaInformativaDiversa: false,
+      informativaPrivacy: modelloInformativaGrest(data, precedente.titolo),
+    }));
+  }
 
   const caricaAttivita = useCallback(async () => {
     if (!parrocchiaId) {
@@ -131,16 +170,18 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
     caricaAttivita();
   }, [caricaAttivita]);
 
-  async function apriModulo(voce = null) {
+  async function apriModulo(voce = null, principaleId = null) {
     setErrore("");
     setMessaggio("");
-    const configurazione = voce?.configurazione_modulo || { versione: 1, tipo: "grest" };
+    const tipo = voce?.tipo || "altro";
+    const configurazione = voce?.configurazione_modulo || { versione: 1, tipo };
     let informativaPrivacy = configurazione.informativa_privacy_testo || "";
     let datiParrocchia = null;
     const usaInformativaDiversa = Boolean(informativaPrivacy.trim()) &&
       configurazione.informativa_privacy_modalita !== "standard";
 
     if (!parrocchiaId) return setErrore("La parrocchia non è ancora disponibile.");
+    if (tipo === "grest") {
     setCaricamentoInformativa(true);
     const { data, error } = await supabase.rpc("ars_dati_parrocchia_informativa", {
       p_parrocchia_id: parrocchiaId,
@@ -154,15 +195,18 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
     }
     // Un testo già salvato non viene rigenerato all'apertura.
     if (!informativaPrivacy.trim()) {
-      informativaPrivacy = modelloInformativaGrest(datiParrocchia, voce?.titolo || bozzaIniziale.titolo);
+      informativaPrivacy = modelloInformativaGrest(datiParrocchia, voce?.titolo || "GREST");
     }
 
+    }
     setDatiInformativa(datiParrocchia);
     setTestoInformativaDiversa(usaInformativaDiversa ? informativaPrivacy : "");
     setInformativaAutomatica(Boolean(datiParrocchia) && !usaInformativaDiversa);
     setBozza(voce ? {
       id: voce.id,
-      titolo: voce.titolo || "GREST 2027",
+      tipo,
+      attivitaPrincipaleId: voce.attivita_principale_id || null,
+      titolo: voce.titolo || "",
       descrizione: voce.descrizione || "",
       luogo: voce.luogo || "",
       dataInizio: dataPerInput(voce.data_inizio),
@@ -178,7 +222,7 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
         (configurazione.modulo_cartaceo_modalita === "entrambi" && configurazione.modulo_cartaceo_url) ||
         (!configurazione.modulo_cartaceo_modalita && configurazione.modulo_cartaceo_url) ? "parrocchia" : "ars",
       statoOriginale: voce.stato,
-    } : { ...bozzaIniziale, configurazioneModulo: { ...bozzaIniziale.configurazioneModulo }, informativaPrivacy });
+    } : { ...bozzaIniziale, attivitaPrincipaleId: principaleId, configurazioneModulo: { ...bozzaIniziale.configurazioneModulo }, informativaPrivacy });
     setPdfParrocchia(null);
     setMostraModulo(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -191,7 +235,7 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
     if (stato === "pubblicata" && !bozza.id) return setErrore("Salva prima la bozza, poi pubblicala.");
     if (!parrocchiaId) return setErrore("La parrocchia non è ancora disponibile.");
     if (!bozza.titolo.trim()) return setErrore("Inserisci il titolo.");
-    if (stato === "pubblicata" && bozza.iscrizioniOnline && !bozza.informativaPrivacy.trim()) {
+    if (stato === "pubblicata" && bozza.tipo === "grest" && bozza.iscrizioniOnline && !bozza.informativaPrivacy.trim()) {
       return setErrore("Controlla e completa l'informativa prima di aprire le iscrizioni online.");
     }
     if (bozza.dataInizio && bozza.dataFine && new Date(bozza.dataFine) < new Date(bozza.dataInizio)) {
@@ -203,13 +247,13 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
     if (stato === "pubblicata" && bozza.modelloQuota === "quota_fissa" && bozza.scadenzaQuota && bozza.scadenzaQuota < oggiLocale()) {
       return setErrore("La scadenza della quota è passata. Aggiornala prima di pubblicare.");
     }
-    if (bozza.id && bozza.moduloScelto !== "ars" && !pdfParrocchia && !bozza.configurazioneModulo?.modulo_cartaceo_url) {
+    if (bozza.tipo === "grest" && bozza.id && bozza.moduloScelto !== "ars" && !pdfParrocchia && !bozza.configurazioneModulo?.modulo_cartaceo_url) {
       return setErrore("Seleziona il PDF della parrocchia prima di salvare.");
     }
 
     setSalvataggio(true);
     let urlPersonalizzato = bozza.configurazioneModulo?.modulo_cartaceo_url;
-    if (bozza.moduloScelto !== "ars" && pdfParrocchia) {
+    if (bozza.tipo === "grest" && bozza.moduloScelto !== "ars" && pdfParrocchia) {
       if (!bozza.id) {
         setSalvataggio(false);
         return setErrore("Salva prima la bozza, poi carica il PDF della parrocchia.");
@@ -231,18 +275,20 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
       const { data: pubblico } = supabase.storage.from(bucketModuli).getPublicUrl(percorso);
       urlPersonalizzato = `${pubblico.publicUrl}?v=${Date.now()}`;
     }
-    const configurazioneModulo = { ...bozza.configurazioneModulo,
+    const configurazioneModulo = bozza.tipo === "grest" ? { ...bozza.configurazioneModulo,
+      tipo: bozza.tipo,
       informativa_privacy_testo: bozza.informativaPrivacy.trim(),
       informativa_privacy_modalita: bozza.usaInformativaDiversa ? "diversa" : "standard",
       abilita_iscrizioni_grest: stato === "pubblicata" && bozza.iscrizioniOnline,
       modulo_cartaceo_modalita: bozza.moduloScelto,
-    };
-    if (bozza.moduloScelto !== "ars" && urlPersonalizzato) configurazioneModulo.modulo_cartaceo_url = urlPersonalizzato;
+    } : { ...bozza.configurazioneModulo, tipo: bozza.tipo, abilita_iscrizioni_grest: false };
+    if (bozza.tipo === "grest" && bozza.moduloScelto !== "ars" && urlPersonalizzato) configurazioneModulo.modulo_cartaceo_url = urlPersonalizzato;
     else delete configurazioneModulo.modulo_cartaceo_url;
-    const { data, error } = await supabase.rpc("ars_salva_attivita_parrocchiale", {
+    const { data, error } = await supabase.rpc("ars_salva_attivita_collegata", {
       p_parrocchia_id: parrocchiaId,
       p_id: bozza.id,
-      p_tipo: "grest",
+      p_tipo: bozza.tipo,
+      p_attivita_principale_id: bozza.attivitaPrincipaleId,
       p_titolo: bozza.titolo.trim(),
       p_descrizione: bozza.descrizione.trim() || null,
       p_luogo: bozza.luogo.trim() || null,
@@ -265,10 +311,12 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
     setBozza(bozzaIniziale);
     await caricaAttivita();
     setMessaggio(stato === "pubblicata"
-      ? bozza.iscrizioniOnline
-        ? "Attività pubblicata. I fedeli possono inviare le iscrizioni."
-        : "Attività pubblicata. Le iscrizioni online sono ancora chiuse."
-      : "Bozza salvata. L'attività non è ancora visibile ai fedeli.");
+      ? bozza.statoOriginale === "pubblicata"
+        ? "Modifiche salvate nell’attività pubblicata."
+        : bozza.tipo === "grest" && bozza.iscrizioniOnline
+          ? "Attività pubblicata. I fedeli possono inviare le iscrizioni."
+          : "Attività pubblicata."
+      : "Bozza salvata. L’attività non è ancora visibile ai fedeli.");
   }
 
   return (
@@ -287,24 +335,54 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
           <button type="button" style={stile.pulsante} onClick={tornaDashboard}>
             ← Torna alla dashboard
           </button>
-          <h1>Attività e Gruppi</h1>
-          <p>Le attività della tua parrocchia, comprese le bozze.</p>
+          <h1>{cartella ? cartella.titolo : "Attività e Gruppi"}</h1>
+          <p>{cartella ? "Gestisci questa attività e le iniziative al suo interno." : "Le attività della tua parrocchia, comprese le bozze."}</p>
+          {cartella && <button type="button" style={stile.pulsante} onClick={chiudiCartella}>← Tutte le attività</button>}
         </div>
         <button type="button" style={stile.pulsante} onClick={caricaAttivita} disabled={caricamento || !parrocchiaId}>
           Aggiorna elenco
         </button>
-        {!mostraModulo && <button type="button" style={stile.pulsante} disabled={!parrocchiaId || caricamento || caricamentoInformativa} onClick={() => apriModulo(grest2027InBozza)}>
-          {caricamentoInformativa ? "Preparo l'informativa…" : grest2027InBozza ? "Riprendi GREST 2027" : "+ Prepara GREST"}
+        {!mostraModulo && <button type="button" style={stile.pulsante} disabled={!parrocchiaId || caricamento || caricamentoInformativa || (cartella && !["bozza", "pubblicata"].includes(cartella.stato))} onClick={() => apriModulo(null, cartella?.id || null)}>
+          + Nuova attività
         </button>}
       </header>
 
+      {cartella && !mostraModulo && <section style={{ ...stile.card, marginBottom: 24 }}>
+        <span style={stile.etichetta}>{cartella.stato}</span>
+        <h2>{cartella.titolo}</h2>
+        {cartella.descrizione && <p>{cartella.descrizione}</p>}
+        {(cartella.data_inizio || cartella.data_fine) && <p>{[dataItaliana(cartella.data_inizio), dataItaliana(cartella.data_fine)].filter(Boolean).join(" – ")}</p>}
+        {cartella.luogo && <p>Luogo: {cartella.luogo}</p>}
+        <p>{cartella.modello_quota === "quota_fissa" ? `Quota: ${Number(cartella.importo_quota).toLocaleString("it-IT", { style: "currency", currency: "EUR" })}` : cartella.modello_quota === "contributo_libero" ? "Contributo libero" : "Gratuita"}</p>
+        {["bozza", "pubblicata"].includes(cartella.stato) && <>
+          <button type="button" style={stile.pulsante} disabled={caricamentoInformativa} onClick={() => apriModulo(cartella)}>Modifica</button>
+          {cartella.tipo?.toLowerCase() === "grest" && <>
+            {cartella.stato === "pubblicata" && <> {" "}<button type="button" style={stile.pulsante} onClick={() => setGrestIscrizioni(cartella)}>Vedi iscrizioni</button></>}
+            {" "}<button type="button" style={stile.pulsante} onClick={() => setGrestGruppi(cartella)}>Gestisci gruppi</button>
+          </>}
+        </>}
+        <h3>Attività interne</h3>
+        <p>Usa «Nuova attività» per aggiungere una gita, un picnic o un’altra iniziativa in questa cartella.</p>
+      </section>}
       {mostraModulo && (
         <form onSubmit={(evento) => salvaAttivita(evento)} style={{ ...stile.card, marginBottom: 24 }}>
-          <h2>{bozza.statoOriginale === "pubblicata" ? "Gestisci GREST pubblicato" : bozza.id ? "Modifica GREST in bozza" : "Nuovo GREST in bozza"}</h2>
-          <p>Scegli il modulo cartaceo da mostrare ai fedeli. Le iscrizioni online si gestiscono separatamente.</p>
+          <h2>{bozza.id ? "Modifica attività" : "Nuova attività"}</h2>
+          {bozza.attivitaPrincipaleId && <p>Dentro: {attivita.find((voce) => voce.id === bozza.attivitaPrincipaleId)?.titolo || "attività principale"}</p>}
+          {bozza.statoOriginale === "pubblicata" && <p>Le modifiche salvate saranno subito visibili nell’attività pubblicata.</p>}
+          <label style={stile.campo}>Tipo di attività
+            <select style={stile.controllo} value={bozza.tipo} disabled={salvataggio || caricamentoInformativa || Boolean(bozza.id)} onChange={(e) => cambiaTipo(e.target.value)}>
+              <option value="altro">Altra attività</option>
+              <option value="grest">GREST</option>
+              <option value="gita">Gita</option>
+              <option value="picnic">Picnic</option>
+              <option value="pellegrinaggio">Pellegrinaggio</option>
+              <option value="catechismo">Catechismo</option>
+              {!["altro", "grest", "gita", "picnic", "pellegrinaggio", "catechismo"].includes(bozza.tipo) && <option value={bozza.tipo}>{bozza.tipo}</option>}
+            </select>
+          </label>
           <label style={stile.campo}>Titolo <input style={stile.controllo} required value={bozza.titolo} onChange={(e) => {
             const titolo = e.target.value;
-            setBozza({ ...bozza, titolo, informativaPrivacy: informativaAutomatica && !bozza.usaInformativaDiversa && datiInformativa
+            setBozza({ ...bozza, titolo, informativaPrivacy: bozza.tipo === "grest" && informativaAutomatica && !bozza.usaInformativaDiversa && datiInformativa
               ? modelloInformativaGrest(datiInformativa, titolo) : bozza.informativaPrivacy });
           }} /></label>
           <label style={stile.campo}>Descrizione <textarea style={stile.controllo} rows={4} value={bozza.descrizione} onChange={(e) => setBozza({ ...bozza, descrizione: e.target.value })} /></label>
@@ -322,6 +400,7 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
             <label style={stile.campo}>Quota fissa in euro <input style={stile.controllo} type="number" min="0.01" step="0.01" required value={bozza.importoQuota} onChange={(e) => setBozza({ ...bozza, importoQuota: e.target.value })} /></label>
             <label style={stile.campo}>Scadenza quota <input style={stile.controllo} type="date" value={bozza.scadenzaQuota} onChange={(e) => setBozza({ ...bozza, scadenzaQuota: e.target.value })} /></label>
           </>}
+          {bozza.tipo === "grest" && <>
           <fieldset style={{ border: "1px solid #ded5c6", borderRadius: 10, margin: "16px 0", padding: 16 }}>
             <legend>Informativa privacy per le iscrizioni online</legend>
             <p>L'informativa standard usa i dati della parrocchia. Verifica che i recapiti e le modalità descritte corrispondano alla tua attività.</p>
@@ -375,25 +454,26 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
             <input type="checkbox" checked={bozza.iscrizioniOnline} onChange={(e) => setBozza({ ...bozza, iscrizioniOnline: e.target.checked })} />
             {bozza.statoOriginale === "pubblicata" ? "Iscrizioni online aperte" : "Apri le iscrizioni online quando pubblichi questa attività"}
           </label>}
-          <button type="submit" style={stile.pulsante} disabled={salvataggio}>{salvataggio ? "Salvataggio…" : bozza.statoOriginale === "pubblicata" ? "Salva modifiche" : "Salva bozza"}</button>{" "}
-          {bozza.id && bozza.statoOriginale !== "pubblicata" && <button type="button" style={stile.pulsante} disabled={salvataggio} onClick={(evento) => {
+          </>}
+          <button type="submit" style={stile.pulsante} disabled={salvataggio || caricamentoInformativa}>{salvataggio ? "Salvataggio…" : bozza.statoOriginale === "pubblicata" ? "Salva modifiche" : "Salva bozza"}</button>{" "}
+          {bozza.id && bozza.statoOriginale !== "pubblicata" && <button type="button" style={stile.pulsante} disabled={salvataggio || caricamentoInformativa} onClick={(evento) => {
             if (evento.currentTarget.form?.reportValidity()) salvaAttivita(evento, "pubblicata");
           }}>{salvataggio ? "Pubblicazione…" : "Pubblica"}</button>}{" "}
-          <button type="button" style={stile.pulsante} disabled={salvataggio} onClick={() => setMostraModulo(false)}>Annulla</button>
+          <button type="button" style={stile.pulsante} disabled={salvataggio || caricamentoInformativa} onClick={() => setMostraModulo(false)}>Annulla</button>
         </form>
       )}
       {caricamento && <p role="status">Caricamento delle attività…</p>}
       {errore && <p role="alert">{errore}</p>}
       {messaggio && <p role="status">{messaggio}</p>}
-      {!caricamento && !errore && attivita.length === 0 && (
+      {!caricamento && !errore && elencoVisibile.length === 0 && (
         <section style={stile.card}>
-          <h2>Nessuna attività ancora creata</h2>
-          <p>Qui appariranno GREST, catechismo, gruppi e altre attività quando saranno salvate dalla parrocchia.</p>
+          <h2>{cartella ? "Nessuna attività interna ancora creata" : "Nessuna attività ancora creata"}</h2>
+          <p>Premi «Nuova attività» per iniziare.</p>
         </section>
       )}
-      {!caricamento && !errore && attivita.length > 0 && (
+      {!caricamento && !errore && elencoVisibile.length > 0 && (
         <div style={stile.griglia}>
-          {attivita.map((voce) => {
+          {elencoVisibile.map((voce) => {
             const inizio = dataItaliana(voce.data_inizio);
             const fine = dataItaliana(voce.data_fine);
             return (
@@ -404,8 +484,9 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
                 {(inizio || fine) && <p>{[inizio, fine].filter(Boolean).join(" – ")}</p>}
                 {voce.luogo && <p>Luogo: {voce.luogo}</p>}
                 <p>{voce.modello_quota === "quota_fissa" ? `Quota: ${Number(voce.importo_quota).toLocaleString("it-IT", { style: "currency", currency: "EUR" })}` : voce.modello_quota === "contributo_libero" ? "Contributo libero" : "Gratuita"}</p>
-                {["bozza", "pubblicata"].includes(voce.stato) && voce.tipo?.toLowerCase() === "grest" && (
-                  <button type="button" style={stile.pulsante} disabled={caricamentoInformativa} onClick={() => apriModulo(voce)}>{voce.stato === "bozza" ? "Modifica bozza" : "Gestisci attività e moduli"}</button>
+                {!cartella && <><button type="button" style={stile.pulsante} onClick={() => apriCartella(voce)}>Apri attività</button>{" "}</>}
+                {["bozza", "pubblicata"].includes(voce.stato) && (
+                  <button type="button" style={stile.pulsante} disabled={caricamentoInformativa} onClick={() => apriModulo(voce)}>Modifica</button>
                 )}
                 {["bozza", "pubblicata"].includes(voce.stato) && voce.tipo?.toLowerCase() === "grest" && <>
                   {voce.stato === "pubblicata" && <>{" "}<button type="button" style={stile.pulsante} onClick={() => setGrestIscrizioni(voce)}>Vedi iscrizioni</button></>}
