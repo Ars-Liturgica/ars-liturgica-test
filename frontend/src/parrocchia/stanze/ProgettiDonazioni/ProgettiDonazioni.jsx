@@ -4,7 +4,7 @@ import { supabase } from "../../../supabaseClient";
 const TIPI = {
   bonifico: "Bonifico",
   paypal: "PayPal",
-  link_pagamento: "Link di pagamento",
+  link_pagamento: "Carta di credito/debito",
   consegna_diretta: "Consegna diretta in parrocchia",
 };
 const nuovoMetodo = (tipo = "bonifico") => ({
@@ -127,7 +127,7 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard }) {
       <section className="sezione-metodi-incasso">
         <div className="intestazione-sezione-donazioni">
           <h3>Metodi di incasso</h3>
-          <p>Bonifico, PayPal, link di pagamento e consegna diretta alla parrocchia.</p>
+          <p>Bonifico, PayPal, carta di credito/debito e consegna diretta alla parrocchia.</p>
           <button type="button" className="pulsante-primario" disabled={!parrocchiaId || salvataggio}
             onClick={() => scegliTipo(Object.keys(TIPI).find((tipo) => !metodiIncasso.some((m) => m.tipo === tipo)) || "bonifico")}>
             Aggiungi metodo
@@ -150,6 +150,7 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard }) {
               {campo("bic_swift", "BIC / SWIFT (facoltativo)")}
             </>}
             {modulo.tipo === "paypal" && campo("email_paypal", "Email PayPal", { tipo: "email" })}
+            {modulo.tipo === "link_pagamento" && <p>Inserisci il link per pagare con carta fornito dal servizio della parrocchia, per esempio Stripe.</p>}
             {["paypal", "link_pagamento"].includes(modulo.tipo) && campo("link_pagamento", "Link di pagamento", { tipo: "url", obbligatorio: modulo.tipo === "link_pagamento" })}
             <label style={{ display: "block", margin: "12px 0" }}>Istruzioni per chi paga
               <textarea style={stileCampo} rows={3} value={modulo.istruzioni || ""} onChange={(e) => aggiorna("istruzioni", e.target.value)} />
