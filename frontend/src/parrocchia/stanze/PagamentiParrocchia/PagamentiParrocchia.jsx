@@ -1,9 +1,236 @@
-import React, {
-  useCallback,
-  useEffect,
-  useState,
-} from "react";
+import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { supabase } from "../../../supabaseClient";
+
+const ETICHETTE_QUOTA = { da_pagare: "Non pagato", parziale: "Parziale", saldata: "Saldato", esente: "Esente", gratuita: "Gratuita", contributo_libero: "Contributo libero" };
+const numero = (v) => Number.isFinite(Number(v)) ? Number(v) : 0;
+const nomeRagazzo = (r) => [r.cognome_partecipante, r.nome_partecipante].filter(Boolean).join(" ");
+const nomeGenitore = (r) => [r.genitore_cognome, r.genitore_nome].filter(Boolean).join(" ") || "Referente non indicato";
+const escapeHtml = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const PROMEMORIA = "Gentile famiglia, vi ricordiamo che per l’attività indicata risulta ancora una quota da completare. Se avete già effettuato il versamento, vi chiediamo cortesemente di comunicarlo alla segreteria, così da aggiornare il riepilogo. Grazie per la collaborazione.";
+
+function totaliQuote(righe) {
+  return righe.reduce((t, r) => ({ dovuto: t.dovuto + numero(r.dovuto), pagato: t.pagato + numero(r.pagato), residuo: t.residuo + numero(r.residuo), in_attesa: t.in_attesa + numero(r.in_attesa) }), { dovuto: 0, pagato: 0, residuo: 0, in_attesa: 0 });
+}
+
+function raggruppaFamiglie(righe) {
+  const mappa = new Map();
+  righe.forEach((r) => {
+    const chiave = r.famiglia_id || `iscrizione:${r.id}`;
+    if (!mappa.has(chiave)) mappa.set(chiave, { id: chiave, righe: [] });
+    mappa.get(chiave).righe.push(r);
+  });
+  return [...mappa.values()].map((f) => ({ ...f, ...totaliQuote(f.righe), nomi: [...new Set(f.righe.map(nomeGenitore))].join(" / "), telefoni: [...new Set(f.righe.map((r) => r.telefono_contatto).filter(Boolean))].join(" / ") }));
+}
+
+// Anteprima separata: contiene soltanto i dati scelti, pronti anche per Salva PDF.
+function apriStampa(titolo, corpo) {
+  const finestra = window.open("", "_blank");
+  if (!finestra) throw new Error("Consenti l’apertura dell’anteprima di stampa nel browser.");
+  finestra.opener = null;
+  finestra.document.write(`<!doctype html><html lang="it"><head><meta charset="utf-8"><title>${escapeHtml(titolo)}</title><style>
+    body{font:14px Georgia,serif;color:#213b4c;margin:32px}h1{font-size:25px}h2{font-size:19px}p{line-height:1.6}table{width:100%;border-collapse:collapse;font:12px Arial,sans-serif}th,td{padding:9px 7px;border-bottom:1px solid #ddd;text-align:left;vertical-align:top}th{background:#f4f1eb}td.numero{text-align:right;white-space:nowrap}thead{display:table-header-group}tr{break-inside:avoid}.meta{color:#555}.firma{margin-top:32px}.testo{white-space:pre-line}.totale{background:#f4f1eb;padding:18px;margin-top:22px}.azioni{margin-bottom:25px}button{padding:10px 18px;cursor:pointer}@page{size:A4;margin:16mm}@media print{body{margin:0}.azioni{display:none}}
+    </style></head><body><div class="azioni"><button type="button" onclick="window.print()">Stampa / Salva PDF</button></div>${corpo}</body></html>`);
+  finestra.document.close();
+}
+
+function righeStampa(righe, valuta) {
+  return righe.map((r) => `<tr><td>${escapeHtml(nomeGenitore(r))}<br>${escapeHtml(r.telefono_contatto || "")}</td><td>${escapeHtml(nomeRagazzo(r))}</td><td>${escapeHtml((r.gruppi || []).map((g) => g.nome).join(", ") || "Non assegnato")}</td><td class="numero">${escapeHtml(formattaImporto(r.dovuto, valuta))}</td><td class="numero">${escapeHtml(formattaImporto(r.pagato, valuta))}</td><td class="numero">${escapeHtml(formattaImporto(r.residuo, valuta))}</td><td>${escapeHtml(ETICHETTE_QUOTA[r.stato_quota] || r.stato_quota)}</td></tr>`).join("");
+}
+
+export default function PagamentiParrocchia({ parrocchiaId, tornaDashboard, nomeParrocchia = "" }) {
+  const [pagina, setPagina] = useState("quote");
+  return <div>
+    <div className="azioni-non-stampabili" style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20 }}>
+      <button type="button" className="pulsante-secondario" aria-pressed={pagina === "quote"} onClick={() => setPagina("quote")}>Quote delle attività</button>
+      <button type="button" className="pulsante-secondario" aria-pressed={pagina === "registro"} onClick={() => setPagina("registro")}>Registro dei movimenti</button>
+    </div>
+    {pagina === "quote" ? <QuoteAttivita key={parrocchiaId || "nessuna"} parrocchiaId={parrocchiaId} tornaDashboard={tornaDashboard} nomeParrocchia={nomeParrocchia} /> : <RegistroMovimenti key={parrocchiaId || "nessuna"} parrocchiaId={parrocchiaId} tornaDashboard={tornaDashboard} />}
+  </div>;
+}
+
+function QuoteAttivita({ parrocchiaId, tornaDashboard, nomeParrocchia }) {
+  const [attivita, setAttivita] = useState([]);
+  const [attivitaId, setAttivitaId] = useState("");
+  const [dati, setDati] = useState(null);
+  const [caricamento, setCaricamento] = useState(true);
+  const [errore, setErrore] = useState("");
+  const [gruppoId, setGruppoId] = useState("");
+  const [soloSospesi, setSoloSospesi] = useState(false);
+  const [revisione, setRevisione] = useState(0);
+  const [pagamento, setPagamento] = useState(null);
+  const [salvataggio, setSalvataggio] = useState(false);
+  const [errorePagamento, setErrorePagamento] = useState("");
+  const [messaggio, setMessaggio] = useState("");
+  const [famigliaPromemoria, setFamigliaPromemoria] = useState("");
+  const [testoPromemoria, setTestoPromemoria] = useState(PROMEMORIA);
+  const [intestazioneStampa, setIntestazioneStampa] = useState(nomeParrocchia || "Segreteria parrocchiale");
+  const [metodi, setMetodi] = useState([]);
+  const [erroreMetodi, setErroreMetodi] = useState("");
+  const salvaInCorso = useRef(false);
+  const richiestaQuote = useRef(0);
+  const vivo = useRef(true);
+  const pannelloPagamento = useRef(null);
+  const pannelloPromemoria = useRef(null);
+
+  useEffect(() => { vivo.current = true; return () => { vivo.current = false; }; }, []);
+  useEffect(() => { if (pagamento) pannelloPagamento.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }, [pagamento?.riga.id]);
+  useEffect(() => { if (famigliaPromemoria) pannelloPromemoria.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }, [famigliaPromemoria]);
+
+  useEffect(() => {
+    let attuale = true;
+    if (!parrocchiaId) { setErrore("Seleziona una parrocchia."); setCaricamento(false); return; }
+    async function carica() {
+      try {
+        const { data, error } = await supabase.rpc("ars_elenco_attivita_parroco", { p_parrocchia_id: parrocchiaId });
+        if (error) throw error;
+        if (!Array.isArray(data)) throw new Error("Impossibile leggere l’elenco delle attività.");
+        if (!attuale) return;
+        setAttivita(data);
+        setAttivitaId(data[0]?.id || "");
+        if (!data.length) setCaricamento(false);
+      } catch (e) { if (attuale) { setErrore(e.message || "Impossibile caricare le attività."); setCaricamento(false); } }
+    }
+    carica();
+    return () => { attuale = false; };
+  }, [parrocchiaId]);
+
+  useEffect(() => {
+    let attuale = true;
+    if (!parrocchiaId) return;
+    async function carica() {
+      try {
+        const { data, error } = await supabase.rpc("ars_elenco_metodi_incasso_pubblici", { p_parrocchia_id: parrocchiaId });
+        if (error) throw error;
+        if (!Array.isArray(data)) throw new Error("Risposta dei metodi di pagamento inattesa.");
+        if (attuale) setMetodi(data);
+      } catch (e) { if (attuale) setErroreMetodi("Metodi di pagamento non disponibili: il promemoria inviterà a contattare la segreteria."); }
+    }
+    carica();
+    return () => { attuale = false; };
+  }, [parrocchiaId]);
+
+  useEffect(() => {
+    if (!attivitaId) return;
+    let attuale = true;
+    const richiesta = ++richiestaQuote.current;
+    setCaricamento(true); setErrore(""); setDati(null);
+    async function carica() {
+      try {
+        const { data, error } = await supabase.rpc("ars_riepilogo_quote_attivita_parroco", { p_parrocchia_id: parrocchiaId, p_attivita_id: attivitaId });
+        if (error) throw error;
+        if (!data || !Array.isArray(data.iscrizioni)) throw new Error("Impossibile leggere il riepilogo delle quote.");
+        if (attuale && richiesta === richiestaQuote.current) setDati(data);
+      } catch (e) { if (attuale) setErrore(e.message || "Impossibile caricare le quote."); }
+      finally { if (attuale) setCaricamento(false); }
+    }
+    carica();
+    return () => { attuale = false; };
+  }, [parrocchiaId, attivitaId, revisione]);
+
+  const iscrizioni = dati?.iscrizioni || [];
+  const valuta = dati?.attivita?.valuta || "EUR";
+  const gruppi = useMemo(() => {
+    const mappa = new Map();
+    (dati?.iscrizioni || []).forEach((r) => (r.gruppi || []).forEach((g) => mappa.set(g.id, g)));
+    return [...mappa.values()].sort((a, b) => a.nome.localeCompare(b.nome, "it"));
+  }, [dati]);
+  const righeVisibili = iscrizioni.filter((r) => (!gruppoId || (gruppoId === "non_assegnati" ? !(r.gruppi || []).length : (r.gruppi || []).some((g) => g.id === gruppoId))) && (!soloSospesi || numero(r.residuo) > 0));
+  const famiglieVisibili = raggruppaFamiglie(righeVisibili);
+  const famiglieComplete = raggruppaFamiglie(iscrizioni);
+  const totali = totaliQuote(righeVisibili);
+  const titolo = dati?.attivita?.titolo || "Attività";
+  const gruppoNome = gruppoId === "non_assegnati" ? "Non assegnati" : gruppi.find((g) => g.id === gruppoId)?.nome || "Tutti i gruppi";
+
+  function cambiaAttivita(e) {
+    richiestaQuote.current += 1;
+    setDati(null); setCaricamento(true); setAttivitaId(e.target.value); setGruppoId(""); setPagamento(null); setFamigliaPromemoria(""); setMessaggio("");
+  }
+
+  function nuovoPagamento(r) {
+    setErrorePagamento(""); setMessaggio("");
+    setPagamento({ riga: r, importo: numero(r.residuo) > 0 ? numero(r.residuo).toFixed(2) : "", metodo: "consegna_diretta", data: new Date().toLocaleDateString("sv-SE"), note: "" });
+  }
+
+  async function salvaPagamento(e) {
+    e.preventDefault();
+    if (!pagamento || salvaInCorso.current) return;
+    const importo = numero(String(pagamento.importo).replace(",", "."));
+    if (importo <= 0) { setErrorePagamento("Indica un importo maggiore di zero."); return; }
+    if (pagamento.riga.stato_quota !== "contributo_libero" && importo > numero(pagamento.riga.residuo)) { setErrorePagamento("L’importo supera il residuo dell’iscrizione."); return; }
+    const data = new Date(`${pagamento.data}T12:00:00`);
+    if (Number.isNaN(data.getTime())) { setErrorePagamento("Indica una data valida."); return; }
+    salvaInCorso.current = true; setSalvataggio(true); setErrorePagamento("");
+    try {
+      const { error } = await supabase.rpc("ars_registra_pagamento_attivita", {
+        p_parrocchia_id: parrocchiaId, p_iscrizione_attivita_id: pagamento.riga.id,
+        p_importo: importo, p_metodo: pagamento.metodo, p_stato: "completata",
+        p_data_pagamento: data.toISOString(), p_pagante_utente_id: null, p_note_private: pagamento.note.trim() || null,
+      });
+      if (error) throw error;
+      if (vivo.current) { setPagamento(null); setMessaggio("Pagamento registrato. Il riepilogo viene aggiornato."); setRevisione((v) => v + 1); }
+    } catch (err) { if (vivo.current) setErrorePagamento(err.message || "Impossibile registrare il pagamento."); }
+    finally { salvaInCorso.current = false; if (vivo.current) setSalvataggio(false); }
+  }
+
+  function stampaElenco(soloResidui = false) {
+    const righe = righeVisibili.filter((r) => !soloResidui || numero(r.residuo) > 0);
+    const t = totaliQuote(righe);
+    try {
+      apriStampa(titolo, `<p class="meta">${escapeHtml(intestazioneStampa)}</p><h1>${escapeHtml(titolo)}</h1><p>${escapeHtml(gruppoNome)} · ${soloResidui || soloSospesi ? "Quote da completare" : "Riepilogo quote"} · ${escapeHtml(new Date().toLocaleDateString("it-IT"))}</p><table><thead><tr><th>Genitore / telefono</th><th>Partecipante</th><th>Gruppo</th><th>Dovuto</th><th>Pagato</th><th>Residuo</th><th>Stato</th></tr></thead><tbody>${righeStampa(righe, valuta)}</tbody></table><p class="totale">Iscritti: ${righe.length} · Dovuto: ${escapeHtml(formattaImporto(t.dovuto, valuta))} · Pagato: ${escapeHtml(formattaImporto(t.pagato, valuta))} · Residuo: ${escapeHtml(formattaImporto(t.residuo, valuta))}</p>`);
+    } catch (e) { setErrore(e.message); }
+  }
+
+  function stampaPromemoria() {
+    const famiglia = famiglieComplete.find((f) => f.id === famigliaPromemoria);
+    if (!famiglia) return;
+    const istruzioni = metodi.map((m) => {
+      const dettagli = [m.intestatario && `Intestatario: ${m.intestatario}`, m.iban && `IBAN: ${m.iban}`, m.bic_swift && `BIC/SWIFT: ${m.bic_swift}`, m.email_paypal && `PayPal: ${m.email_paypal}`, m.link_pagamento, m.istruzioni].filter(Boolean).map(escapeHtml).join("<br>");
+      return `<p><strong>${escapeHtml(m.titolo)}</strong><br>${dettagli}</p>`;
+    }).join("") || "<p>Per completare il versamento, contattate la segreteria parrocchiale.</p>";
+    try {
+      apriStampa(`Promemoria quota - ${famiglia.nomi}`, `<p class="meta">${escapeHtml(intestazioneStampa)} · ${escapeHtml(new Date().toLocaleDateString("it-IT"))}</p><h1>Promemoria quota di partecipazione</h1><h2>${escapeHtml(titolo)}</h2><p>Alla cortese attenzione di ${escapeHtml(famiglia.nomi)}</p><p class="testo">${escapeHtml(testoPromemoria)}</p><table><thead><tr><th>Partecipante</th><th>Dovuto</th><th>Pagato</th><th>Da completare</th></tr></thead><tbody>${famiglia.righe.map((r) => `<tr><td>${escapeHtml(nomeRagazzo(r))}</td><td class="numero">${escapeHtml(formattaImporto(r.dovuto, valuta))}</td><td class="numero">${escapeHtml(formattaImporto(r.pagato, valuta))}</td><td class="numero">${escapeHtml(formattaImporto(r.residuo, valuta))}</td></tr>`).join("")}</tbody></table><p class="totale">Quota complessiva: ${escapeHtml(formattaImporto(famiglia.dovuto, valuta))}<br>Versamenti registrati: ${escapeHtml(formattaImporto(famiglia.pagato, valuta))}<br><strong>Importo da completare: ${escapeHtml(formattaImporto(famiglia.residuo, valuta))}</strong></p>${famiglia.in_attesa > 0 ? `<p>Versamenti in attesa di registrazione definitiva: ${escapeHtml(formattaImporto(famiglia.in_attesa, valuta))}.</p>` : ""}<h2>Modalità di versamento</h2>${istruzioni}<p class="firma">Un cordiale saluto,<br>${escapeHtml(intestazioneStampa)}</p>`);
+    } catch (e) { setErrore(e.message); }
+  }
+
+  return <main className="quote-attivita">
+    <style>{STILI_QUOTE}</style>
+    <button type="button" className="pulsante-torna-dashboard" onClick={tornaDashboard}>← Torna alla dashboard</button>
+    <h2>Quote delle attività</h2><p>Seleziona l’attività per vedere tutti gli iscritti, compresi quelli che non hanno ancora pagato.</p>
+    <div className="qa-filtri">
+      <label>Attività<select value={attivitaId} onChange={cambiaAttivita} disabled={salvataggio || !attivita.length}>{!attivita.length && <option value="">Nessuna attività</option>}{attivita.map((a) => <option key={a.id} value={a.id}>{a.titolo}</option>)}</select></label>
+      <label>Gruppo<select value={gruppoId} onChange={(e) => setGruppoId(e.target.value)} disabled={caricamento}><option value="">Tutti i gruppi</option>{gruppi.map((g) => <option key={g.id} value={g.id}>{g.nome}</option>)}<option value="non_assegnati">Non assegnati</option></select></label>
+      <label className="qa-check"><input type="checkbox" checked={soloSospesi} onChange={(e) => setSoloSospesi(e.target.checked)} /> Solo quote da completare</label>
+      <button type="button" onClick={() => setRevisione((v) => v + 1)} disabled={caricamento || !attivitaId || salvataggio}>Aggiorna</button>
+    </div>
+    {messaggio && <p role="status">{messaggio}</p>}{errore && <p role="alert" className="messaggio-errore">{errore}</p>}
+    {caricamento && <p role="status">Caricamento delle quote…</p>}
+    {!caricamento && !errore && !attivita.length && <p>Nessuna attività disponibile.</p>}
+    {!caricamento && !errore && dati && <>
+      <h3>{titolo} · {gruppoNome}</h3>
+      <div className="qa-totali">{[["Iscritti", righeVisibili.length], ["Dovuto", formattaImporto(totali.dovuto, valuta)], ["Pagato", formattaImporto(totali.pagato, valuta)], ["Da completare", formattaImporto(totali.residuo, valuta)]].map(([etichetta, valore]) => <article key={etichetta}><span>{etichetta}</span><strong>{valore}</strong></article>)}</div>
+      {totali.in_attesa > 0 && <p>Versamenti in attesa: {formattaImporto(totali.in_attesa, valuta)}. Saranno conteggiati come pagati quando completati.</p>}
+      <p>I totali rispettano il gruppo e il filtro selezionati. Le quote esenti hanno importo dovuto zero.</p>
+      <div className="qa-filtri"><label>Intestazione delle stampe<input value={intestazioneStampa} onChange={(e) => setIntestazioneStampa(e.target.value)} placeholder="Nome della parrocchia" /></label><button type="button" disabled={!righeVisibili.length} onClick={() => stampaElenco()}>Stampa elenco</button><button type="button" disabled={!righeVisibili.some((r) => numero(r.residuo) > 0)} onClick={() => stampaElenco(true)}>Stampa quote da completare</button></div>
+      {!righeVisibili.length ? <p>Nessuna iscrizione corrisponde alla selezione.</p> : <div className="qa-tabella"><table><thead><tr><th>Genitore</th><th>Figlio / partecipante</th><th>Gruppo</th><th>Dovuto</th><th>Pagato</th><th>Residuo</th><th>Stato</th><th>Azioni</th></tr></thead><tbody>{famiglieVisibili.map((f) => <React.Fragment key={f.id}>
+        {f.righe.map((r) => <tr key={r.id}><td>{nomeGenitore(r)}<small>{r.telefono_contatto || ""}</small></td><td>{nomeRagazzo(r)}</td><td>{(r.gruppi || []).map((g) => g.nome).join(", ") || "Non assegnato"}</td><td>{formattaImporto(r.dovuto, valuta)}</td><td>{formattaImporto(r.pagato, valuta)}{numero(r.in_attesa) > 0 && <small>In attesa: {formattaImporto(r.in_attesa, valuta)}</small>}</td><td><strong>{formattaImporto(r.residuo, valuta)}</strong></td><td>{ETICHETTE_QUOTA[r.stato_quota] || r.stato_quota}</td><td>{(numero(r.residuo) > 0 || r.stato_quota === "contributo_libero") && <button type="button" onClick={() => nuovoPagamento(r)} disabled={salvataggio}>Registra pagamento</button>}</td></tr>)}
+        <tr className="qa-famiglia"><td colSpan={3}>Totale famiglia nella selezione · {f.nomi}</td><td>{formattaImporto(f.dovuto, valuta)}</td><td>{formattaImporto(f.pagato, valuta)}</td><td>{formattaImporto(f.residuo, valuta)}</td><td colSpan={2}>{famiglieComplete.find((c) => c.id === f.id)?.residuo > 0 && <button type="button" onClick={() => setFamigliaPromemoria(f.id)}>Promemoria famiglia</button>}</td></tr>
+      </React.Fragment>)}</tbody></table></div>}
+    </>}
+    {pagamento && <section ref={pannelloPagamento} className="qa-pannello"><h3>Registra pagamento · {nomeRagazzo(pagamento.riga)}</h3><p>{nomeGenitore(pagamento.riga)} · Residuo: {formattaImporto(pagamento.riga.residuo, valuta)}</p><p>Registra un versamento già ricevuto. Per più figli, registra la quota attribuita a ciascuno.</p>
+      <form onSubmit={salvaPagamento}><fieldset disabled={salvataggio}><div className="qa-filtri">
+        <label>Importo ({valuta})<input type="number" min="0.01" step="0.01" required value={pagamento.importo} onChange={(e) => setPagamento({ ...pagamento, importo: e.target.value })} /></label>
+        <label>Metodo<select value={pagamento.metodo} onChange={(e) => setPagamento({ ...pagamento, metodo: e.target.value })}><option value="consegna_diretta">Versamento in parrocchia</option><option value="bonifico">Bonifico ricevuto</option></select></label>
+        <label>Data<input type="date" required value={pagamento.data} onChange={(e) => setPagamento({ ...pagamento, data: e.target.value })} /></label>
+        <label>Note private<input value={pagamento.note} onChange={(e) => setPagamento({ ...pagamento, note: e.target.value })} /></label>
+      </div>{errorePagamento && <p role="alert">{errorePagamento}</p>}<div className="qa-filtri"><button type="submit">{salvataggio ? "Registrazione…" : "Registra versamento"}</button><button type="button" onClick={() => setPagamento(null)}>Annulla</button></div></fieldset></form>
+    </section>}
+    {famigliaPromemoria && !caricamento && !errore && <section ref={pannelloPromemoria} className="qa-pannello"><h3>Promemoria riservato · {famiglieComplete.find((f) => f.id === famigliaPromemoria)?.nomi}</h3><p>Comprende tutti i figli della famiglia in questa attività, anche se sono in gruppi diversi. Puoi stampare oppure salvare in PDF e inviarlo personalmente.</p><label>Testo del promemoria<textarea rows={5} value={testoPromemoria} onChange={(e) => setTestoPromemoria(e.target.value)} /></label>{erroreMetodi && <p role="status">{erroreMetodi}</p>}<div className="qa-filtri"><button type="button" onClick={stampaPromemoria}>Anteprima / Salva PDF</button><button type="button" onClick={() => setFamigliaPromemoria("")}>Chiudi</button></div></section>}
+  </main>;
+}
+
+const STILI_QUOTE = `
+  .quote-attivita{color:#173955}.qa-filtri{display:flex;flex-wrap:wrap;gap:14px;align-items:end;margin:20px 0}.quote-attivita label{display:flex;flex-direction:column;gap:6px}.quote-attivita input,.quote-attivita select,.quote-attivita textarea{padding:10px;border:1px solid #d6c8b4;border-radius:8px;font:inherit;background:#fff;max-width:100%;box-sizing:border-box}.quote-attivita button{padding:10px 14px;border:1px solid #c99536;border-radius:8px;background:#fffaf0;color:#173955;font:inherit;cursor:pointer}.quote-attivita button:disabled{opacity:.55;cursor:default}.quote-attivita .qa-check{flex-direction:row;align-items:center;padding-bottom:10px}.qa-totali{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin:20px 0}.qa-totali article{background:#fffdf9;border:1px solid #e5d9ca;border-radius:12px;padding:18px}.qa-totali span,.qa-totali strong{display:block}.qa-totali strong{font-size:24px;margin-top:8px}.qa-tabella{overflow:auto}.qa-tabella table{width:100%;border-collapse:collapse}.qa-tabella th,.qa-tabella td{text-align:left;vertical-align:top;padding:12px 10px;border-bottom:1px solid #e5d9ca}.qa-tabella th{background:#f6f0e5}.qa-tabella small{display:block;margin-top:5px}.qa-famiglia{background:#faf5eb;font-weight:600}.qa-pannello{background:#fffdf9;border:1px solid #c99536;border-radius:14px;padding:22px;margin-top:24px}.qa-pannello fieldset{border:0;margin:0;padding:0}.qa-pannello textarea{width:100%}@media print{.azioni-non-stampabili{display:none!important}}
+`;
 
 const FILTRI_INIZIALI = {
   attivitaId: "",
@@ -61,7 +288,7 @@ function etichettaStato(stato) {
   return etichette[stato] || stato || "—";
 }
 
-export default function PagamentiParrocchia({
+function RegistroMovimenti({
   parrocchiaId,
   tornaDashboard,
 }) {
