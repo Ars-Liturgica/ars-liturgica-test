@@ -95,6 +95,16 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
   const [grestIscrizioni, setGrestIscrizioni] = useState(null);
   const [grestGruppi, setGrestGruppi] = useState(null);
   const [cartellaId, setCartellaId] = useState(null);
+  const [azioneAttivita, setAzioneAttivita] = useState(null);
+  const [messaggioCancellazione, setMessaggioCancellazione] = useState("");
+  const [pubblicaCancellazione, setPubblicaCancellazione] = useState(false);
+  const [operazioneAttivita, setOperazioneAttivita] = useState(false);
+  const [praticaAvvisi, setPraticaAvvisi] = useState(null);
+  const [avvisiCancellazione, setAvvisiCancellazione] = useState([]);
+  const [erroreAvvisi, setErroreAvvisi] = useState("");
+  const [caricamentoAvvisi, setCaricamentoAvvisi] = useState(false);
+  const [avvisoInConferma, setAvvisoInConferma] = useState(null);
+  const [avvisiAperti, setAvvisiAperti] = useState([]);
   const cartella = attivita.find((voce) => voce.id === cartellaId) || null;
   const principaleBozza = attivita.find((voce) => voce.id === bozza.attivitaPrincipaleId);
   const testoAggiunta = cartella
@@ -104,7 +114,125 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
     cartella ? voce.attivita_principale_id === cartella.id : !voce.attivita_principale_id
   );
 
+  function avvisaFamiglie(voce) {
+    const principale = attivita.find((a) => a.id === voce.attivita_principale_id);
+    return voce.tipo?.toLowerCase() === "grest" || principale?.tipo?.toLowerCase() === "grest";
+  }
+
+  function preparaAzioneAttivita(voce) {
+    setMostraModulo(false);
+    setErrore("");
+    setMessaggio("");
+    setPraticaAvvisi(null);
+    setAzioneAttivita(voce);
+    setPubblicaCancellazione(false);
+    setMessaggioCancellazione(`L’attività «${voce.titolo}» è stata cancellata. Per informazioni ed eventuali quote già versate, contatta la parrocchia.`);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function apriAvvisiCancellazione(voce, risultato = null) {
+    setPraticaAvvisi(null);
+    setErroreAvvisi("");
+    setAvvisiCancellazione([]);
+    setAvvisiAperti([]);
+    setCaricamentoAvvisi(true);
+    try {
+      let pratica = risultato;
+      if (!pratica) {
+        const { data, error } = await supabase.rpc("ars_elenco_attivita_cancellate_parroco", {
+          p_parrocchia_id: parrocchiaId,
+        });
+        if (error) throw error;
+        pratica = data?.find((a) => a.id === voce.id);
+        if (!pratica) throw new Error("La pratica di cancellazione non è disponibile per questa attività.");
+      }
+      setPraticaAvvisi({ attivita: voce, messaggio: pratica.messaggio });
+      const { data, error } = await supabase.rpc("ars_famiglie_cancellazione_parroco", {
+        p_attivita_id: voce.id,
+      });
+      if (error) throw error;
+      if (!Array.isArray(data)) throw new Error("L’elenco degli avvisi non è riconosciuto.");
+      setAvvisiCancellazione(data);
+    } catch (error) {
+      setErroreAvvisi(error.message || "Impossibile caricare gli avvisi. Riprova.");
+    } finally {
+      setCaricamentoAvvisi(false);
+    }
+  }
+
+  async function confermaAzioneAttivita(evento) {
+    evento.preventDefault();
+    if (!azioneAttivita || operazioneAttivita) return;
+    const voce = azioneAttivita;
+    const eliminaBozza = voce.stato === "bozza";
+    if (!eliminaBozza && !messaggioCancellazione.trim()) {
+      setErrore("Inserisci il messaggio prima di confermare.");
+      return;
+    }
+    setOperazioneAttivita(true);
+    setErrore("");
+    try {
+      const { data, error } = await supabase.rpc(
+        eliminaBozza ? "ars_elimina_bozza_attivita_parroco" : "ars_cancella_attivita_con_avvisi_parroco",
+        eliminaBozza ? { p_attivita_id: voce.id } : {
+          p_attivita_id: voce.id,
+          p_messaggio: messaggioCancellazione.trim(),
+          p_pubblica_bacheca: pubblicaCancellazione,
+        }
+      );
+      if (error) throw error;
+      if (data?.stato !== (eliminaBozza ? "eliminata" : "annullata")) {
+        throw new Error("Non è stato possibile confermare l’esito. Aggiorna l’elenco prima di riprovare.");
+      }
+      setAzioneAttivita(null);
+      if (eliminaBozza && cartellaId === voce.id) setCartellaId(null);
+      await caricaAttivita();
+      setMessaggio(eliminaBozza
+        ? "Bozza eliminata. Nessun avviso inviato."
+        : `Attività cancellata.${data.bacheca_documento_id ? " Avviso pubblicato in Bacheca Avvisi." : ""} Gli avvisi personali sono da inviare e confermare qui sotto.`);
+      if (!eliminaBozza) await apriAvvisiCancellazione(voce, data);
+    } catch (error) {
+      setErrore(error.message || "L’operazione non è riuscita. Riprova.");
+    } finally {
+      setOperazioneAttivita(false);
+    }
+  }
+
+  async function confermaInvioAvviso(avviso) {
+    if (!praticaAvvisi || avvisoInConferma || !avvisiAperti.includes(avviso.id)) return;
+    if (!window.confirm("Confermi di aver effettivamente inviato il messaggio su WhatsApp? Aprire WhatsApp non equivale a inviarlo.")) return;
+    setAvvisoInConferma(avviso.id);
+    setErroreAvvisi("");
+    try {
+      const { error } = await supabase.rpc("ars_conferma_avviso_whatsapp_parroco", {
+        p_attivita_id: praticaAvvisi.attivita.id,
+        p_avviso_id: avviso.id,
+      });
+      if (error) throw error;
+      setAvvisiCancellazione((precedenti) => precedenti.map((a) => a.id === avviso.id ? { ...a, stato: "inviato" } : a));
+    } catch (error) {
+      setErroreAvvisi(error.message || "La conferma non è stata registrata.");
+    } finally {
+      setAvvisoInConferma(null);
+    }
+  }
+
+  function pulsanteCancellazione(voce) {
+    if (!["bozza", "pubblicata", "annullata"].includes(voce.stato)) return null;
+    if (voce.stato === "annullata") return <button type="button" style={stile.pulsante}
+      disabled={operazioneAttivita || caricamentoAvvisi}
+      onClick={() => apriAvvisiCancellazione(voce)}>Gestisci avvisi di cancellazione</button>;
+    return <button type="button" style={stile.pulsante}
+      disabled={operazioneAttivita || caricamentoInformativa || salvataggio}
+      onClick={() => preparaAzioneAttivita(voce)}>
+      {voce.stato === "bozza" ? "Elimina bozza" : "Cancella attività"}
+    </button>;
+  }
+
   function apriCartella(voce) {
+    setAzioneAttivita(null);
+    setPraticaAvvisi(null);
+    setErroreAvvisi("");
     setCartellaId(voce.id);
     setMostraModulo(false);
     setErrore("");
@@ -113,6 +241,9 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
   }
 
   function chiudiCartella() {
+    setAzioneAttivita(null);
+    setPraticaAvvisi(null);
+    setErroreAvvisi("");
     setCartellaId(null);
     setMostraModulo(false);
     setErrore("");
@@ -175,6 +306,9 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
   }, [caricaAttivita]);
 
   async function apriModulo(voce = null, principaleId = null) {
+    setAzioneAttivita(null);
+    setPraticaAvvisi(null);
+    setErroreAvvisi("");
     setErrore("");
     setMessaggio("");
     const tipo = voce?.tipo || "altro";
@@ -346,10 +480,67 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
         <button type="button" style={stile.pulsante} onClick={caricaAttivita} disabled={caricamento || !parrocchiaId}>
           Aggiorna elenco
         </button>
-        {!mostraModulo && <button type="button" style={stile.pulsante} disabled={!parrocchiaId || caricamento || caricamentoInformativa || (cartella && !["bozza", "pubblicata"].includes(cartella.stato))} onClick={() => apriModulo(null, cartella?.id || null)}>
+        {!mostraModulo && !azioneAttivita && <button type="button" style={stile.pulsante} disabled={!parrocchiaId || caricamento || caricamentoInformativa || (cartella && !["bozza", "pubblicata"].includes(cartella.stato))} onClick={() => apriModulo(null, cartella?.id || null)}>
           + {testoAggiunta}
         </button>}
       </header>
+
+      {azioneAttivita && <form onSubmit={confermaAzioneAttivita} style={{ ...stile.card, marginBottom: 24 }}>
+        <h2>{azioneAttivita.stato === "bozza" ? "Elimina bozza" : "Cancella attività"}: {azioneAttivita.titolo}</h2>
+        {azioneAttivita.stato === "bozza" ? <p>Questa bozza verrà eliminata definitivamente. Nessun avviso sarà inviato.</p> : <>
+          <p>L’attività sarà cancellata. Iscrizioni e pagamenti resteranno disponibili per gestire le questioni pendenti.</p>
+          <p>Gli avvisi personali sono destinati {avvisaFamiglie(azioneAttivita) ? "ai genitori o tutori dei ragazzi iscritti" : "agli iscritti a questa attività"}. Dopo la conferma potrai inviarli su WhatsApp e registrarne l’invio.</p>
+          <label style={stile.campo}>Messaggio di cancellazione
+            <textarea style={stile.controllo} rows={5} required maxLength={2000}
+              disabled={operazioneAttivita} value={messaggioCancellazione}
+              onChange={(e) => setMessaggioCancellazione(e.target.value)} />
+          </label>
+          <label style={{ display: "block", marginBottom: 16 }}>
+            <input type="checkbox" disabled={operazioneAttivita} checked={pubblicaCancellazione}
+              onChange={(e) => setPubblicaCancellazione(e.target.checked)} /> Pubblica anche in Bacheca Avvisi
+          </label>
+          {pubblicaCancellazione && <p>Lo stesso messaggio sarà visibile a tutta la comunità parrocchiale.</p>}
+        </>}
+        {attivita.some((a) => a.attivita_principale_id === azioneAttivita.id && (azioneAttivita.stato === "bozza" || a.stato !== "annullata")) &&
+          <p>Questa attività contiene iniziative collegate: elimina prima le loro bozze e cancella quelle pubblicate.</p>}
+        <button type="submit" style={stile.pulsante} disabled={operazioneAttivita}>
+          {operazioneAttivita ? "Operazione in corso…" : azioneAttivita.stato === "bozza" ? "Conferma eliminazione bozza" : "Conferma cancellazione attività"}
+        </button>{" "}
+        <button type="button" style={stile.pulsante} disabled={operazioneAttivita}
+          onClick={() => { setAzioneAttivita(null); setErrore(""); }}>Annulla</button>
+      </form>}
+
+      {(praticaAvvisi || caricamentoAvvisi || erroreAvvisi) && <section style={{ ...stile.card, marginBottom: 24 }}>
+        <h2>Avvisi personali di cancellazione{praticaAvvisi ? `: ${praticaAvvisi.attivita.titolo}` : ""}</h2>
+        {caricamentoAvvisi && <p role="status">Caricamento dei destinatari…</p>}
+        {erroreAvvisi && <p role="alert">{erroreAvvisi}</p>}
+        {praticaAvvisi && <>
+          <p>Destinatari: {avvisaFamiglie(praticaAvvisi.attivita) ? "genitori o tutori" : "iscritti all’attività"}.</p>
+          <p style={{ whiteSpace: "pre-wrap" }}>{praticaAvvisi.messaggio}</p>
+          <p>Apri WhatsApp, invia il messaggio e poi premi «Conferma invio». La conferma registra il tuo riscontro; non verifica la consegna.</p>
+          {!caricamentoAvvisi && !erroreAvvisi && avvisiCancellazione.length === 0 && <p>Non risultano destinatari per questa attività.</p>}
+          {avvisiCancellazione.map((avviso) => {
+            const cifre = String(avviso.telefono || "").replace(/[^0-9]/g, "");
+            const numero = cifre.startsWith("00") ? cifre.slice(2) : /^3[0-9]{9}$/.test(cifre) ? `39${cifre}` : cifre;
+            const inviato = ["inviato", "consegnato"].includes(avviso.stato);
+            const puoInviare = numero && ["in_attesa", "fallito"].includes(avviso.stato);
+            return <div key={avviso.id} style={{ borderTop: "1px solid #ded5c6", padding: "14px 0" }}>
+              <p>Telefono: {avviso.telefono || "non disponibile"}{avviso.email ? ` — Email: ${avviso.email}` : ""}</p>
+              <p>{inviato ? "Invio registrato" : "Da contattare"}</p>
+              {puoInviare ? <>
+                <a style={{ ...stile.pulsante, display: "inline-block" }} target="_blank" rel="noopener noreferrer"
+                  href={`https://wa.me/${numero}?text=${encodeURIComponent(praticaAvvisi.messaggio || "")}`}
+                  onClick={() => setAvvisiAperti((prima) => prima.includes(avviso.id) ? prima : [...prima, avviso.id])}>Apri WhatsApp</a>{" "}
+                <button type="button" style={stile.pulsante} disabled={Boolean(avvisoInConferma) || !avvisiAperti.includes(avviso.id)}
+                  onClick={() => confermaInvioAvviso(avviso)}>{avvisoInConferma === avviso.id ? "Registrazione…" : "Conferma invio"}</button>
+                <p>Per i cellulari italiani di 10 cifre viene aggiunto il prefisso 39. Per gli altri numeri verifica il prefisso internazionale.</p>
+              </> : !inviato && <p>Contatta il destinatario con il recapito disponibile o tramite la segreteria. L’avviso resta da gestire.</p>}
+            </div>;
+          })}
+        </>}
+        <button type="button" style={stile.pulsante} disabled={caricamentoAvvisi || Boolean(avvisoInConferma)}
+          onClick={() => { setPraticaAvvisi(null); setErroreAvvisi(""); }}>Chiudi avvisi</button>
+      </section>}
 
       {cartella && !mostraModulo && <section style={{ ...stile.card, marginBottom: 24 }}>
         <span style={stile.etichetta}>{cartella.stato}</span>
@@ -365,6 +556,7 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
             {" "}<button type="button" style={stile.pulsante} onClick={() => setGrestGruppi(cartella)}>Gestisci gruppi</button>
           </>}
         </>}
+        {" "}{pulsanteCancellazione(cartella)}
         <h3>{cartella.tipo?.toLowerCase() === "grest" ? "Attività del GREST" : "Attività collegate"}</h3>
         <p>{cartella.tipo?.toLowerCase() === "grest"
           ? "Organizza una gita, un picnic o un’altra iniziativa per i partecipanti al GREST."
@@ -498,6 +690,7 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
                   {voce.stato === "pubblicata" && <>{" "}<button type="button" style={stile.pulsante} onClick={() => setGrestIscrizioni(voce)}>Vedi iscrizioni</button></>}
                   {" "}<button type="button" style={stile.pulsante} onClick={() => setGrestGruppi(voce)}>Gestisci gruppi</button>
                 </>}
+                {" "}{pulsanteCancellazione(voce)}
               </article>
             );
           })}
