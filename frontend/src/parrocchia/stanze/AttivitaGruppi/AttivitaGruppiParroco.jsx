@@ -96,6 +96,10 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
   const [grestGruppi, setGrestGruppi] = useState(null);
   const [cartellaId, setCartellaId] = useState(null);
   const cartella = attivita.find((voce) => voce.id === cartellaId) || null;
+  const principaleBozza = attivita.find((voce) => voce.id === bozza.attivitaPrincipaleId);
+  const testoAggiunta = cartella
+    ? cartella.tipo?.toLowerCase() === "grest" ? "Aggiungi un’attività al GREST" : "Aggiungi un’attività a questa iniziativa"
+    : "Nuova attività";
   const elencoVisibile = attivita.filter((voce) =>
     cartella ? voce.attivita_principale_id === cartella.id : !voce.attivita_principale_id
   );
@@ -336,14 +340,14 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
             ← Torna alla dashboard
           </button>
           <h1>{cartella ? cartella.titolo : "Attività e Gruppi"}</h1>
-          <p>{cartella ? "Gestisci questa attività e le iniziative al suo interno." : "Le attività della tua parrocchia, comprese le bozze."}</p>
+          <p>{cartella ? "Gestisci questa attività e le iniziative al suo interno." : "Le attività della tua parrocchia, comprese le bozze. Puoi creare un GREST, una gita o un’altra attività parrocchiale."}</p>
           {cartella && <button type="button" style={stile.pulsante} onClick={chiudiCartella}>← Tutte le attività</button>}
         </div>
         <button type="button" style={stile.pulsante} onClick={caricaAttivita} disabled={caricamento || !parrocchiaId}>
           Aggiorna elenco
         </button>
         {!mostraModulo && <button type="button" style={stile.pulsante} disabled={!parrocchiaId || caricamento || caricamentoInformativa || (cartella && !["bozza", "pubblicata"].includes(cartella.stato))} onClick={() => apriModulo(null, cartella?.id || null)}>
-          + Nuova attività
+          + {testoAggiunta}
         </button>}
       </header>
 
@@ -361,13 +365,15 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
             {" "}<button type="button" style={stile.pulsante} onClick={() => setGrestGruppi(cartella)}>Gestisci gruppi</button>
           </>}
         </>}
-        <h3>Attività interne</h3>
-        <p>Usa «Nuova attività» per aggiungere una gita, un picnic o un’altra iniziativa in questa cartella.</p>
+        <h3>{cartella.tipo?.toLowerCase() === "grest" ? "Attività del GREST" : "Attività collegate"}</h3>
+        <p>{cartella.tipo?.toLowerCase() === "grest"
+          ? "Organizza una gita, un picnic o un’altra iniziativa per i partecipanti al GREST."
+          : "Aggiungi una gita, un picnic o un’altra iniziativa collegata a questa attività."}</p>
       </section>}
       {mostraModulo && (
         <form onSubmit={(evento) => salvaAttivita(evento)} style={{ ...stile.card, marginBottom: 24 }}>
-          <h2>{bozza.id ? "Modifica attività" : "Nuova attività"}</h2>
-          {bozza.attivitaPrincipaleId && <p>Dentro: {attivita.find((voce) => voce.id === bozza.attivitaPrincipaleId)?.titolo || "attività principale"}</p>}
+          <h2>{bozza.id ? "Modifica attività" : principaleBozza?.tipo?.toLowerCase() === "grest" ? `Nuova attività del ${principaleBozza.titolo}` : "Nuova attività"}</h2>
+          {bozza.attivitaPrincipaleId && <p>Questa attività fa parte {principaleBozza?.tipo?.toLowerCase() === "grest" ? `del ${principaleBozza.titolo}` : `di «${principaleBozza?.titolo || "attività principale"}»`}.</p>}
           {bozza.statoOriginale === "pubblicata" && <p>Le modifiche salvate saranno subito visibili nell’attività pubblicata.</p>}
           <label style={stile.campo}>Tipo di attività
             <select style={stile.controllo} value={bozza.tipo} disabled={salvataggio || caricamentoInformativa || Boolean(bozza.id)} onChange={(e) => cambiaTipo(e.target.value)}>
@@ -467,8 +473,8 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
       {messaggio && <p role="status">{messaggio}</p>}
       {!caricamento && !errore && elencoVisibile.length === 0 && (
         <section style={stile.card}>
-          <h2>{cartella ? "Nessuna attività interna ancora creata" : "Nessuna attività ancora creata"}</h2>
-          <p>Premi «Nuova attività» per iniziare.</p>
+          <h2>{cartella ? cartella.tipo?.toLowerCase() === "grest" ? "Non hai ancora aggiunto attività al GREST" : "Non hai ancora aggiunto attività collegate" : "Nessuna attività ancora creata"}</h2>
+          <p>Premi «{testoAggiunta}» per iniziare.</p>
         </section>
       )}
       {!caricamento && !errore && elencoVisibile.length > 0 && (
