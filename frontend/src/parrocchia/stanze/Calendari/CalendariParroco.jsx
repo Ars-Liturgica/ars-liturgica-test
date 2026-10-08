@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { supabase } from "../../../supabaseClient";
 import "./CalendariParroco.css";
 
@@ -6,6 +6,11 @@ export default function CalendariParroco({
   parrocchiaId,
   tornaDashboard,
 }) {
+  const [vista, setVista] = useState("mese");
+  const [salvataggio, setSalvataggio] = useState(false);
+  const salvataggioInCorso = useRef(false);
+  const [aggiornamento, setAggiornamento] = useState(0);
+  const [erroreSalvataggio, setErroreSalvataggio] = useState("");
   const [eventi, setEventi] = useState([]);
   const [intenzioni, setIntenzioni] = useState([]);
   const [caricamento, setCaricamento] = useState(true);
@@ -25,131 +30,75 @@ const [nuovoEvento, setNuovoEvento] = useState({
   visibilita: "privato",
   pubblicaInBacheca: false,
 });
-  useEffect(() => {
-    async function caricaEventi() {
-      if (!parrocchiaId) {
-        setCaricamento(false);
-        return;
-      }
+  const giorniCalendario = useMemo(() => {
+    if (vista === "settimana") {
+      const lunedi = new Date(dataCorrente.getFullYear(), dataCorrente.getMonth(), dataCorrente.getDate());
+      lunedi.setDate(lunedi.getDate() - ((lunedi.getDay() + 6) % 7));
+      return Array.from({ length: 7 }, (_, i) => new Date(lunedi.getFullYear(), lunedi.getMonth(), lunedi.getDate() + i));
+    }
+    const primo = new Date(dataCorrente.getFullYear(), dataCorrente.getMonth(), 1);
+    const ultimo = new Date(dataCorrente.getFullYear(), dataCorrente.getMonth() + 1, 0);
+    const inizio = new Date(primo);
+    inizio.setDate(1 - ((primo.getDay() + 6) % 7));
+    const fine = new Date(ultimo);
+    fine.setDate(ultimo.getDate() + (6 - ((ultimo.getDay() + 6) % 7)));
+    const giorni = [];
+    for (let d = new Date(inizio); d <= fine; d.setDate(d.getDate() + 1)) giorni.push(new Date(d));
+    return giorni;
+  }, [dataCorrente, vista]);
 
+  const intervallo = useMemo(() => {
+    const inizio = vista === "agenda"
+      ? new Date(dataCorrente.getFullYear(), dataCorrente.getMonth(), 1)
+      : giorniCalendario[0];
+    const fine = vista === "agenda"
+      ? new Date(dataCorrente.getFullYear(), dataCorrente.getMonth() + 1, 1)
+      : new Date(giorniCalendario.at(-1).getFullYear(), giorniCalendario.at(-1).getMonth(), giorniCalendario.at(-1).getDate() + 1);
+    return { inizio, fine };
+  }, [dataCorrente, vista, giorniCalendario]);
+
+  useEffect(() => {
+    let attivo = true;
+    async function caricaEventi() {
+      if (!parrocchiaId) { setCaricamento(false); return; }
       setCaricamento(true);
       setErrore("");
       setErroreIntenzioni("");
-
-      const inizioMese = new Date(
-        dataCorrente.getFullYear(),
-        dataCorrente.getMonth(),
-        1
-      );
-
-      const fineMese = new Date(
-        dataCorrente.getFullYear(),
-        dataCorrente.getMonth() + 1,
-        1
-      );
-
-      const ultimoGiornoMese = new Date(
-        dataCorrente.getFullYear(),
-        dataCorrente.getMonth() + 1,
-        0
-      );
-
-      function formattaDataPerDatabase(data) {
-        const anno = data.getFullYear();
-        const mese = String(data.getMonth() + 1).padStart(2, "0");
-        const giorno = String(data.getDate()).padStart(2, "0");
-
-        return `${anno}-${mese}-${giorno}`;
+      try {
+        const { data: datiEventi, error: erroreEventi } = await supabase
+          .from("eventi_calendario").select("*")
+          .eq("parrocchia_id", parrocchiaId).neq("stato", "annullato")
+          .eq("mostra_calendario_parroco", true)
+          .lt("data_ora_inizio", intervallo.fine.toISOString())
+          .or(`data_ora_inizio.gte.${intervallo.inizio.toISOString()},data_ora_fine.gt.${intervallo.inizio.toISOString()}`)
+          .order("data_ora_inizio", { ascending: true });
+        if (erroreEventi) throw erroreEventi;
+        if (!attivo) return;
+        setEventi(datiEventi || []);
+        const ultimo = new Date(intervallo.fine);
+        ultimo.setDate(ultimo.getDate() - 1);
+        const { data: datiIntenzioni, error: erroreI } = await supabase.rpc("ars_elenco_intenzioni_parroco", {
+          p_parrocchia_id: parrocchiaId,
+          p_data_dal: dataDatabase(intervallo.inizio), p_data_al: dataDatabase(ultimo),
+        });
+        if (!attivo) return;
+        setIntenzioni(erroreI ? [] : (datiIntenzioni || []));
+        if (erroreI) setErroreIntenzioni("Le intenzioni non sono momentaneamente disponibili.");
+      } catch (error) {
+        if (attivo) { setErrore(error.message || "Calendario non disponibile"); setEventi([]); setIntenzioni([]); }
+      } finally {
+        if (attivo) setCaricamento(false);
       }
-
-      const { data: datiEventi, error: erroreEventi } = await supabase
-        .from("eventi_calendario")
-        .select("*")
-        .eq("parrocchia_id", parrocchiaId)
-        .neq("stato", "annullato")
-        .gte("data_ora_inizio", inizioMese.toISOString())
-        .lt("data_ora_inizio", fineMese.toISOString())
-        .order("data_ora_inizio", { ascending: true });
-
-      if (erroreEventi) {
-        setErrore(erroreEventi.message);
-        setEventi([]);
-        setIntenzioni([]);
-        setCaricamento(false);
-        return;
-      }
-
-      const {
-        data: datiIntenzioni,
-        error: erroreCaricamentoIntenzioni,
-      } = await supabase.rpc("ars_elenco_intenzioni_parroco", {
-        p_parrocchia_id: parrocchiaId,
-        p_data_dal: formattaDataPerDatabase(inizioMese),
-        p_data_al: formattaDataPerDatabase(ultimoGiornoMese),
-      });
-
-      setEventi(datiEventi || []);
-
-      if (erroreCaricamentoIntenzioni) {
-        console.error(
-          "Errore caricamento intenzioni del parroco:",
-          erroreCaricamentoIntenzioni
-        );
-        setIntenzioni([]);
-        setErroreIntenzioni(
-          "Le intenzioni non sono momentaneamente disponibili."
-        );
-      } else {
-        setIntenzioni(datiIntenzioni || []);
-      }
-
-      setCaricamento(false);
     }
-
     caricaEventi();
-  }, [parrocchiaId, dataCorrente]);
+    return () => { attivo = false; };
+  }, [parrocchiaId, intervallo, aggiornamento]);
 
   const nomeMese = useMemo(() => {
     return new Intl.DateTimeFormat("it-IT", {
       month: "long",
       year: "numeric",
     }).format(dataCorrente);
-  }, [dataCorrente]);
-
-  const giorniCalendario = useMemo(() => {
-    const anno = dataCorrente.getFullYear();
-    const mese = dataCorrente.getMonth();
-
-    const primoGiornoMese = new Date(anno, mese, 1);
-    const ultimoGiornoMese = new Date(anno, mese + 1, 0);
-
-    let giornoSettimana = primoGiornoMese.getDay();
-    if (giornoSettimana === 0) giornoSettimana = 7;
-
-    const giorniPrima = giornoSettimana - 1;
-
-    const giorni = [];
-
-    for (let i = giorniPrima; i > 0; i--) {
-      giorni.push(new Date(anno, mese, 1 - i));
-    }
-
-    for (let giorno = 1; giorno <= ultimoGiornoMese.getDate(); giorno++) {
-      giorni.push(new Date(anno, mese, giorno));
-    }
-
-    while (giorni.length % 7 !== 0) {
-      const ultimo = giorni[giorni.length - 1];
-      giorni.push(
-        new Date(
-          ultimo.getFullYear(),
-          ultimo.getMonth(),
-          ultimo.getDate() + 1
-        )
-      );
-    }
-
-    return giorni;
   }, [dataCorrente]);
 
   function categoriaEvento(evento) {
@@ -206,9 +155,12 @@ const [nuovoEvento, setNuovoEvento] = useState({
   }
 
   function eventiDelGiorno(giorno) {
-    return eventiFiltrati.filter((evento) =>
-      stessoGiorno(new Date(evento.data_ora_inizio), giorno)
-    );
+    const inizio = new Date(giorno.getFullYear(), giorno.getMonth(), giorno.getDate());
+    const fine = new Date(giorno.getFullYear(), giorno.getMonth(), giorno.getDate() + 1);
+    return eventiFiltrati.filter(evento => {
+      const avvio = new Date(evento.data_ora_inizio);
+      return avvio < fine && (avvio >= inizio || (evento.data_ora_fine && new Date(evento.data_ora_fine) > inizio));
+    }).sort((a, b) => new Date(a.data_ora_inizio) - new Date(b.data_ora_inizio));
   }
 
   function intenzioniDellEvento(eventoId) {
@@ -230,26 +182,18 @@ const [nuovoEvento, setNuovoEvento] = useState({
 
   const eventiGiornoSelezionato = eventiDelGiorno(giornoSelezionato);
 
-  function mesePrecedente() {
-    const nuovaData = new Date(
-      dataCorrente.getFullYear(),
-      dataCorrente.getMonth() - 1,
-      1
-    );
-
+  function spostaPeriodo(direzione) {
+    const nuovaData = vista === "settimana"
+      ? new Date(dataCorrente.getFullYear(), dataCorrente.getMonth(), dataCorrente.getDate() + direzione * 7)
+      : new Date(dataCorrente.getFullYear(), dataCorrente.getMonth() + direzione, 1);
     setDataCorrente(nuovaData);
     setGiornoSelezionato(nuovaData);
   }
-
-  function meseSuccessivo() {
-    const nuovaData = new Date(
-      dataCorrente.getFullYear(),
-      dataCorrente.getMonth() + 1,
-      1
-    );
-
-    setDataCorrente(nuovaData);
-    setGiornoSelezionato(nuovaData);
+  function mesePrecedente() { spostaPeriodo(-1); }
+  function meseSuccessivo() { spostaPeriodo(1); }
+  function cambiaVista(nuovaVista) {
+    setDataCorrente(giornoSelezionato);
+    setVista(nuovaVista);
   }
 
   function vaiAOggi() {
@@ -283,50 +227,36 @@ function aggiornaNuovoEvento(campo, valore) {
   setMostraNuovoEvento(false);
 }
   async function salvaNuovoEvento() {
-  if (!nuovoEvento.titolo || !nuovoEvento.data || !nuovoEvento.ora) {
-    alert("Compila almeno Titolo, Data e Ora.");
-    return;
+    if (salvataggioInCorso.current) return;
+    setErroreSalvataggio("");
+    if (!nuovoEvento.titolo.trim() || !nuovoEvento.data || !nuovoEvento.ora) {
+      setErroreSalvataggio("Compila almeno Titolo, Data e Ora."); return;
+    }
+    salvataggioInCorso.current = true;
+    setSalvataggio(true);
+    try {
+      const { data, error } = await supabase.rpc("ars_salva_evento_calendario_parroco", {
+        p_parrocchia_id: parrocchiaId, p_titolo: nuovoEvento.titolo.trim(),
+        p_data: nuovoEvento.data, p_ora: nuovoEvento.ora,
+        p_descrizione: nuovoEvento.descrizione || null, p_luogo: nuovoEvento.luogo || null,
+        p_origine: nuovoEvento.origine, p_visibilita: nuovoEvento.visibilita,
+      });
+      if (error) throw error;
+      if (!data?.id) throw new Error("Il salvataggio non ha restituito l’evento. Verifica il calendario prima di riprovare.");
+      const giorno = new Date(nuovoEvento.data + "T12:00:00");
+      setDataCorrente(giorno);
+      setGiornoSelezionato(giorno);
+      setFiltroCategoria("tutto");
+      setAggiornamento(n => n + 1);
+      setNuovoEvento({ titolo: "", descrizione: "", data: "", ora: "", luogo: "", origine: "calendario", visibilita: "privato", pubblicaInBacheca: false });
+      setMostraNuovoEvento(false);
+    } catch (error) {
+      setErroreSalvataggio(error.message || "Salvataggio non riuscito. Verifica il calendario prima di riprovare.");
+    } finally {
+      salvataggioInCorso.current = false;
+      setSalvataggio(false);
+    }
   }
-
-  const dataOraInizio = new Date(
-    `${nuovoEvento.data}T${nuovoEvento.ora}`
-  );
-
-  const { data, error } = await supabase
-    .from("eventi_calendario")
-    .insert({
-      parrocchia_id: parrocchiaId,
-      titolo: nuovoEvento.titolo,
-      descrizione: nuovoEvento.descrizione || null,
-      data_ora_inizio: dataOraInizio.toISOString(),
-      luogo: nuovoEvento.luogo || null,
-      origine: nuovoEvento.origine,
-      visibilita: nuovoEvento.visibilita,
-      mostra_calendario_parroco: true,
-    })
-    .select()
-    .single();
-
-  if (error) {
-    alert(`Errore nel salvataggio: ${error.message}`);
-    return;
-  }
-
-  setEventi((precedenti) => [...precedenti, data]);
-
-  setNuovoEvento({
-    titolo: "",
-    descrizione: "",
-    data: "",
-    ora: "",
-    luogo: "",
-    origine: "calendario",
-    visibilita: "privato",
-    pubblicaInBacheca: false,
-  });
-
-  setMostraNuovoEvento(false);
-}
   return (
     <div className="calendari-parroco">
       <button
@@ -346,7 +276,7 @@ function aggiornaNuovoEvento(campo, valore) {
        <button
   type="button"
   className="pulsante-nuovo-evento"
-  onClick={() => setMostraNuovoEvento(true)}
+  onClick={() => { setErroreSalvataggio(""); setMostraNuovoEvento(true); }}
 >
           + Nuovo evento
         </button>
@@ -360,6 +290,7 @@ function aggiornaNuovoEvento(campo, valore) {
         type="button"
         className="chiudi-nuovo-evento"
         onClick={chiudiNuovoEvento}
+        disabled={salvataggio}
         aria-label="Chiudi"
       >
         ×
@@ -463,52 +394,23 @@ function aggiornaNuovoEvento(campo, valore) {
 
   {nuovoEvento.visibilita === "privato" && (
     <small className="info-visibilita">
-      Visibile solo al parroco e agli eventuali delegati
-      autorizzati al suo calendario. Non è visibile alla
-      comunità e non può essere pubblicato in Bacheca.
+      Visibile al parroco che lo ha creato. Non è visibile alla comunità.
     </small>
   )}
 
  {nuovoEvento.visibilita === "riservato" && (
   <small className="info-visibilita">
-    Visibile esclusivamente ai gruppi della parrocchia
-    selezionati dal parroco. L'evento sarà disponibile nei
-    calendari dei gruppi selezionati e non sarà visibile
-    all'intera comunità né pubblicato nella Bacheca pubblica.
+    L’evento resta visibile al creatore. La scelta dei gruppi autorizzati sarà attivata in un passaggio successivo.
   </small>
 )}
  {nuovoEvento.visibilita === "pubblico" && (
   <small className="info-visibilita">
-    Visibile a tutta la comunità nel calendario pubblico
-    della parrocchia. Se selezioni "Pubblica anche in Bacheca",
-    l'evento verrà pubblicato anche nella Bacheca della stessa
-    parrocchia.
+    Visibile a tutta la comunità nel calendario pubblico della parrocchia.
   </small>
 )}
       </div>
             </div>
-{nuovoEvento.visibilita === "pubblico" && (
-  <div className="campo-pubblica-bacheca">
-    <label>
-      <input
-        type="checkbox"
-        checked={nuovoEvento.pubblicaInBacheca}
-        onChange={(e) =>
-          aggiornaNuovoEvento(
-            "pubblicaInBacheca",
-            e.target.checked
-          )
-        }
-      />
-      <span>Pubblica anche in Bacheca</span>
-    </label>
-
-    <small>
-      L'avviso sarà pubblicato nella Bacheca della stessa
-      parrocchia a cui appartiene questo evento.
-    </small>
-  </div>
-)}
+{nuovoEvento.visibilita === "pubblico" && <p className="avviso-intenzioni-calendario">La pubblicazione anche in Bacheca è ancora da attivare.</p>}
       <div className="campo-evento campo-descrizione">
         <label htmlFor="evento-descrizione">Descrizione</label>
         <textarea
@@ -522,11 +424,13 @@ function aggiornaNuovoEvento(campo, valore) {
         />
       </div>
 
+      {erroreSalvataggio && <p role="alert" className="errore-calendario">{erroreSalvataggio}</p>}
       <div className="nuovo-evento-azioni">
         <button
           type="button"
           className="pulsante-annulla-evento"
           onClick={chiudiNuovoEvento}
+          disabled={salvataggio}
         >
           Annulla
         </button>
@@ -535,8 +439,9 @@ function aggiornaNuovoEvento(campo, valore) {
           type="button"
           className="pulsante-salva-evento"
           onClick={salvaNuovoEvento}
+          disabled={salvataggio}
         >
-          Salva evento
+          {salvataggio ? "Salvataggio…" : "Salva evento"}
         </button>
       </div>
     </div>
@@ -547,7 +452,7 @@ function aggiornaNuovoEvento(campo, valore) {
           ‹
         </button>
 
-        <h2>{nomeMese}</h2>
+        <h2>{vista === "settimana" ? `${giorniCalendario[0].toLocaleDateString("it-IT")} – ${giorniCalendario.at(-1).toLocaleDateString("it-IT")}` : nomeMese}</h2>
 
         <button type="button" onClick={meseSuccessivo}>
           ›
@@ -558,11 +463,10 @@ function aggiornaNuovoEvento(campo, valore) {
         </button>
 
         <div className="calendari-viste">
-          <button type="button" className="attivo">
-            Mese
-          </button>
-          <button type="button">Settimana</button>
-          <button type="button">Agenda</button>
+          {[ ["mese", "Mese"], ["settimana", "Settimana"], ["agenda", "Agenda"] ].map(([id, etichetta]) =>
+            <button key={id} type="button" className={vista === id ? "attivo" : ""}
+              aria-pressed={vista === id} onClick={() => cambiaVista(id)}>{etichetta}</button>
+          )}
         </div>
       </div>
 
@@ -635,6 +539,24 @@ function aggiornaNuovoEvento(campo, valore) {
       {!caricamento && !errore && (
         <div className="calendario-contenitore">
           <div className="calendario-mese">
+            {vista === "agenda" ? <div className="calendario-agenda">
+              <h3>Agenda di {nomeMese}</h3>
+              {eventiFiltrati.length === 0 ? <p>Nessun evento per questo periodo e filtro.</p> :
+                giorniCalendario.filter(giorno => giorno.getMonth() === dataCorrente.getMonth()).map(giorno => {
+                  const appuntamenti = eventiDelGiorno(giorno);
+                  if (!appuntamenti.length) return null;
+                  return <section key={dataDatabase(giorno)}>
+                    <h4>{formattaGiornoCompleto(giorno)}</h4>
+                    {appuntamenti.map(evento => <button type="button" key={evento.id}
+                      className={`agenda-evento categoria-${categoriaEvento(evento)}`}
+                      onClick={() => setGiornoSelezionato(giorno)}>
+                      <span>{evento.tutto_il_giorno ? "Tutto il giorno" : formattaOra(evento.data_ora_inizio)}</span>
+                      <div><strong>{evento.titolo}</strong>{evento.luogo && <small>{evento.luogo}</small>}</div>
+                      {intenzioniDellEvento(evento.id).length > 0 && <small>{intenzioniDellEvento(evento.id).length} intenzioni</small>}
+                    </button>)}
+                  </section>;
+                })}
+            </div> : <>
             <div className="calendario-settimana-titoli">
               <div>LUN</div>
               <div>MAR</div>
@@ -661,13 +583,15 @@ function aggiornaNuovoEvento(campo, valore) {
                   <button
                     type="button"
                     key={giorno.toISOString()}
+                    aria-label={formattaGiornoCompleto(giorno)}
+                    aria-pressed={selezionato}
                     className={`calendario-giorno ${
                       fuoriMese ? "fuori-mese" : ""
                     } ${selezionato ? "selezionato" : ""}`}
                     onClick={() => setGiornoSelezionato(giorno)}
                   >
                     <span className="numero-giorno">
-                      {giorno.getDate()}
+                      {vista === "settimana" ? giorno.toLocaleDateString("it-IT", { weekday: "short", day: "numeric", month: "short" }) : giorno.getDate()}
                     </span>
 
                     <div className="eventi-giorno">
@@ -683,7 +607,7 @@ function aggiornaNuovoEvento(campo, valore) {
                             )}`}
                           >
                             <span>
-                              {formattaOra(evento.data_ora_inizio)}
+                              {evento.tutto_il_giorno ? "Tutto il giorno" : formattaOra(evento.data_ora_inizio)}
                             </span>
 
                             <strong>{evento.titolo}</strong>
@@ -712,6 +636,7 @@ function aggiornaNuovoEvento(campo, valore) {
                 );
               })}
             </div>
+            </>}
           </div>
 
           <aside className="calendario-dettaglio">
@@ -728,7 +653,7 @@ function aggiornaNuovoEvento(campo, valore) {
                 return (
                   <div key={evento.id} className="dettaglio-evento">
                     <div className="dettaglio-orario">
-                      {formattaOra(evento.data_ora_inizio)}
+                      {evento.tutto_il_giorno ? "Tutto il giorno" : formattaOra(evento.data_ora_inizio)}
                     </div>
 
                     <div className="contenuto-dettaglio-evento">
@@ -806,4 +731,8 @@ function aggiornaNuovoEvento(campo, valore) {
       )}
     </div>
   );
+}
+
+function dataDatabase(data) {
+  return `${data.getFullYear()}-${String(data.getMonth() + 1).padStart(2, "0")}-${String(data.getDate()).padStart(2, "0")}`;
 }
