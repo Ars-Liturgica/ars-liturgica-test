@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { supabase } from "../../../supabaseClient";
 import ElencoIscrizioniGrestParroco from "./ElencoIscrizioniGrestParroco";
+import { BilancioAttivitaParroco } from "../PagamentiParrocchia/PagamentiParrocchia";
 import GestioneGruppiGrestParroco from "./GestioneGruppiGrestParroco";
 
 const stile = {
@@ -92,6 +93,7 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
   const [testoInformativaDiversa, setTestoInformativaDiversa] = useState("");
   const [informativaAutomatica, setInformativaAutomatica] = useState(false);
   const [pdfParrocchia, setPdfParrocchia] = useState(null);
+  const [bilancioAttivita, setBilancioAttivita] = useState(null);
   const [grestIscrizioni, setGrestIscrizioni] = useState(null);
   const [grestGruppi, setGrestGruppi] = useState(null);
   const [cartellaId, setCartellaId] = useState(null);
@@ -458,6 +460,11 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
   }
 
   return (
+    bilancioAttivita ? <BilancioAttivitaParroco
+      parrocchiaId={parrocchiaId}
+      attivita={bilancioAttivita}
+      onIndietro={() => setBilancioAttivita(null)}
+    /> :
     grestIscrizioni ? <ElencoIscrizioniGrestParroco
       attivita={grestIscrizioni}
       onIndietro={() => { setGrestIscrizioni(null); caricaAttivita(); }}
@@ -556,6 +563,7 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
             {" "}<button type="button" style={stile.pulsante} onClick={() => setGrestGruppi(cartella)}>Gestisci gruppi</button>
           </>}
         </>}
+        {" "}<button type="button" style={stile.pulsante} onClick={() => setBilancioAttivita(cartella)}>Entrate, uscite e saldo</button>
         {" "}{pulsanteCancellazione(cartella)}
         <h3>{cartella.tipo?.toLowerCase() === "grest" ? "Attività del GREST" : "Attività collegate"}</h3>
         <p>{cartella.tipo?.toLowerCase() === "grest"
@@ -682,7 +690,7 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
                 {(inizio || fine) && <p>{[inizio, fine].filter(Boolean).join(" – ")}</p>}
                 {voce.luogo && <p>Luogo: {voce.luogo}</p>}
                 <p>{voce.modello_quota === "quota_fissa" ? `Quota: ${Number(voce.importo_quota).toLocaleString("it-IT", { style: "currency", currency: "EUR" })}` : voce.modello_quota === "contributo_libero" ? "Contributo libero" : "Gratuita"}</p>
-                {!cartella && <><button type="button" style={stile.pulsante} onClick={() => apriCartella(voce)}>Apri attività</button>{" "}</>}
+                <button type="button" style={stile.pulsante} onClick={() => apriCartella(voce)}>Apri attività</button>{" "}
                 {["bozza", "pubblicata"].includes(voce.stato) && (
                   <button type="button" style={stile.pulsante} disabled={caricamentoInformativa} onClick={() => apriModulo(voce)}>Modifica</button>
                 )}
