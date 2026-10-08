@@ -109,6 +109,59 @@ function descrizioneMessa(messa) {
   )} · ${messa.luogo || "Parrocchia"}${disponibilita}`;
 }
 
+function linkPagamentoSicuro(valore) {
+  try {
+    const url = new URL(valore);
+    return url.protocol === "https:" ? url.href : null;
+  } catch {
+    return null;
+  }
+}
+
+function IconaMetodoOfferta({ tipo }) {
+  const stile = { width: "68px", height: "42px", flexShrink: 0 };
+  if (tipo === "paypal") {
+    return <svg viewBox="0 0 120 60" aria-label="PayPal" role="img" style={stile}><rect width="120" height="60" rx="10" fill="#f3f8fc" /><text x="10" y="38" fontFamily="Arial, sans-serif" fontWeight="bold" fontStyle="italic" fontSize="28"><tspan fill="#003087">Pay</tspan><tspan fill="#0070ba">Pal</tspan></text></svg>;
+  }
+  if (tipo === "bonifico") {
+    return <svg viewBox="0 0 68 42" aria-label="Bonifico bancario" role="img" style={stile}><rect width="68" height="42" rx="8" fill="#edf3f8" /><g fill="none" stroke="#173955" strokeWidth="2.3" strokeLinejoin="round"><path d="M18 15 34 6 50 15Z M18 34h32 M21 30h26 M24 18v10 M34 18v10 M44 18v10" /></g></svg>;
+  }
+  if (tipo === "consegna_diretta") {
+    return <svg viewBox="0 0 68 42" aria-label="Consegna in parrocchia" role="img" style={stile}><rect width="68" height="42" rx="8" fill="#f2f7ed" /><g fill="none" stroke="#406632" strokeWidth="2.3"><rect x="14" y="11" width="40" height="22" rx="3" /><circle cx="34" cy="22" r="7" /></g><text x="34" y="26" textAnchor="middle" fontFamily="Arial, sans-serif" fontSize="12" fill="#406632">€</text></svg>;
+  }
+  return <svg viewBox="0 0 68 42" aria-label="Pagamento online" role="img" style={stile}><rect width="68" height="42" rx="8" fill="#edf3f8" /><g fill="none" stroke="#173955" strokeWidth="2.3"><rect x="14" y="9" width="40" height="25" rx="4" /><path d="M14 17h40 M21 27h10" /></g></svg>;
+}
+
+function MetodiOfferta({ metodi, aperto = false }) {
+  return (
+    <details open={aperto || undefined} style={{ marginTop: "18px", marginBottom: "20px", padding: "16px", border: "1px solid #d8cbbc", borderRadius: "11px", background: "#fffaf0", fontFamily: "Arial, sans-serif", lineHeight: "1.6" }}>
+      <summary style={{ cursor: "pointer", color: "#173955", fontWeight: "700" }}>Lascia un’offerta (facoltativa)</summary>
+      <p>Questa Messa accetta offerte. Puoi prenotare l’intenzione anche senza lasciare un’offerta.</p>
+      {metodi.length === 0 ? (
+        <p>Per lasciare un’offerta, contatta la parrocchia: i metodi di incasso non sono ancora disponibili.</p>
+      ) : metodi.map((metodo) => {
+        const etichette = { bonifico: "Bonifico", paypal: "PayPal", link: "Pagamento online", link_pagamento: "Pagamento online", consegna_diretta: "Consegna in parrocchia" };
+        const link = linkPagamentoSicuro(metodo.link_pagamento);
+        return (
+          <div key={metodo.id} style={{ background: "#ffffff", padding: "14px", borderRadius: "9px", marginTop: "12px", overflowWrap: "anywhere" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "8px" }}>
+              <IconaMetodoOfferta tipo={metodo.tipo} />
+              <strong>{metodo.titolo || etichette[metodo.tipo] || "Metodo di incasso"}</strong>
+            </div>
+            {metodo.intestatario && <div>Intestatario: {metodo.intestatario}</div>}
+            {metodo.iban && <div>IBAN: <strong>{metodo.iban}</strong></div>}
+            {metodo.bic_swift && <div>BIC/SWIFT: {metodo.bic_swift}</div>}
+            {metodo.email_paypal && <div>PayPal: {metodo.email_paypal}</div>}
+            {metodo.istruzioni && <p style={{ whiteSpace: "pre-wrap", margin: "8px 0" }}>{metodo.istruzioni}</p>}
+            {link && <a href={link} target="_blank" rel="noopener noreferrer" style={{ display: "inline-block", marginTop: "8px", color: "#173955", fontWeight: "700" }}>Apri il pagamento</a>}
+          </div>
+        );
+      })}
+      {metodi.length > 0 && <p style={{ marginBottom: 0 }}>Nella causale indica il tuo nome, la data della Messa e l’intenzione. La prenotazione e l’apertura del link non confermano l’avvenuto pagamento.</p>}
+    </details>
+  );
+}
+
 export default function IntenzioniMesseFedele({
   parrocchiaId,
   utenteId,
@@ -117,6 +170,8 @@ export default function IntenzioniMesseFedele({
   const [vista, setVista] = useState("elenco");
   const [messe, setMesse] = useState([]);
   const [intenzioni, setIntenzioni] = useState([]);
+  const [opzioniOfferta, setOpzioniOfferta] = useState({ messe: [], metodi: [] });
+  const [erroreOfferte, setErroreOfferte] = useState("");
 
   const [caricamento, setCaricamento] = useState(true);
   const [salvataggio, setSalvataggio] = useState(false);
@@ -153,8 +208,10 @@ export default function IntenzioniMesseFedele({
 
     setCaricamento(true);
     setErrore("");
+    setErroreOfferte("");
+    setOpzioniOfferta({ messe: [], metodi: [] });
 
-    const [risultatoMesse, risultatoIntenzioni] =
+    const [risultatoMesse, risultatoIntenzioni, risultatoOfferte] =
       await Promise.all([
         supabase.rpc(
           "ars_elenco_messe_intenzioni_fedele",
@@ -164,6 +221,10 @@ export default function IntenzioniMesseFedele({
           }
         ),
         supabase.rpc("ars_elenco_intenzioni_fedele", {
+          p_utente_id: utenteId,
+          p_parrocchia_id: parrocchiaId,
+        }),
+        supabase.rpc("ars_configurazione_offerte_intenzioni_fedele", {
           p_utente_id: utenteId,
           p_parrocchia_id: parrocchiaId,
         }),
@@ -189,6 +250,15 @@ export default function IntenzioniMesseFedele({
       return;
     }
 
+    if (risultatoOfferte.error) {
+      console.error("Errore caricamento metodi per le offerte:", risultatoOfferte.error);
+      setErroreOfferte("I metodi per le offerte non sono al momento disponibili. Puoi comunque prenotare l’intenzione; per l’offerta contatta la parrocchia.");
+    } else {
+      setOpzioniOfferta({
+        messe: risultatoOfferte.data?.messe || [],
+        metodi: risultatoOfferte.data?.metodi || [],
+      });
+    }
     setMesse(risultatoMesse.data || []);
     setIntenzioni(risultatoIntenzioni.data || []);
     setCaricamento(false);
@@ -218,6 +288,12 @@ export default function IntenzioniMesseFedele({
       );
     });
   }, [messe, intenzioneDaSpostare]);
+
+  function accettaOfferte(eventoId) {
+    return opzioniOfferta.messe.some(
+      (messa) => messa.evento_id === eventoId && messa.consenti_offerte === true
+    );
+  }
 
   function tornaElenco() {
     setVista("elenco");
@@ -549,6 +625,7 @@ export default function IntenzioniMesseFedele({
           </div>
         ) : (
           <>
+            {erroreOfferte && <p role="status" style={{ padding: "14px", borderRadius: "10px", background: "#fffaf0", fontFamily: "Arial, sans-serif", lineHeight: "1.6" }}>{erroreOfferte}</p>}
             {vista === "elenco" && (
               <>
                 <div
@@ -787,6 +864,9 @@ export default function IntenzioniMesseFedele({
                             )}
                           </div>
                         </div>
+                        {intenzione.stato !== "annullata" && accettaOfferte(intenzione.evento_id) && (
+                          <MetodiOfferta metodi={opzioniOfferta.metodi} />
+                        )}
                       </div>
                     ))}
                   </div>
@@ -853,6 +933,10 @@ export default function IntenzioniMesseFedele({
                     ))}
                   </select>
                 </div>
+
+                {accettaOfferte(eventoSelezionato) && (
+                  <MetodiOfferta metodi={opzioniOfferta.metodi} aperto />
+                )}
 
                 <div style={{ marginBottom: "20px" }}>
                   <label
