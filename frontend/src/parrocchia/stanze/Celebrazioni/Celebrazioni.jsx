@@ -1,141 +1,78 @@
 import React, { useState } from "react";
 import OrariMesse from "./OrariMesse";
+import IntenzioniMesseParroco from "./IntenzioniMesseParroco";
 
-export default function Celebrazioni({
-  parrocchiaId,
-  tornaDashboard,
-}) {
+export default function Celebrazioni({ parrocchiaId, tornaDashboard }) {
   const [sezioneAperta, setSezioneAperta] = useState(null);
-
   const sezioniCelebrazioni = [
     {
       id: "orari-messe",
       icona: <i className="fa-solid fa-clock icona-dashboard"></i>,
       titolo: "Orari Messe",
-      descrizione:
-        "Orari ordinari feriali, prefestivi e festivi della parrocchia.",
+      descrizione: "Orari ordinari feriali, prefestivi e festivi della parrocchia.",
     },
     {
       id: "intenzioni-registro-messe",
-      icona: (
-        <i className="fa-solid fa-book-open icona-dashboard"></i>
-      ),
+      icona: <i className="fa-solid fa-book-open icona-dashboard"></i>,
       titolo: "Intenzioni e Registro Messe",
-      descrizione:
-        "Messe per defunti e altre intenzioni, richieste, donazioni e registro delle celebrazioni.",
+      descrizione: "Messe per defunti e altre intenzioni, richieste, donazioni e registro delle celebrazioni.",
     },
     {
       id: "solennita-feste",
       icona: <i className="fa-solid fa-star icona-dashboard"></i>,
       titolo: "Solennità e feste liturgiche",
-      descrizione:
-        "Natale, Pasqua, festa patronale e altre ricorrenze liturgiche.",
+      descrizione: "Natale, Pasqua, festa patronale e altre ricorrenze liturgiche.",
     },
     {
       id: "celebrazioni-straordinarie",
       icona: <i className="fa-solid fa-bell icona-dashboard"></i>,
       titolo: "Celebrazioni straordinarie",
-      descrizione:
-        "Messe e celebrazioni che non rientrano nell’orario ordinario.",
+      descrizione: "Messe e celebrazioni che non rientrano nell’orario ordinario.",
     },
     {
       id: "confessioni",
-      icona: (
-        <i className="fa-solid fa-hands-praying icona-dashboard"></i>
-      ),
+      icona: <i className="fa-solid fa-hands-praying icona-dashboard"></i>,
       titolo: "Confessioni",
-      descrizione:
-        "Orari ordinari e disponibilità particolari nei tempi forti.",
+      descrizione: "Orari ordinari e disponibilità particolari nei tempi forti.",
     },
     {
       id: "adorazione-liturgie",
       icona: <i className="fa-solid fa-cross icona-dashboard"></i>,
       titolo: "Adorazione e altre liturgie",
-      descrizione:
-        "Adorazione eucaristica, Via Crucis, veglie e liturgie penitenziali.",
+      descrizione: "Adorazione eucaristica, Via Crucis, veglie e liturgie penitenziali.",
     },
     {
       id: "calendario-celebrazioni",
-      icona: (
-        <i className="fa-solid fa-calendar-days icona-dashboard"></i>
-      ),
+      icona: <i className="fa-solid fa-calendar-days icona-dashboard"></i>,
       titolo: "Calendario delle celebrazioni",
-      descrizione:
-        "Messe, liturgie e celebrazioni provenienti dal calendario centrale.",
+      descrizione: "Messe, liturgie e celebrazioni provenienti dal calendario centrale.",
     },
   ];
-
   if (sezioneAperta === "orari-messe") {
-    return (
-      <OrariMesse
-        parrocchiaId={parrocchiaId}
-        tornaCelebrazioni={() => setSezioneAperta(null)}
-      />
-    );
+    return <OrariMesse parrocchiaId={parrocchiaId} tornaCelebrazioni={() => setSezioneAperta(null)} />;
   }
-
-  const sezioneSelezionata = sezioniCelebrazioni.find(
-    (sezione) => sezione.id === sezioneAperta
-  );
-
+  if (sezioneAperta === "intenzioni-registro-messe") {
+    return <IntenzioniMesseParroco parrocchiaId={parrocchiaId} tornaCelebrazioni={() => setSezioneAperta(null)} />;
+  }
+  const sezioneSelezionata = sezioniCelebrazioni.find((sezione) => sezione.id === sezioneAperta);
   if (sezioneSelezionata) {
-    return (
-      <div className="dashboard-parroco">
-        <button
-          type="button"
-          className="pulsante-torna-dashboard"
-          onClick={() => setSezioneAperta(null)}
-        >
-          ← Torna a Celebrazioni
-        </button>
-
-        <h2>{sezioneSelezionata.titolo}</h2>
-        <p>{sezioneSelezionata.descrizione}</p>
-
-        <div className="sezione-in-preparazione">
-          <p>
-            Questa funzione sarà sviluppata nella prossima fase del
-            cantiere.
-          </p>
-        </div>
-      </div>
-    );
+    return <div className="dashboard-parroco">
+      <button type="button" className="pulsante-torna-dashboard" onClick={() => setSezioneAperta(null)}>← Torna a Celebrazioni</button>
+      <h2>{sezioneSelezionata.titolo}</h2>
+      <p>{sezioneSelezionata.descrizione}</p>
+      <div className="sezione-in-preparazione"><p>Questa funzione sarà sviluppata nella prossima fase del cantiere.</p></div>
+    </div>;
   }
-
-  return (
-    <div className="dashboard-parroco">
-      <button
-        type="button"
-        className="pulsante-torna-dashboard"
-        onClick={tornaDashboard}
-      >
-        ← Torna a Gestione Parrocchia
-      </button>
-
-      <h2>Celebrazioni</h2>
-
-      <p>
-        Gestione delle Messe, delle liturgie e delle celebrazioni
-        della vita parrocchiale.
-      </p>
-
-      <div className="griglia-gestione">
-        {sezioniCelebrazioni.map((sezione) => (
-          <button
-            type="button"
-            className="card-gestione"
-            key={sezione.id}
-            onClick={() => setSezioneAperta(sezione.id)}
-          >
-            <span className="icona-gestione">
-              {sezione.icona}
-            </span>
-
-            <h3>{sezione.titolo}</h3>
-            <p>{sezione.descrizione}</p>
-          </button>
-        ))}
-      </div>
+  return <div className="dashboard-parroco">
+    <button type="button" className="pulsante-torna-dashboard" onClick={tornaDashboard}>← Torna a Gestione Parrocchia</button>
+    <h2>Celebrazioni</h2>
+    <p>Gestione delle Messe, delle liturgie e delle celebrazioni della vita parrocchiale.</p>
+    <div className="griglia-gestione">
+      {sezioniCelebrazioni.map((sezione) => <button type="button" className="card-gestione" key={sezione.id} onClick={() => setSezioneAperta(sezione.id)}>
+        <span className="icona-gestione">{sezione.icona}</span>
+        <h3>{sezione.titolo}</h3>
+        <p>{sezione.descrizione}</p>
+      </button>)}
     </div>
-  );
+  </div>;
 }
