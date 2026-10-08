@@ -229,9 +229,9 @@ export default function DashboardParroco({
       icona: (
         <i className="fa-solid fa-receipt icona-dashboard"></i>
       ),
-      titolo: "Pagamenti",
+      titolo: "Gestione economica",
       descrizione:
-        "Registro generale degli incassi, quote delle attività e posizioni da saldare.",
+        "Entrate, uscite e saldi",
       stanza: "pagamenti",
     },
     {
