@@ -480,8 +480,8 @@ export default function DashboardParroco({
             <h3>{sezione.titolo}</h3>
             <p>{sezione.descrizione}</p>
             {!sezione.stanza && <span className="ars-dato-card">In preparazione</span>}
-            {riepilogo && sezione.stanza === "celebrazioni" && <span className="ars-dato-card">{riepilogo.intenzioni_oggi} intenzioni oggi</span>}
-            {riepilogo && sezione.stanza === "attivita-gruppi" && <span className="ars-dato-card">{riepilogo.attivita_pubblicate} attività pubblicate</span>}
+            {riepilogo && sezione.stanza === "celebrazioni" && <span className="ars-dato-card">{riepilogo.intenzioni_oggi} {riepilogo.intenzioni_oggi === 1 ? "intenzione" : "intenzioni"} oggi</span>}
+            {riepilogo && sezione.stanza === "attivita-gruppi" && <span className="ars-dato-card">{riepilogo.attivita_pubblicate} {riepilogo.attivita_pubblicate === 1 ? "attività pubblicata" : "attività pubblicate"}</span>}
             {riepilogo && sezione.stanza === "pagamenti" && <span className="ars-dato-card">{riepilogo.pagamenti_in_attesa} versamenti in attesa</span>}
           </button>
         ))}
@@ -511,7 +511,7 @@ function RiepilogoDashboard({ dati, apri }) {
   return <div className="ars-riepilogo-griglia">
     <section className="ars-riepilogo-pannello">
       <h3>Oggi in parrocchia</h3>
-      <p className="ars-numeri-oggi">{dati.eventi_oggi} appuntamenti · {dati.intenzioni_oggi} intenzioni di Messa</p>
+      <p className="ars-numeri-oggi">{dati.eventi_oggi} {dati.eventi_oggi === 1 ? "appuntamento" : "appuntamenti"} · {dati.intenzioni_oggi} {dati.intenzioni_oggi === 1 ? "intenzione" : "intenzioni"} di Messa</p>
       <button type="button" className="ars-azione-principale" onClick={() => apri("intenzioni")}>Apri le intenzioni di Messa</button>
       {dati.appuntamenti.length === 0 ? <p>Nessun appuntamento nel calendario del parroco per oggi.</p> :
         <ul className="ars-appuntamenti">{dati.appuntamenti.map(evento => <li key={evento.id}>
@@ -533,12 +533,12 @@ function RiepilogoDashboard({ dati, apri }) {
     <section className="ars-riepilogo-pannello ars-pannello-economia">
       <h3>Gestione economica</h3>
       <p>Movimenti di {mese}</p>
-      {dati.economia.length === 0 ? <p>Nessun incasso confermato o spesa di attività registrata nel mese.</p> :
+      {dati.economia.length === 0 ? <p>Nessun incasso confermato o spesa registrata nel mese.</p> :
         dati.economia.map(conto => <div className="ars-conti" key={conto.valuta}>
           <div><span>Incassi confermati · tutte le causali</span><strong>{denaro(conto.entrate, conto.valuta)}</strong></div>
-          <div><span>Spese registrate delle attività</span><strong>{denaro(conto.spese_attivita, conto.valuta)}</strong></div>
+          <div><span>Spese registrate · tutte le causali</span><strong>{denaro(conto.spese_attivita, conto.valuta)}</strong></div>
         </div>)}
-      <p className="ars-nota">Le spese generali e quelle per altre causali saranno incluse quando ne aggiungeremo la registrazione.</p>
+      <p className="ars-nota">Il riepilogo considera gli incassi confermati e le spese registrate nel mese.</p>
       <button type="button" className="ars-azione-principale" onClick={() => apri("pagamenti")}>Apri la gestione economica</button>
     </section>
   </div>;
