@@ -38,18 +38,19 @@ function righeStampa(righe, valuta) {
 }
 
 export default function PagamentiParrocchia({ parrocchiaId, tornaDashboard, nomeParrocchia = "" }) {
-  const [pagina, setPagina] = useState("quote");
+  const [pagina, setPagina] = useState("versamenti");
+  const [occupato, setOccupato] = useState(false);
   return <div className="ars-pagina-economica">
     <style>{STILI_ECONOMIA}</style>
     <nav className="ars-scelta-economica azioni-non-stampabili" aria-label="Gestione economica">
-      <button type="button" aria-pressed={pagina === "quote"} onClick={() => setPagina("quote")}>Quote delle attività</button>
-      <button type="button" aria-pressed={pagina === "registro"} onClick={() => setPagina("registro")}>Bilancio delle attività</button>
+      <button type="button" aria-pressed={pagina === "versamenti"} disabled={occupato} onClick={() => setPagina("versamenti")}>Versamenti per causale</button>
+      <button type="button" aria-pressed={pagina === "bilancio"} disabled={occupato} onClick={() => setPagina("bilancio")}>Bilancio generale</button>
     </nav>
-    {pagina === "quote" ? <QuoteAttivita key={parrocchiaId || "nessuna"} parrocchiaId={parrocchiaId} tornaDashboard={tornaDashboard} nomeParrocchia={nomeParrocchia} /> : <RegistroMovimenti key={parrocchiaId || "nessuna"} parrocchiaId={parrocchiaId} tornaDashboard={tornaDashboard} nomeParrocchia={nomeParrocchia} />}
+    <EconomiaPerCausale key={`${parrocchiaId}:${pagina}`} parrocchiaId={parrocchiaId} tornaDashboard={tornaDashboard} nomeParrocchia={nomeParrocchia} modalita={pagina} onOccupato={setOccupato} />
   </div>;
 }
 
-function QuoteAttivita({ parrocchiaId, tornaDashboard, nomeParrocchia }) {
+function QuoteAttivita({ parrocchiaId, tornaDashboard, nomeParrocchia, attivitaIniziale = "", onOccupato }) {
   const [attivita, setAttivita] = useState([]);
   const [attivitaId, setAttivitaId] = useState("");
   const [dati, setDati] = useState(null);
@@ -73,6 +74,7 @@ function QuoteAttivita({ parrocchiaId, tornaDashboard, nomeParrocchia }) {
   const pannelloPagamento = useRef(null);
   const pannelloPromemoria = useRef(null);
 
+  useEffect(() => { onOccupato?.(salvataggio); }, [salvataggio, onOccupato]);
   useEffect(() => { vivo.current = true; return () => { vivo.current = false; }; }, []);
   useEffect(() => { if (pagamento) pannelloPagamento.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }, [pagamento?.riga.id]);
   useEffect(() => { if (famigliaPromemoria) pannelloPromemoria.current?.scrollIntoView({ behavior: "smooth", block: "start" }); }, [famigliaPromemoria]);
@@ -87,7 +89,7 @@ function QuoteAttivita({ parrocchiaId, tornaDashboard, nomeParrocchia }) {
         if (!Array.isArray(data)) throw new Error("Impossibile leggere l’elenco delle attività.");
         if (!attuale) return;
         setAttivita(data);
-        setAttivitaId(data[0]?.id || "");
+        setAttivitaId(data.find(a => a.id === attivitaIniziale)?.id || data[0]?.id || "");
         if (!data.length) setCaricamento(false);
       } catch (e) { if (attuale) { setErrore(e.message || "Impossibile caricare le attività."); setCaricamento(false); } }
     }
@@ -195,7 +197,7 @@ function QuoteAttivita({ parrocchiaId, tornaDashboard, nomeParrocchia }) {
 
   return <main className="quote-attivita">
     <style>{STILI_QUOTE}</style>
-    <button type="button" className="pulsante-torna-dashboard" onClick={tornaDashboard}>← Torna alla dashboard</button>
+    <button type="button" className="pulsante-torna-dashboard" onClick={tornaDashboard} disabled={salvataggio}>← Torna alla dashboard</button>
     <h2>Quote delle attività</h2><p>Seleziona l’attività per vedere tutti gli iscritti, compresi quelli che non hanno ancora pagato.</p>
     <div className="qa-filtri">
       <label>Attività<select value={attivitaId} onChange={cambiaAttivita} disabled={salvataggio || !attivita.length}>{!attivita.length && <option value="">Nessuna attività</option>}{attivita.map((a) => <option key={a.id} value={a.id}>{a.titolo}</option>)}</select></label>
@@ -485,3 +487,187 @@ const STILI_ECONOMIA = `
 @media(max-width:600px){.ars-scelta-economica button{width:100%;font-size:18px}.ars-bilancio input,.ars-bilancio select{width:100%}.ars-economia-azioni label{width:100%}}
 @media print{.azioni-non-stampabili{display:none!important}}
 `;
+const CAUSALI_ECONOMIA = {
+  quota_attivita: "Quote delle attività", intenzione_messa: "Offerte per le Messe",
+  donazione_libera: "Donazioni libere", progetto: "Progetti", altra_iniziativa: "Altre iniziative",
+  spese_generali: "Spese generali",
+};
+
+function causaleMovimento(p) {
+  if (p.causale_tipo === "quota_attivita") return p.attivita?.titolo || "Attività non indicata";
+  if (p.causale_tipo === "progetto") return p.progetto?.titolo || "Progetto non indicato";
+  return CAUSALI_ECONOMIA[p.causale_tipo] || p.causale_tipo || "Altra causale";
+}
+function causaleSpesa(s) {
+  return s.causale_tipo === "quota_attivita" ? s.titolo_attivita || "Attività non indicata" :
+    s.causale_tipo === "progetto" ? s.titolo_progetto || "Progetto non indicato" :
+    CAUSALI_ECONOMIA[s.causale_tipo] || "Altra causale";
+}
+function bilanciPerCausale(dati, movimenti, spese, tipo, collegamento) {
+  const m = new Map();
+  function gruppo(causale, id, titolo, valuta) {
+    const key = `${causale}:${id || ""}:${valuta || "EUR"}`;
+    if (!m.has(key)) m.set(key, { key, causale, titolo, valuta: valuta || "EUR", incassi: 0, spese: 0, inAttesa: 0, rimborsi: 0 });
+    return m.get(key);
+  }
+  if (!tipo || tipo === "quota_attivita") dati.attivita.filter(a => !collegamento || a.id === collegamento).forEach(a => gruppo("quota_attivita", a.id, a.titolo, a.valuta));
+  if (!tipo || tipo === "progetto") dati.progetti.filter(a => !collegamento || a.id === collegamento).forEach(a => gruppo("progetto", a.id, a.titolo, a.valuta));
+  movimenti.forEach(p => {
+    const g = gruppo(p.causale_tipo, p.attivita?.id || p.progetto?.id, causaleMovimento(p), p.valuta);
+    if (p.stato === "completata") g.incassi += Math.round(numero(p.importo) * 100);
+    if (p.stato === "in_attesa") g.inAttesa += Math.round(numero(p.importo) * 100);
+    if (p.stato === "rimborsata") g.rimborsi++;
+  });
+  spese.forEach(s => { gruppo(s.causale_tipo, s.attivita_id || s.progetto_donazione_id, causaleSpesa(s), s.valuta).spese += Math.round(numero(s.importo) * 100); });
+  return [...m.values()].sort((a,b) => a.titolo.localeCompare(b.titolo,"it") || a.valuta.localeCompare(b.valuta));
+}
+
+function EconomiaPerCausale({ parrocchiaId, tornaDashboard, nomeParrocchia, modalita, onOccupato }) {
+  const bilancio = modalita === "bilancio";
+  const [dati, setDati] = useState(null);
+  const [caricamento, setCaricamento] = useState(true);
+  const [errore, setErrore] = useState("");
+  const [filtri, setFiltri] = useState({ dataDa: "", dataA: "", tipo: "", collegamento: "", stato: "", ricerca: "" });
+  const [dateApplicate, setDateApplicate] = useState({ dataDa: "", dataA: "" });
+  const [revisione, setRevisione] = useState(0);
+  const [quoteAperte, setQuoteAperte] = useState(false);
+  const [spesa, setSpesa] = useState(null);
+  const [salvataggio, setSalvataggio] = useState(false);
+  const [erroreSpesa, setErroreSpesa] = useState("");
+  const [messaggio, setMessaggio] = useState("");
+  const inCorso = useRef(false);
+  const vivo = useRef(true);
+  const pannello = useRef(null);
+  useEffect(() => { onOccupato?.(salvataggio); }, [salvataggio, onOccupato]);
+  useEffect(() => { vivo.current = true; return () => { vivo.current = false; }; }, []);
+  useEffect(() => { if (spesa) pannello.current?.scrollIntoView({ behavior:"smooth", block:"start" }); }, [spesa?.id]);
+  useEffect(() => {
+    let attuale = true;
+    setCaricamento(true); setErrore(""); setDati(null);
+    async function carica() {
+      try {
+        if (!parrocchiaId) throw new Error("Seleziona una parrocchia.");
+        const { data, error } = await supabase.rpc("ars_economia_parrocchia_per_causale", {
+          p_parrocchia_id: parrocchiaId, p_data_da: dateApplicate.dataDa || null, p_data_a: dateApplicate.dataA || null,
+        });
+        if (error) throw error;
+        if (!data || !["movimenti","spese","attivita","progetti"].every(k => Array.isArray(data[k]))) throw new Error("Riepilogo economico non disponibile.");
+        if (attuale) setDati(data);
+      } catch(e) { if (attuale) setErrore(e.message || "Impossibile leggere i movimenti."); }
+      finally { if (attuale) setCaricamento(false); }
+    }
+    carica(); return () => { attuale = false; };
+  }, [parrocchiaId, dateApplicate, revisione, quoteAperte]);
+
+  const ricerca = filtri.ricerca.trim().toLocaleLowerCase("it-IT");
+  const include = (tipo, id) => (!filtri.tipo || tipo === filtri.tipo) && (!filtri.collegamento || id === filtri.collegamento);
+  const movimenti = (dati?.movimenti || []).filter(p => include(p.causale_tipo, p.attivita?.id || p.progetto?.id));
+  const spese = (dati?.spese || []).filter(s => include(s.causale_tipo, s.attivita_id || s.progetto_donazione_id));
+  const versamentiVisibili = movimenti.filter(p => (!filtri.stato || p.stato === filtri.stato) && (!ricerca ||
+    [p.pagante,p.partecipante,p.causale,causaleMovimento(p)].filter(Boolean).join(" ").toLocaleLowerCase("it-IT").includes(ricerca)));
+  const bilanci = dati ? bilanciPerCausale(dati,movimenti,spese,filtri.tipo,filtri.collegamento) : [];
+  const totali = [];
+  for (const b of bilanci) {
+    let t = totali.find(x=>x.valuta===b.valuta);
+    if (!t) { t = {valuta:b.valuta,incassi:0,spese:0,inAttesa:0,rimborsi:0}; totali.push(t); }
+    for (const k of ["incassi","spese","inAttesa","rimborsi"]) t[k] += b[k];
+  }
+  const euro = (v,valuta) => formattaImporto(v/100,valuta);
+  const dataSpesa = d => new Date(d + "T12:00:00").toLocaleDateString("it-IT");
+  const collegamenti = filtri.tipo === "quota_attivita" ? dati?.attivita || [] : filtri.tipo === "progetto" ? dati?.progetti || [] : [];
+  const titoloSelezione = collegamenti.find(a=>a.id===filtri.collegamento)?.titolo || CAUSALI_ECONOMIA[filtri.tipo] || "Tutte le causali";
+  const titolo = bilancio ? "Bilancio generale" : "Versamenti per causale";
+
+  function applicaDate(e) {
+    e.preventDefault();
+    if (filtri.dataDa && filtri.dataA && filtri.dataDa > filtri.dataA) { setErrore("La data iniziale deve precedere quella finale."); return; }
+    setDateApplicate({dataDa:filtri.dataDa,dataA:filtri.dataA});
+  }
+  function nuovaSpesa() {
+    setErroreSpesa(""); setMessaggio("");
+    setSpesa({id:crypto.randomUUID(),tipo:filtri.tipo || "spese_generali",collegamento:filtri.collegamento,
+      data:new Date().toLocaleDateString("sv-SE"),descrizione:"",importo:"",valuta:"EUR",note:""});
+  }
+  const spesaCollegata = spesa?.tipo === "quota_attivita" ? dati?.attivita.find(a=>a.id===spesa.collegamento) :
+    spesa?.tipo === "progetto" ? dati?.progetti.find(a=>a.id===spesa.collegamento) : null;
+  async function salvaSpesa(e) {
+    e.preventDefault(); if (!spesa || inCorso.current) return;
+    const importo = Number(String(spesa.importo).replace(",","."));
+    const collegata = ["quota_attivita","progetto"].includes(spesa.tipo);
+    if (!spesa.data || !spesa.descrizione.trim() || !Number.isFinite(importo) || importo<=0 ||
+      Math.abs(importo*100-Math.round(importo*100))>0.000001 || (collegata && !spesaCollegata) || !/^[A-Z]{3}$/.test(spesa.valuta)) {
+      setErroreSpesa("Indica causale, eventuale attività o progetto, data, descrizione, valuta e importo positivo con massimo due decimali."); return;
+    }
+    inCorso.current=true;setSalvataggio(true);setErroreSpesa("");
+    try {
+      const { error } = await supabase.rpc("ars_registra_spesa_parrocchia", {
+        p_parrocchia_id:parrocchiaId,p_causale_tipo:spesa.tipo,
+        p_attivita_id:spesa.tipo==="quota_attivita"?spesa.collegamento:null,
+        p_progetto_donazione_id:spesa.tipo==="progetto"?spesa.collegamento:null,
+        p_data_spesa:spesa.data,p_descrizione:spesa.descrizione.trim(),p_importo:importo,
+        p_valuta:spesaCollegata?.valuta || spesa.valuta,p_note_private:spesa.note.trim()||null,p_spesa_id:spesa.id,
+      });
+      if(error)throw error;
+      if(vivo.current){setSpesa(null);setMessaggio("Spesa registrata. Il bilancio viene aggiornato.");
+        setFiltri(f=>({...f,tipo:"",collegamento:"",dataDa:"",dataA:""}));setDateApplicate({dataDa:"",dataA:""});setRevisione(n=>n+1);}
+    }catch(e){if(vivo.current)setErroreSpesa(e.message||"Registrazione non riuscita. Puoi riprovare.");}
+    finally{inCorso.current=false;if(vivo.current)setSalvataggio(false);}
+  }
+  function stampa() {
+    try {
+      const righe = bilancio ? bilanci.map(b=>`<tr><td>${escapeHtml(b.titolo)}</td><td>${escapeHtml(euro(b.incassi,b.valuta))}</td><td>${escapeHtml(euro(b.spese,b.valuta))}</td><td>${escapeHtml(b.rimborsi?"Da verificare":euro(b.incassi-b.spese,b.valuta))}</td></tr>`).join("") :
+        versamentiVisibili.map(p=>`<tr><td>${escapeHtml(formattaData(p.data))}</td><td>${escapeHtml(causaleMovimento(p))}</td><td>${escapeHtml(p.pagante||"—")}</td><td>${escapeHtml(p.causale||"—")}</td><td>${escapeHtml(etichettaMetodo(p.metodo))}</td><td>${escapeHtml(etichettaStato(p.stato))}</td><td>${escapeHtml(formattaImporto(p.importo,p.valuta))}</td></tr>`).join("");
+      const testata = bilancio ? "<th>Causale</th><th>Entrate</th><th>Uscite</th><th>Saldo</th>" : "<th>Data</th><th>Causale</th><th>Pagante</th><th>Descrizione</th><th>Metodo</th><th>Stato</th><th>Importo</th>";
+      const tot = bilancio ? `<tfoot>${totali.map(t=>`<tr><th>Totale ${escapeHtml(t.valuta)}</th><th>${escapeHtml(euro(t.incassi,t.valuta))}</th><th>${escapeHtml(euro(t.spese,t.valuta))}</th><th>${escapeHtml(t.rimborsi?"Da verificare":euro(t.incassi-t.spese,t.valuta))}</th></tr>`).join("")}</tfoot>` : "";
+      const uscite = bilancio ? `<h2>Spese registrate</h2><table><thead><tr><th>Data</th><th>Causale</th><th>Descrizione</th><th>Importo</th></tr></thead><tbody>${spese.map(s=>`<tr><td>${escapeHtml(dataSpesa(s.data))}</td><td>${escapeHtml(causaleSpesa(s))}</td><td>${escapeHtml(s.descrizione)}</td><td>${escapeHtml(formattaImporto(s.importo,s.valuta))}</td></tr>`).join("")}</tbody></table>` : "";
+      apriStampa(titolo,`<p>${escapeHtml(nomeParrocchia||"Segreteria parrocchiale")}</p><h1>${escapeHtml(titolo)}</h1><p>${escapeHtml(titoloSelezione)} · Dal ${escapeHtml(dateApplicate.dataDa||"inizio")} al ${escapeHtml(dateApplicate.dataA||"ultima registrazione")}</p>${bilancio?"<p>Saldo: incassi completati meno spese registrate. Versamenti in attesa e quote ancora dovute esclusi. In presenza di rimborsi il saldo richiede verifica.</p>":`<p>Stato: ${escapeHtml(filtri.stato?etichettaStato(filtri.stato):"Tutti")} · Ricerca: ${escapeHtml(filtri.ricerca||"nessuna")}</p>`}<table><thead><tr>${testata}</tr></thead><tbody>${righe}</tbody>${tot}</table>${uscite}`);
+    }catch(e){setErrore(e.message);}
+  }
+
+  if(quoteAperte)return <QuoteAttivita parrocchiaId={parrocchiaId} nomeParrocchia={nomeParrocchia} attivitaIniziale={filtri.collegamento} onOccupato={onOccupato} tornaDashboard={()=>setQuoteAperte(false)} />;
+  return <main className="ars-bilancio">
+    <style>{STILI_ECONOMIA}</style>
+    <button type="button" onClick={tornaDashboard} disabled={salvataggio}>← Torna alla dashboard</button>
+    <h2>{titolo}</h2><p>{bilancio?"Entrate, spese e saldo della parrocchia, distinti per causale.":"Tutti i versamenti della parrocchia: quote, offerte per le Messe, donazioni e progetti."}</p>
+    <div className="ars-economia-azioni">
+      {bilancio && <button type="button" onClick={nuovaSpesa} disabled={caricamento||!!errore||!!spesa}>Registra una spesa</button>}
+      {!bilancio && <button type="button" onClick={()=>setQuoteAperte(true)} disabled={salvataggio}>Quote e iscritti delle attività</button>}
+      <button type="button" onClick={stampa} disabled={caricamento||!!errore||!dati}>Stampa / Salva PDF</button>
+    </div>
+    <form className="ars-economia-azioni" onSubmit={applicaDate}>
+      <label>Causale<select value={filtri.tipo} disabled={salvataggio} onChange={e=>setFiltri({...filtri,tipo:e.target.value,collegamento:""})}><option value="">Tutte le causali</option>{Object.entries(CAUSALI_ECONOMIA).filter(([id])=>bilancio||id!=="spese_generali").map(([id,nome])=><option key={id} value={id}>{nome}</option>)}</select></label>
+      {["quota_attivita","progetto"].includes(filtri.tipo)&&<label>{filtri.tipo==="progetto"?"Progetto":"Attività"}<select value={filtri.collegamento} disabled={salvataggio} onChange={e=>setFiltri({...filtri,collegamento:e.target.value})}><option value="">Tutti</option>{collegamenti.map(a=><option key={a.id} value={a.id}>{a.titolo}</option>)}</select></label>}
+      <label>Dal<input type="date" value={filtri.dataDa} disabled={salvataggio} onChange={e=>setFiltri({...filtri,dataDa:e.target.value})}/></label>
+      <label>Al<input type="date" value={filtri.dataA} disabled={salvataggio} onChange={e=>setFiltri({...filtri,dataA:e.target.value})}/></label>
+      <button type="submit" disabled={caricamento||salvataggio}>Applica date</button>
+      <button type="button" disabled={salvataggio} onClick={()=>{setFiltri({dataDa:"",dataA:"",tipo:"",collegamento:"",stato:"",ricerca:""});setDateApplicate({dataDa:"",dataA:""});}}>Azzera filtri</button>
+      <button type="button" disabled={caricamento||salvataggio} onClick={()=>setRevisione(n=>n+1)}>Aggiorna</button>
+    </form>
+    {messaggio&&<p role="status">{messaggio}</p>}{errore&&<p role="alert">{errore}</p>}
+    {spesa&&<section className="ars-spesa-pannello" ref={pannello}><h3>Registra una spesa</h3><p>Registra una spesa già sostenuta. Può essere generale oppure collegata a una causale, attività o progetto.</p>
+      <form onSubmit={salvaSpesa}><fieldset disabled={salvataggio}><div className="ars-economia-azioni">
+        <label>Causale<select value={spesa.tipo} onChange={e=>setSpesa({...spesa,tipo:e.target.value,collegamento:""})}>{Object.entries(CAUSALI_ECONOMIA).map(([id,nome])=><option key={id} value={id}>{nome}</option>)}</select></label>
+        {["quota_attivita","progetto"].includes(spesa.tipo)&&<label>{spesa.tipo==="progetto"?"Progetto":"Attività"}<select required value={spesa.collegamento} onChange={e=>setSpesa({...spesa,collegamento:e.target.value})}><option value="">Seleziona</option>{(spesa.tipo==="progetto"?dati?.progetti||[]:dati?.attivita||[]).map(a=><option key={a.id} value={a.id}>{a.titolo}</option>)}</select></label>}
+        <label>Data<input type="date" required value={spesa.data} onChange={e=>setSpesa({...spesa,data:e.target.value})}/></label>
+        <label>Descrizione<input required maxLength={500} value={spesa.descrizione} onChange={e=>setSpesa({...spesa,descrizione:e.target.value})} placeholder="Es. materiali, utenze, manutenzione"/></label>
+        <label>Importo<input type="number" required min="0.01" step="0.01" value={spesa.importo} onChange={e=>setSpesa({...spesa,importo:e.target.value})}/></label>
+        <label>Valuta<input required maxLength={3} pattern="[A-Z]{3}" readOnly={!!spesaCollegata} value={spesaCollegata?.valuta||spesa.valuta} onChange={e=>setSpesa({...spesa,valuta:e.target.value.toUpperCase()})}/></label>
+        <label>Note private<input maxLength={2000} value={spesa.note} onChange={e=>setSpesa({...spesa,note:e.target.value})}/></label>
+      </div>{erroreSpesa&&<p role="alert">{erroreSpesa}</p>}<div className="ars-economia-azioni"><button type="submit">{salvataggio?"Registrazione…":"Registra spesa"}</button><button type="button" onClick={()=>setSpesa(null)}>Annulla</button></div></fieldset></form>
+    </section>}
+    {caricamento?<p role="status">Caricamento dei movimenti…</p>:!errore&&dati&&<>
+      {bilancio?<>
+        <p>Il saldo considera gli incassi completati meno le spese registrate. Quote ancora dovute e versamenti in attesa sono esclusi.</p>
+        {bilanci.some(b=>b.rimborsi>0)&&<p role="status">Sono presenti rimborsi: i saldi interessati richiedono verifica.</p>}
+        <div className="ars-economia-tabella"><table><thead><tr><th>Causale</th><th>Entrate</th><th>Uscite</th><th>Saldo</th></tr></thead><tbody>{bilanci.map(b=><tr key={b.key}><td>{b.titolo}<small className="ars-stato-attivita">{CAUSALI_ECONOMIA[b.causale]}</small></td><td>{euro(b.incassi,b.valuta)}</td><td>{euro(b.spese,b.valuta)}</td><td><strong>{b.rimborsi?"Da verificare":euro(b.incassi-b.spese,b.valuta)}</strong></td></tr>)}</tbody><tfoot>{totali.map(t=><tr key={t.valuta}><th>Totale generale{totali.length>1?` (${t.valuta})`:""}</th><td><strong>{euro(t.incassi,t.valuta)}</strong></td><td><strong>{euro(t.spese,t.valuta)}</strong></td><td><strong>{t.rimborsi?"Da verificare":euro(t.incassi-t.spese,t.valuta)}</strong></td></tr>)}</tfoot></table></div>
+        {!bilanci.length&&<p>Nessun movimento per la selezione.</p>}
+        <h3>Spese registrate</h3>{!spese.length?<p>Nessuna spesa per la selezione.</p>:<div className="ars-economia-tabella"><table><thead><tr><th>Data</th><th>Causale</th><th>Descrizione</th><th>Importo</th><th>Note private</th></tr></thead><tbody>{spese.map(s=><tr key={s.id}><td>{dataSpesa(s.data)}</td><td>{causaleSpesa(s)}</td><td>{s.descrizione}</td><td>{formattaImporto(s.importo,s.valuta)}</td><td>{s.note_private||"—"}</td></tr>)}</tbody></table></div>}
+      </>:<>
+        <div className="ars-economia-azioni"><label>Stato<select value={filtri.stato} onChange={e=>setFiltri({...filtri,stato:e.target.value})}><option value="">Tutti gli stati</option>{["completata","in_attesa","fallita","annullata","rimborsata"].map(id=><option key={id} value={id}>{etichettaStato(id)}</option>)}</select></label><label>Cerca<input value={filtri.ricerca} onChange={e=>setFiltri({...filtri,ricerca:e.target.value})} placeholder="Pagante, partecipante o descrizione"/></label></div>
+        <p>{versamentiVisibili.length} versamenti nella selezione.</p>
+        {[...new Set(versamentiVisibili.map(p=>p.valuta||"EUR"))].map(valuta=><p key={valuta}><strong>Incassi confermati: {formattaImporto(versamentiVisibili.filter(p=>p.valuta===valuta&&p.stato==="completata").reduce((t,p)=>t+Math.round(numero(p.importo)*100),0)/100,valuta)}</strong></p>)}
+        {!versamentiVisibili.length?<p>Nessun versamento per i filtri scelti.</p>:<div className="ars-economia-tabella"><table><thead><tr><th>Data</th><th>Causale</th><th>Pagante</th><th>Partecipante</th><th>Descrizione</th><th>Metodo</th><th>Stato</th><th>Importo</th></tr></thead><tbody>{versamentiVisibili.map(p=><tr key={p.id}><td>{formattaData(p.data)}</td><td>{causaleMovimento(p)}</td><td>{p.pagante||"—"}</td><td>{p.partecipante||"—"}</td><td>{p.causale||"—"}</td><td>{p.metodo==="online"&&p.gestore_pagamento==="paypal"?"PayPal":etichettaMetodo(p.metodo)}</td><td>{etichettaStato(p.stato)}</td><td>{formattaImporto(p.importo,p.valuta)}</td></tr>)}</tbody></table></div>}
+      </>}
+    </>}
+  </main>;
+}
