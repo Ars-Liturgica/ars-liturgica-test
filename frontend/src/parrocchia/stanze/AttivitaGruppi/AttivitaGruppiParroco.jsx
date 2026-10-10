@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "../../../supabaseClient";
 import ElencoIscrizioniGrestParroco from "./ElencoIscrizioniGrestParroco";
 import { BilancioAttivitaParroco } from "../PagamentiParrocchia/PagamentiParrocchia";
@@ -99,7 +99,9 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
   const [cartellaId, setCartellaId] = useState(null);
   const [azioneAttivita, setAzioneAttivita] = useState(null);
   const [messaggioCancellazione, setMessaggioCancellazione] = useState("");
-  const [pubblicaCancellazione, setPubblicaCancellazione] = useState(false);
+  const [mostraCancellate, setMostraCancellate] = useState(false);
+  const [pratiche, setPratiche] = useState([]);
+  const [rimborsiOccupati, setRimborsiOccupati] = useState(false);
   const [operazioneAttivita, setOperazioneAttivita] = useState(false);
   const [praticaAvvisi, setPraticaAvvisi] = useState(null);
   const [avvisiCancellazione, setAvvisiCancellazione] = useState([]);
@@ -113,7 +115,8 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
     ? cartella.tipo?.toLowerCase() === "grest" ? "Aggiungi un’attività al GREST" : "Aggiungi un’attività a questa iniziativa"
     : "Nuova attività";
   const elencoVisibile = attivita.filter((voce) =>
-    cartella ? voce.attivita_principale_id === cartella.id : !voce.attivita_principale_id
+    cartella ? voce.attivita_principale_id === cartella.id && voce.stato !== "annullata"
+      : mostraCancellate ? voce.stato === "annullata" : !voce.attivita_principale_id && voce.stato !== "annullata"
   );
 
   function avvisaFamiglie(voce) {
@@ -127,7 +130,6 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
     setMessaggio("");
     setPraticaAvvisi(null);
     setAzioneAttivita(voce);
-    setPubblicaCancellazione(false);
     setMessaggioCancellazione(`L’attività «${voce.titolo}» è stata cancellata. Per informazioni ed eventuali quote già versate, contatta la parrocchia.`);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
@@ -179,7 +181,7 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
         eliminaBozza ? { p_attivita_id: voce.id } : {
           p_attivita_id: voce.id,
           p_messaggio: messaggioCancellazione.trim(),
-          p_pubblica_bacheca: pubblicaCancellazione,
+          p_pubblica_bacheca: true,
         }
       );
       if (error) throw error;
@@ -187,11 +189,11 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
         throw new Error("Non è stato possibile confermare l’esito. Aggiorna l’elenco prima di riprovare.");
       }
       setAzioneAttivita(null);
-      if (eliminaBozza && cartellaId === voce.id) setCartellaId(null);
+      if (cartellaId === voce.id) setCartellaId(null);
       await caricaAttivita();
       setMessaggio(eliminaBozza
         ? "Bozza eliminata. Nessun avviso inviato."
-        : `Attività cancellata.${data.bacheca_documento_id ? " Avviso pubblicato in Bacheca Avvisi." : ""} Gli avvisi personali sono da inviare e confermare qui sotto.`);
+        : `Attività cancellata.${data.bacheca_documento_id ? " Avviso pubblicato in Bacheca Avvisi." : ""} Notifiche personali generate nell’app. Verifica qui sotto i destinatari da contattare anche personalmente.`);
       if (!eliminaBozza) await apriAvvisiCancellazione(voce, data);
     } catch (error) {
       setErrore(error.message || "L’operazione non è riuscita. Riprova.");
@@ -288,8 +290,10 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
       p_parrocchia_id: parrocchiaId,
     });
 
-    if (error) {
-      console.error("Errore caricamento attività:", error);
+    const { data: cancellate, error: erroreCancellate } = await supabase.rpc("ars_elenco_attivita_cancellate_parroco", { p_parrocchia_id: parrocchiaId });
+    if (!erroreCancellate && Array.isArray(cancellate)) setPratiche(cancellate);
+    if (error || erroreCancellate) {
+      console.error("Errore caricamento attività:", error || erroreCancellate);
       setErrore("Impossibile caricare le attività. Riprova tra poco.");
     } else {
       const elenco = elencoDaRisposta(data);
@@ -477,17 +481,21 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
     <main style={stile.pagina}>
       <header style={stile.intestazione}>
         <div>
-          <button type="button" style={stile.pulsante} onClick={tornaDashboard}>
+          <button type="button" style={stile.pulsante} disabled={rimborsiOccupati} onClick={tornaDashboard}>
             ← Torna alla dashboard
           </button>
-          <h1>{cartella ? cartella.titolo : "Attività e Gruppi"}</h1>
+          <h1>{cartella ? cartella.titolo : mostraCancellate ? "Attività cancellate" : "Attività e Gruppi"}</h1>
           <p>{cartella ? "Gestisci questa attività e le iniziative al suo interno." : "Le attività della tua parrocchia, comprese le bozze. Puoi creare un GREST, una gita o un’altra attività parrocchiale."}</p>
-          {cartella && <button type="button" style={stile.pulsante} onClick={chiudiCartella}>← Tutte le attività</button>}
+          {!cartella && <button type="button" style={stile.pulsante} disabled={rimborsiOccupati || operazioneAttivita} onClick={() => { setMostraCancellate(v => !v); setPraticaAvvisi(null); setMostraModulo(false); setAzioneAttivita(null); }}>
+            {mostraCancellate ? "← Attività attive e bozze" : `Attività cancellate (${attivita.filter(a => a.stato === "annullata").length})`}
+          </button>}
+          {!cartella && mostraCancellate && <p>Restano disponibili per 30 giorni. Le pratiche non concluse sono evidenziate e restano accessibili per risolvere rimborsi e contatti.</p>}
+          {cartella && <button type="button" style={stile.pulsante} disabled={rimborsiOccupati} onClick={chiudiCartella}>← Tutte le attività</button>}
         </div>
-        <button type="button" style={stile.pulsante} onClick={caricaAttivita} disabled={caricamento || !parrocchiaId}>
+        <button type="button" style={stile.pulsante} onClick={caricaAttivita} disabled={rimborsiOccupati || caricamento || !parrocchiaId}>
           Aggiorna elenco
         </button>
-        {!mostraModulo && !azioneAttivita && <button type="button" style={stile.pulsante} disabled={!parrocchiaId || caricamento || caricamentoInformativa || (cartella && !["bozza", "pubblicata"].includes(cartella.stato))} onClick={() => apriModulo(null, cartella?.id || null)}>
+        {!mostraModulo && !azioneAttivita && !mostraCancellate && (!cartella || ["bozza", "pubblicata"].includes(cartella.stato)) && <button type="button" style={stile.pulsante} disabled={!parrocchiaId || caricamento || caricamentoInformativa || (cartella && !["bozza", "pubblicata"].includes(cartella.stato))} onClick={() => apriModulo(null, cartella?.id || null)}>
           + {testoAggiunta}
         </button>}
       </header>
@@ -496,17 +504,13 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
         <h2>{azioneAttivita.stato === "bozza" ? "Elimina bozza" : "Cancella attività"}: {azioneAttivita.titolo}</h2>
         {azioneAttivita.stato === "bozza" ? <p>Questa bozza verrà eliminata definitivamente. Nessun avviso sarà inviato.</p> : <>
           <p>L’attività sarà cancellata. Iscrizioni e pagamenti resteranno disponibili per gestire le questioni pendenti.</p>
-          <p>Gli avvisi personali sono destinati {avvisaFamiglie(azioneAttivita) ? "ai genitori o tutori dei ragazzi iscritti" : "agli iscritti a questa attività"}. Dopo la conferma potrai inviarli su WhatsApp e registrarne l’invio.</p>
+          <p>Gli avvisi personali sono destinati {avvisaFamiglie(azioneAttivita) ? "ai genitori o tutori dei ragazzi iscritti" : "agli iscritti a questa attività"}. Alla conferma vengono generate le notifiche nell’app. Per chi non ha un account collegato, usa il contatto disponibile e registra l’avvenuto avviso.</p>
           <label style={stile.campo}>Messaggio di cancellazione
-            <textarea style={stile.controllo} rows={5} required maxLength={2000}
+            <textarea style={stile.controllo} rows={5} required maxLength={1600}
               disabled={operazioneAttivita} value={messaggioCancellazione}
               onChange={(e) => setMessaggioCancellazione(e.target.value)} />
           </label>
-          <label style={{ display: "block", marginBottom: 16 }}>
-            <input type="checkbox" disabled={operazioneAttivita} checked={pubblicaCancellazione}
-              onChange={(e) => setPubblicaCancellazione(e.target.checked)} /> Pubblica anche in Bacheca Avvisi
-          </label>
-          {pubblicaCancellazione && <p>Lo stesso messaggio sarà visibile a tutta la comunità parrocchiale.</p>}
+          <p>Lo stesso messaggio sarà pubblicato in Bacheca Avvisi. L’avviso includerà la data entro cui contattare la parrocchia per il rimborso delle quote.</p>
         </>}
         {attivita.some((a) => a.attivita_principale_id === azioneAttivita.id && (azioneAttivita.stato === "bozza" || a.stato !== "annullata")) &&
           <p>Questa attività contiene iniziative collegate: elimina prima le loro bozze e cancella quelle pubblicate.</p>}
@@ -524,7 +528,13 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
         {praticaAvvisi && <>
           <p>Destinatari: {avvisaFamiglie(praticaAvvisi.attivita) ? "genitori o tutori" : "iscritti all’attività"}.</p>
           <p style={{ whiteSpace: "pre-wrap" }}>{praticaAvvisi.messaggio}</p>
-          <p>Apri WhatsApp, invia il messaggio e poi premi «Conferma invio». La conferma registra il tuo riscontro; non verifica la consegna.</p>
+          <p>Le notifiche nell’app sono automatiche per gli account collegati. WhatsApp e gli altri contatti richiedono l’invio o il contatto personale.</p>
+          {!pratiche.find(p => p.id === praticaAvvisi.attivita.id)?.notifica_id && <button type="button" style={stile.pulsante} disabled={operazioneAttivita} onClick={async () => {
+            setOperazioneAttivita(true); setErroreAvvisi("");
+            try { const { data, error } = await supabase.rpc("ars_cancella_attivita_con_avvisi_parroco", { p_attivita_id: praticaAvvisi.attivita.id, p_messaggio: praticaAvvisi.messaggio, p_pubblica_bacheca: true });
+              if (error) throw error; await caricaAttivita(); await apriAvvisiCancellazione(praticaAvvisi.attivita, data);
+            } catch (e) { setErroreAvvisi(e.message); } finally { setOperazioneAttivita(false); }
+          }}>Completa notifiche e bacheca della cancellazione precedente</button>}
           {!caricamentoAvvisi && !erroreAvvisi && avvisiCancellazione.length === 0 && <p>Non risultano destinatari per questa attività.</p>}
           {avvisiCancellazione.map((avviso) => {
             const cifre = String(avviso.telefono || "").replace(/[^0-9]/g, "");
@@ -533,7 +543,14 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
             const puoInviare = numero && ["in_attesa", "fallito"].includes(avviso.stato);
             return <div key={avviso.id} style={{ borderTop: "1px solid #ded5c6", padding: "14px 0" }}>
               <p>Telefono: {avviso.telefono || "non disponibile"}{avviso.email ? ` — Email: ${avviso.email}` : ""}</p>
-              <p>{inviato ? "Invio registrato" : "Da contattare"}</p>
+              <p>{avviso.notifica_app ? (avviso.app_letta ? "Notifica nell’app letta" : "Notifica personale disponibile nell’app") : "Account nell’app non collegato: avvisare personalmente"}{inviato ? " · Contatto personale registrato" : ""}</p>
+              {!inviato && <button type="button" style={stile.pulsante} disabled={Boolean(avvisoInConferma)} onClick={async () => {
+                if (!window.confirm("Confermi di avere personalmente avvisato questo destinatario, per telefono, email o di persona?")) return;
+                setAvvisoInConferma(avviso.id); setErroreAvvisi("");
+                try { const { error } = await supabase.rpc("ars_conferma_contatto_cancellazione_parroco", { p_attivita_id: praticaAvvisi.attivita.id, p_avviso_id: avviso.id }); if (error) throw error;
+                  setAvvisiCancellazione(prima => prima.map(a => a.id === avviso.id ? { ...a, stato: "inviato" } : a));
+                } catch (e) { setErroreAvvisi(e.message); } finally { setAvvisoInConferma(null); }
+              }}>Conferma contatto personale</button>}
               {puoInviare ? <>
                 <a style={{ ...stile.pulsante, display: "inline-block" }} target="_blank" rel="noopener noreferrer"
                   href={`https://wa.me/${numero}?text=${encodeURIComponent(praticaAvvisi.messaggio || "")}`}
@@ -550,7 +567,7 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
       </section>}
 
       {cartella && !mostraModulo && <section style={{ ...stile.card, marginBottom: 24 }}>
-        <span style={stile.etichetta}>{cartella.stato}</span>
+        <span style={stile.etichetta}>{cartella.stato === "annullata" ? "Cancellata" : cartella.stato}</span>
         <h2>{cartella.titolo}</h2>
         {cartella.descrizione && <p>{cartella.descrizione}</p>}
         {(cartella.data_inizio || cartella.data_fine) && <p>{[dataItaliana(cartella.data_inizio), dataItaliana(cartella.data_fine)].filter(Boolean).join(" – ")}</p>}
@@ -563,8 +580,9 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
             {" "}<button type="button" style={stile.pulsante} onClick={() => setGrestGruppi(cartella)}>Gestisci gruppi</button>
           </>}
         </>}
-        {" "}<button type="button" style={stile.pulsante} onClick={() => setBilancioAttivita(cartella)}>Entrate, uscite e saldo</button>
+        {" "}<button type="button" style={stile.pulsante} disabled={rimborsiOccupati} onClick={() => setBilancioAttivita(cartella)}>Entrate, uscite e saldo</button>
         {" "}{pulsanteCancellazione(cartella)}
+        {cartella.stato === "annullata" && <RimborsiAttivita key={cartella.id} attivita={cartella} pratica={pratiche.find(p => p.id === cartella.id)} onAggiorna={caricaAttivita} onOccupato={setRimborsiOccupati} />}
         <h3>{cartella.tipo?.toLowerCase() === "grest" ? "Attività del GREST" : "Attività collegate"}</h3>
         <p>{cartella.tipo?.toLowerCase() === "grest"
           ? "Organizza una gita, un picnic o un’altra iniziativa per i partecipanti al GREST."
@@ -684,8 +702,9 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
             const fine = dataItaliana(voce.data_fine);
             return (
               <article key={voce.id} style={stile.card}>
-                <span style={stile.etichetta}>{voce.stato || "Attività"}</span>
+                <span style={stile.etichetta}>{voce.stato === "annullata" ? "Cancellata" : voce.stato || "Attività"}</span>
                 <h2>{voce.titolo || "Attività senza titolo"}</h2>
+                {voce.stato === "annullata" && (() => { const p = pratiche.find(p => p.id === voce.id); return p ? <p>{p.questioni_concluse_at ? "Questioni concluse" : "Questioni da completare"}{p.rimozione_prevista_at ? ` · Scadenza: ${dataItaliana(p.rimozione_prevista_at)}` : ""}</p> : null; })()}
                 {voce.descrizione && <p>{voce.descrizione}</p>}
                 {(inizio || fine) && <p>{[inizio, fine].filter(Boolean).join(" – ")}</p>}
                 {voce.luogo && <p>Luogo: {voce.luogo}</p>}
@@ -706,4 +725,118 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
       )}
     </main>
   );
+}
+function RimborsiAttivita({ attivita, pratica, onAggiorna, onOccupato }) {
+  const [righe, setRighe] = useState([]);
+  const [caricamento, setCaricamento] = useState(true);
+  const [errore, setErrore] = useState("");
+  const [messaggio, setMessaggio] = useState("");
+  const [soloAperti, setSoloAperti] = useState(true);
+  const [form, setForm] = useState(null);
+  const [salvataggio, setSalvataggio] = useState(false);
+  const [tentativo, setTentativo] = useState(null);
+  const [revisione, setRevisione] = useState(0);
+  const blocco = useRef(false);
+  useEffect(() => { onOccupato(Boolean(form) || salvataggio); return () => onOccupato(false); }, [form, salvataggio, onOccupato]);
+  useEffect(() => {
+    let valido = true;
+    setCaricamento(true); setErrore("");
+    supabase.rpc("ars_elenco_rimborsi_attivita_parroco", { p_attivita_id: attivita.id }).then(({ data, error }) => {
+      if (!valido) return;
+      if (error || !Array.isArray(data)) setErrore(error?.message || "Elenco rimborsi non disponibile.");
+      else setRighe(data);
+      setCaricamento(false);
+    }).catch(error => { if (valido) { setErrore(error.message); setCaricamento(false); } });
+    return () => { valido = false; };
+  }, [attivita.id, revisione]);
+  const soldi = (n, valuta = "EUR") => new Intl.NumberFormat("it-IT", { style: "currency", currency: valuta }).format(Number(n || 0));
+  const visibili = righe.filter(r => !soloAperti || Number(r.residuo) > 0);
+  const escape = v => String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  function prepara(riga, tipo) {
+    setErrore(""); setMessaggio(""); setTentativo(null);
+    setForm({ id: crypto.randomUUID(), riga, tipo, importo: Number(riga.residuo).toFixed(2),
+      data: new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Rome" }).format(new Date()),
+      metodo: "consegna_diretta", riferimento: "", dichiarazione: "", confermato: false });
+  }
+  async function salva(e) {
+    e.preventDefault(); if (blocco.current) return;
+    let params = tentativo;
+    if (!params) {
+      const importo = Number(String(form.importo).replace(",", "."));
+      if (!Number.isFinite(importo) || importo <= 0 || importo > Number(form.riga.residuo) || Math.abs(importo*100 - Math.round(importo*100)) > 0.000001)
+        return setErrore("Indica un importo positivo, con massimo due decimali, entro il residuo.");
+      if (!form.confermato) return setErrore("Conferma la restituzione o la scelta del versante.");
+      params = { p_pagamento_id: form.riga.pagamento_id, p_operazione_id: form.id, p_tipo: form.tipo,
+        p_importo: importo, p_data: `${form.data}T12:00:00Z`, p_metodo: form.tipo === "rimborso" ? form.metodo : null,
+        p_riferimento: form.riferimento.trim() || null, p_dichiarazione: form.tipo === "donazione" ? form.dichiarazione.trim() : null };
+      setTentativo(params);
+    }
+    blocco.current = true; setSalvataggio(true); setErrore("");
+    try {
+      const { data, error } = await supabase.rpc("ars_registra_regolazione_quota_cancellata", params);
+      if (error) throw error;
+      if (data?.id !== params.p_operazione_id) throw new Error("Esito non confermato. Riprova con gli stessi dati.");
+      setMessaggio(params.p_tipo === "rimborso" ? "Rimborso registrato. Residuo e bilancio aggiornati." : "Scelta del versante registrata. La somma resta in parrocchia come donazione.");
+      setForm(null); setTentativo(null); setRevisione(v => v + 1); onAggiorna();
+    } catch (e) { setErrore(e.message || "Esito non confermato: riprova."); if (e.code) setTentativo(null); }
+    finally { blocco.current = false; setSalvataggio(false); }
+  }
+  async function concludi() {
+    if (blocco.current || !window.confirm("Confermi che avvisi e rimborsi sono conclusi? Dopo 30 giorni dalla cancellazione i dati dell’attività e i suoi movimenti saranno eliminati definitivamente. Salva prima le stampe necessarie.")) return;
+    blocco.current = true; setSalvataggio(true); setErrore("");
+    try {
+      const { error } = await supabase.rpc("ars_concludi_questioni_attivita_parroco", { p_attivita_id: attivita.id });
+      if (error) throw error; setMessaggio("Questioni concluse. La pulizia automatica potrà eliminare l’attività alla scadenza."); onAggiorna();
+    } catch (e) { setErrore(e.message); }
+    finally { blocco.current = false; setSalvataggio(false); }
+  }
+  function stampa() {
+    const w = window.open("", "_blank");
+    if (!w) return setErrore("Consenti l’apertura della finestra di stampa nel browser.");
+    w.opener = null;
+    w.document.write(`<!doctype html><html lang="it"><head><meta charset="utf-8"><title>Elenco rimborsi</title><style>body{font:14px Arial;color:#173850}h1{font-size:22px}table{border-collapse:collapse;width:100%}th,td{border:1px solid #aaa;padding:7px;text-align:left}th{background:#eee}@page{size:A4 landscape;margin:12mm}@media print{button{display:none}}</style></head><body><button onclick="window.print()">Stampa / Salva PDF</button><h1>Rimborsi — ${escape(attivita.titolo)}</h1><p>${soloAperti ? "Solo rimborsi ancora da effettuare" : "Tutti i versamenti e le somme lasciate come donazione"} · Stampa del ${escape(new Date().toLocaleDateString("it-IT"))}</p><table><thead><tr><th>Versante</th><th>Partecipante</th><th>Contatti</th><th>Versato</th><th>Restituito</th><th>Donato</th><th>Da restituire</th><th>Data e firma del ritiro</th></tr></thead><tbody>${visibili.map(r => `<tr><td>${escape(r.versante)}</td><td>${escape(r.partecipante)}</td><td>${escape([r.email,r.telefono].filter(Boolean).join(" · ") || "Non disponibile")}</td><td>${escape(soldi(r.versato,r.valuta))}</td><td>${escape(soldi(r.rimborsato,r.valuta))}</td><td>${escape(soldi(r.donato,r.valuta))}</td><td>${escape(soldi(r.residuo,r.valuta))}</td><td style="min-width:120px;height:35px"></td></tr>`).join("")}</tbody></table><p>Elenco riservato alla segreteria parrocchiale.</p></body></html>`);
+    w.document.close(); w.focus();
+  }
+  return <section style={{ ...stile.card, marginTop: 20 }}>
+    <h3>Rimborsi agli iscritti</h3>
+    <p>Ogni quota ricevuta indica il versante e quanto resta da restituire. Le donazioni originarie non sono quote da rimborsare.</p>
+    {pratica?.rimozione_prevista_at && <p>Scadenza dei 30 giorni: <strong>{dataItaliana(pratica.rimozione_prevista_at)}</strong>. La pulizia resta bloccata finché le questioni non sono concluse.</p>}
+    {pratica?.file_da_rimuovere && <p role="status">Questa attività ha un PDF nel deposito: la rimozione definitiva richiede anche la pulizia di quel file.</p>}
+    {pratica?.questioni_concluse_at && <p>Questioni concluse il {dataItaliana(pratica.questioni_concluse_at)}.</p>}
+    {Number(pratica?.pagamenti_in_attesa) > 0 && <div><p>Restano {pratica.pagamenti_in_attesa} versamenti in attesa. Verifica gli accrediti prima di concludere la pratica.</p>
+      <button type="button" style={stile.pulsante} disabled={Boolean(form) || salvataggio} onClick={async () => {
+        if (blocco.current || !window.confirm("Hai verificato che NESSUNO dei versamenti ancora in attesa sia stato ricevuto, anche sul conto o tramite il gestore online? Confermando saranno chiusi senza registrarli come incassi.")) return;
+        blocco.current = true; setSalvataggio(true); setErrore("");
+        try { const { error } = await supabase.rpc("ars_chiudi_versamenti_in_attesa_cancellati", { p_attivita_id: attivita.id }); if (error) throw error;
+          setMessaggio("Versamenti non ricevuti chiusi."); onAggiorna();
+        } catch (e) { setErrore(e.message); } finally { blocco.current = false; setSalvataggio(false); }
+      }}>Chiudi i versamenti in attesa non ricevuti</button></div>}
+    {caricamento && <p role="status">Caricamento dei rimborsi…</p>}
+    {errore && <p role="alert">{errore}</p>}{messaggio && <p role="status">{messaggio}</p>}
+    {!caricamento && <>
+      <label><input type="checkbox" checked={soloAperti} disabled={Boolean(form) || salvataggio} onChange={e => setSoloAperti(e.target.checked)} /> Solo rimborsi ancora da effettuare</label>{" "}
+      <button type="button" style={stile.pulsante} disabled={Boolean(form) || salvataggio || Boolean(errore)} onClick={stampa}>Stampa elenco / Salva PDF</button>
+      {!visibili.length ? <p>{righe.length ? "Non restano quote da rimborsare." : "Nessuna quota ricevuta da rimborsare per questa attività."}</p> : <div style={{ overflowX: "auto", marginTop: 16 }}><table style={{ width: "100%", borderCollapse: "collapse", color: "#173850" }}>
+        <thead><tr>{["Versante / partecipante", "Contatti", "Versato", "Rimborsato", "Donato", "Da restituire", "Operazioni"].map(t => <th key={t} style={{ padding: 8, textAlign: "left", background: "#173850", color: "white" }}>{t}</th>)}</tr></thead>
+        <tbody>{visibili.map(r => <tr key={r.pagamento_id}>
+          <td style={{ padding: 8 }}>{r.versante}<br /><small>{r.partecipante}</small></td>
+          <td style={{ padding: 8 }}>{r.email && <div><a href={`mailto:${r.email}`}>{r.email}</a></div>}{r.telefono && <div><a href={`tel:${r.telefono.replace(/[^+0-9]/g, "")}`}>{r.telefono}</a></div>}{!r.email && !r.telefono && "Contatto non disponibile"}</td>
+          <td>{soldi(r.versato,r.valuta)}</td><td>{soldi(r.rimborsato,r.valuta)}</td><td>{soldi(r.donato,r.valuta)}</td><td><strong>{soldi(r.residuo,r.valuta)}</strong></td>
+          <td>{Number(r.residuo) > 0 && !pratica?.questioni_concluse_at && <><button type="button" style={stile.pulsante} disabled={Boolean(form) || salvataggio} onClick={() => prepara(r,"rimborso")}>Registra rimborso</button>{" "}<button type="button" style={stile.pulsante} disabled={Boolean(form) || salvataggio} onClick={() => prepara(r,"donazione")}>Il versante lascia una donazione</button></>}
+            {!!r.storico?.length && <details><summary>Registrazioni precedenti</summary>{r.storico.map(s => <p key={s.id}>{dataItaliana(s.data)} · {s.tipo === "rimborso" ? "Rimborso" : "Donazione"} · {soldi(s.importo,r.valuta)}{s.riferimento ? ` · ${s.riferimento}` : ""}</p>)}</details>}
+          </td></tr>)}</tbody></table></div>}
+      {form && <form onSubmit={salva} style={{ marginTop: 20 }}>
+        <h4>{form.tipo === "rimborso" ? "Registra denaro già restituito" : "Registra la scelta di lasciare una donazione"}: {form.riga.versante}</h4>
+        <fieldset disabled={salvataggio || Boolean(tentativo)} style={{ border: 0, padding: 0 }}>
+          <label style={stile.campo}>Importo ({form.riga.valuta})<input style={stile.controllo} type="number" required min="0.01" step="0.01" max={form.riga.residuo} value={form.importo} onChange={e => setForm({ ...form, importo: e.target.value })} /></label>
+          <label style={stile.campo}>Data<input style={stile.controllo} type="date" required value={form.data} onChange={e => setForm({ ...form, data: e.target.value })} /></label>
+          {form.tipo === "rimborso" ? <><label style={stile.campo}>Modalità<select style={stile.controllo} value={form.metodo} onChange={e => setForm({ ...form, metodo: e.target.value })}><option value="consegna_diretta">Restituzione in parrocchia</option><option value="bonifico">Bonifico</option><option value="paypal">PayPal</option><option value="link_pagamento">Gestore del pagamento</option></select></label><label style={stile.campo}>Riferimento (facoltativo)<input style={stile.controllo} maxLength={500} value={form.riferimento} onChange={e => setForm({ ...form, riferimento: e.target.value })} /></label></> : <label style={stile.campo}>Dichiarazione del versante<textarea required style={stile.controllo} maxLength={2000} value={form.dichiarazione} onChange={e => setForm({ ...form, dichiarazione: e.target.value })} placeholder="Indica chi ha espresso la scelta, quando e con quale modalità." /></label>}
+          <label><input type="checkbox" required checked={form.confermato} onChange={e => setForm({ ...form, confermato: e.target.checked })} /> {form.tipo === "rimborso" ? "Confermo che questa somma è stata effettivamente restituita." : "Confermo che il versante ha scelto espressamente di lasciare questa somma come donazione."}</label>
+        </fieldset>
+        <button type="submit" style={stile.pulsante} disabled={salvataggio}>{salvataggio ? "Registrazione…" : tentativo ? "Riprova con gli stessi dati" : "Conferma registrazione"}</button>{" "}
+        <button type="button" style={stile.pulsante} disabled={salvataggio || Boolean(tentativo)} onClick={() => { setForm(null); setErrore(""); }}>Annulla</button>
+      </form>}
+      {!pratica?.questioni_concluse_at && <p><button type="button" style={stile.pulsante} disabled={Boolean(form) || salvataggio || Boolean(errore) || righe.some(r => Number(r.residuo) > 0)} onClick={concludi}>Concludi le questioni dell’attività</button></p>}
+    </>}
+  </section>;
 }
