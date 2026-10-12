@@ -26,7 +26,7 @@ const nomiMetodi = {
   link_pagamento: "Pagamento online", consegna_diretta: "Pagamento in parrocchia",
 };
 
-export default function IscrizioneGrestFedele({ attivita, onIndietro }) {
+export default function IscrizioneGrestFedele({ attivita, utenteId, onIndietro }) {
   const informativa = attivita.configurazione_modulo?.informativa_privacy_testo?.trim() || "";
   const [presaVisione, setPresaVisione] = useState(null);
   const [confermaLettura, setConfermaLettura] = useState(false);
@@ -97,6 +97,7 @@ export default function IscrizioneGrestFedele({ attivita, onIndietro }) {
     const { data, error } = await supabase.rpc("ars_iscrivi_grest", {
       p_attivita_id: attivita.id,
       p_scheda: {
+        richiedente_utente_id: utenteId || null,
         genitore: { ...genitore, telefono: genitore.telefono.trim(), email: genitore.email.trim() || null },
         ragazzo, taglia_maglietta: taglia,
         delegati_ritiro: delegato.nome.trim() ? [delegato] : [],
