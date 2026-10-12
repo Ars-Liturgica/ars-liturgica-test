@@ -151,7 +151,7 @@ export default function AttivitaGruppiFedele({ parrocchiaId, tornaDashboard }) {
           {voce.modello_quota === "contributo_libero" && <p>Contributo libero</p>}
           {voce.modello_quota === "gratuita" && <p>Partecipazione gratuita</p>}
           {String(voce.tipo).toLowerCase() === "grest" && <>
-            {voce.configurazione_modulo?.abilita_iscrizioni_grest === true ? <button type="button" style={stile.pulsante} onClick={() => setGrestSelezionato(voce)}>Iscrivi un ragazzo</button> : <p>Iscrizioni in preparazione.</p>}
+            {voce.stato === "pubblicata" && <button type="button" style={stile.pulsante} onClick={() => setGrestSelezionato(voce)}>Iscrivi un ragazzo</button>}
             {moduliCartacei(voce).map((modulo) => <p key={modulo.url}><a href={modulo.url} target="_blank" rel="noopener noreferrer" style={{ ...stile.pulsante, display: "inline-block", textDecoration: "none" }}>{modulo.etichetta}</a></p>)}
             <p>Compila il modulo e consegnalo alla segreteria della parrocchia.</p>
           </>}
