@@ -89,6 +89,7 @@ function MetodiPagamento({ metodi, errore }) {
 }
 
 export default function AttivitaGruppiFedele({ parrocchiaId, tornaDashboard }) {
+  const utenteId = localStorage.getItem("ars_utente_id");
   const [attivita, setAttivita] = useState([]);
   const [metodi, setMetodi] = useState([]);
   const [erroreMetodi, setErroreMetodi] = useState("");
@@ -129,7 +130,7 @@ export default function AttivitaGruppiFedele({ parrocchiaId, tornaDashboard }) {
   }, [caricaAttivita]);
 
   return <div style={stile.sfondo}><main style={stile.pagina}>
-    {grestSelezionato ? <IscrizioneGrestFedele attivita={grestSelezionato} onIndietro={() => setGrestSelezionato(null)} /> : <>
+    {grestSelezionato ? <IscrizioneGrestFedele attivita={grestSelezionato} utenteId={utenteId} onIndietro={() => setGrestSelezionato(null)} /> : <>
       <header style={stile.intestazione}>
         <div>
           <button type="button" style={stile.pulsante} onClick={tornaDashboard}>← Torna alla dashboard</button>
