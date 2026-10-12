@@ -1,4 +1,3 @@
-```
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "../../../supabaseClient";
 import ElencoIscrizioniGrestParroco from "./ElencoIscrizioniGrestParroco";
@@ -842,4 +841,3 @@ function RimborsiAttivita({ attivita, pratica, onAggiorna, onOccupato }) {
     </>}
   </section>;
 }
-```
