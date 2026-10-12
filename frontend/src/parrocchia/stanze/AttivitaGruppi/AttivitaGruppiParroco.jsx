@@ -1,3 +1,4 @@
+```
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "../../../supabaseClient";
 import ElencoIscrizioniGrestParroco from "./ElencoIscrizioniGrestParroco";
@@ -256,7 +257,7 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
 
   async function cambiaTipo(tipo) {
     if (tipo !== "grest") {
-      setBozza((precedente) => ({ ...precedente, tipo, iscrizioniOnline: false }));
+      setBozza((precedente) => ({ ...precedente, tipo }));
       return;
     }
     setCaricamentoInformativa(true);
@@ -359,7 +360,7 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
       importoQuota: voce.importo_quota == null ? "" : String(voce.importo_quota),
       scadenzaQuota: voce.scadenza_quota || "",
       configurazioneModulo: configurazione,
-      iscrizioniOnline: configurazione.abilita_iscrizioni_grest === true,
+      iscrizioniOnline: voce.prevede_iscrizioni === true || (voce.prevede_iscrizioni == null && configurazione.abilita_iscrizioni_grest === true),
       informativaPrivacy,
       usaInformativaDiversa,
       moduloScelto: configurazione.modulo_cartaceo_modalita === "parrocchia" ||
@@ -423,9 +424,10 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
       tipo: bozza.tipo,
       informativa_privacy_testo: bozza.informativaPrivacy.trim(),
       informativa_privacy_modalita: bozza.usaInformativaDiversa ? "diversa" : "standard",
+      prevede_iscrizioni: bozza.iscrizioniOnline,
       abilita_iscrizioni_grest: stato === "pubblicata" && bozza.iscrizioniOnline,
       modulo_cartaceo_modalita: bozza.moduloScelto,
-    } : { ...bozza.configurazioneModulo, tipo: bozza.tipo, abilita_iscrizioni_grest: false };
+    } : { ...bozza.configurazioneModulo, tipo: bozza.tipo, prevede_iscrizioni: bozza.iscrizioniOnline, abilita_iscrizioni_grest: false };
     if (bozza.tipo === "grest" && bozza.moduloScelto !== "ars" && urlPersonalizzato) configurazioneModulo.modulo_cartaceo_url = urlPersonalizzato;
     else delete configurazioneModulo.modulo_cartaceo_url;
     const { data, error } = await supabase.rpc("ars_salva_attivita_collegata", {
@@ -457,8 +459,8 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
     setMessaggio(stato === "pubblicata"
       ? bozza.statoOriginale === "pubblicata"
         ? "Modifiche salvate nell’attività pubblicata."
-        : bozza.tipo === "grest" && bozza.iscrizioniOnline
-          ? "Attività pubblicata. I fedeli possono inviare le iscrizioni."
+        : bozza.iscrizioniOnline
+          ? "Attività pubblicata con iscrizioni previste."
           : "Attività pubblicata."
       : "Bozza salvata. L’attività non è ancora visibile ai fedeli.");
   }
@@ -674,11 +676,11 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
             )}
             {bozza.moduloScelto === "ars" && bozza.configurazioneModulo?.modulo_cartaceo_url && <p>Dopo il salvataggio il PDF della parrocchia non sarà più mostrato ai fedeli. Il file già caricato rimarrà nel deposito pubblico.</p>}
           </fieldset>
-          {bozza.id && <label style={{ display: "flex", gap: 9, alignItems: "flex-start", marginBottom: 16 }}>
-            <input type="checkbox" checked={bozza.iscrizioniOnline} onChange={(e) => setBozza({ ...bozza, iscrizioniOnline: e.target.checked })} />
-            {bozza.statoOriginale === "pubblicata" ? "Iscrizioni online aperte" : "Apri le iscrizioni online quando pubblichi questa attività"}
-          </label>}
           </>}
+          <label style={{ display: "flex", gap: 9, alignItems: "flex-start", marginBottom: 16 }}>
+            <input type="checkbox" checked={bozza.iscrizioniOnline} onChange={(e) => setBozza({ ...bozza, iscrizioniOnline: e.target.checked })} />
+            <span><strong>Questa attività prevede iscrizioni?</strong><small style={{ display: "block", marginTop: 4 }}>Se selezionato, le iscrizioni sono previste dalla pubblicazione. Il modulo GREST è già disponibile; per gli altri tipi il modulo per i fedeli sarà collegato nei prossimi passaggi.</small></span>
+          </label>
           <button type="submit" style={stile.pulsante} disabled={salvataggio || caricamentoInformativa}>{salvataggio ? "Salvataggio…" : bozza.statoOriginale === "pubblicata" ? "Salva modifiche" : "Salva bozza"}</button>{" "}
           {bozza.id && bozza.statoOriginale !== "pubblicata" && <button type="button" style={stile.pulsante} disabled={salvataggio || caricamentoInformativa} onClick={(evento) => {
             if (evento.currentTarget.form?.reportValidity()) salvaAttivita(evento, "pubblicata");
@@ -840,3 +842,4 @@ function RimborsiAttivita({ attivita, pratica, onAggiorna, onOccupato }) {
     </>}
   </section>;
 }
+```
