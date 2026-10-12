@@ -16,7 +16,7 @@ const stile = {
 };
 
 const bozzaIniziale = {
-  id: null, tipo: "altro", attivitaPrincipaleId: null, titolo: "", descrizione: "", luogo: "", dataInizio: "", dataFine: "",
+  id: null, tipo: "altro", tipoPersonalizzato: "", attivitaPrincipaleId: null, titolo: "", descrizione: "", luogo: "", dataInizio: "", dataFine: "",
   modelloQuota: "gratuita", importoQuota: "", scadenzaQuota: "", configurazioneModulo: { versione: 1, tipo: "altro" },
   iscrizioniOnline: false, moduloScelto: "ars", statoOriginale: "bozza",
   informativaPrivacy: "", usaInformativaDiversa: false,
@@ -82,6 +82,7 @@ Confermare la lettura di questa informativa permette di passare al modulo d'iscr
 
 export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) {
   const [attivita, setAttivita] = useState([]);
+  const [tipologiePersonalizzate, setTipologiePersonalizzate] = useState([]);
   const [caricamento, setCaricamento] = useState(true);
   const [errore, setErrore] = useState("");
   const [messaggio, setMessaggio] = useState("");
@@ -96,6 +97,19 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
   const [bilancioAttivita, setBilancioAttivita] = useState(null);
   const [grestIscrizioni, setGrestIscrizioni] = useState(null);
   const [grestGruppi, setGrestGruppi] = useState(null);
+  const tipiPredefiniti = ["altro", "grest", "gita", "picnic", "pellegrinaggio", "catechismo"];
+  const caricaTipologie = useCallback(async () => {
+    if (!parrocchiaId) return;
+    const { data, error } = await supabase.from("tipologie_attivita_parrocchia")
+      .select("nome").eq("parrocchia_id", parrocchiaId).order("nome");
+    if (error) {
+      console.error("Caricamento tipologie personalizzate:", error);
+      return;
+    }
+    setTipologiePersonalizzate((data || []).map((riga) => riga.nome));
+  }, [parrocchiaId]);
+
+  useEffect(() => { caricaTipologie(); }, [caricaTipologie]);
   const [cartellaId, setCartellaId] = useState(null);
   const [azioneAttivita, setAzioneAttivita] = useState(null);
   const [messaggioCancellazione, setMessaggioCancellazione] = useState("");
@@ -256,7 +270,7 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
 
   async function cambiaTipo(tipo) {
     if (tipo !== "grest") {
-      setBozza((precedente) => ({ ...precedente, tipo }));
+      setBozza((precedente) => ({ ...precedente, tipo, tipoPersonalizzato: "" }));
       return;
     }
     setCaricamentoInformativa(true);
@@ -349,6 +363,7 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
     setBozza(voce ? {
       id: voce.id,
       tipo,
+      tipoPersonalizzato: "",
       attivitaPrincipaleId: voce.attivita_principale_id || null,
       titolo: voce.titolo || "",
       descrizione: voce.descrizione || "",
@@ -379,6 +394,15 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
     if (stato === "pubblicata" && !bozza.id) return setErrore("Salva prima la bozza, poi pubblicala.");
     if (!parrocchiaId) return setErrore("La parrocchia non è ancora disponibile.");
     if (!bozza.titolo.trim()) return setErrore("Inserisci il titolo.");
+    const nuovoTipo = bozza.tipo === "altro" && !bozza.id
+      ? bozza.tipoPersonalizzato.trim().replace(/\s+/g, " ") : bozza.tipo;
+    if (!nuovoTipo) return setErrore("Scrivi il nome della nuova tipologia di attività.");
+    if (nuovoTipo.length > 80) return setErrore("Il nome della tipologia non può superare 80 caratteri.");
+    const tipoEsistente = [...tipiPredefiniti, ...tipologiePersonalizzate]
+      .find((nome) => nome.toLocaleLowerCase("it-IT") === nuovoTipo.toLocaleLowerCase("it-IT"));
+    const tipoDaSalvare = tipoEsistente || nuovoTipo;
+    const nuovaTipologia = !tipiPredefiniti.includes(tipoDaSalvare) &&
+      !tipologiePersonalizzate.some((nome) => nome.toLocaleLowerCase("it-IT") === tipoDaSalvare.toLocaleLowerCase("it-IT"));
     if (stato === "pubblicata" && bozza.tipo === "grest" && bozza.iscrizioniOnline && !bozza.informativaPrivacy.trim()) {
       return setErrore("Controlla e completa l'informativa prima di aprire le iscrizioni online.");
     }
@@ -432,7 +456,7 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
     const { data, error } = await supabase.rpc("ars_salva_attivita_collegata", {
       p_parrocchia_id: parrocchiaId,
       p_id: bozza.id,
-      p_tipo: bozza.tipo,
+      p_tipo: tipoDaSalvare,
       p_attivita_principale_id: bozza.attivitaPrincipaleId,
       p_titolo: bozza.titolo.trim(),
       p_descrizione: bozza.descrizione.trim() || null,
@@ -452,16 +476,30 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
       setErrore(error?.message || "Non è stato possibile confermare il salvataggio dell'attività.");
       return;
     }
+    let avvisoTipologia = "";
+    if (nuovaTipologia) {
+      const { error: erroreTipologia } = await supabase.from("tipologie_attivita_parrocchia")
+        .insert({ parrocchia_id: parrocchiaId, nome: tipoDaSalvare });
+      if (erroreTipologia) {
+        // L'attività è già stata salvata: non presentare un falso errore di salvataggio.
+        // Il vincolo di unicità usa lower(btrim(nome)), quindi in caso di concorrenza
+        // una insert semplice è preferibile all'upsert su colonne non vincolate.
+        console.error("Registrazione tipologia:", erroreTipologia);
+        avvisoTipologia = " La tipologia è stata salvata nell’attività, ma non nel menu: contatta l’assistenza.";
+      } else {
+        await caricaTipologie();
+      }
+    }
     setMostraModulo(false);
     setBozza(bozzaIniziale);
     await caricaAttivita();
-    setMessaggio(stato === "pubblicata"
+    setMessaggio((stato === "pubblicata"
       ? bozza.statoOriginale === "pubblicata"
         ? "Modifiche salvate nell’attività pubblicata."
         : bozza.iscrizioniOnline
           ? "Attività pubblicata con iscrizioni previste."
           : "Attività pubblicata."
-      : "Bozza salvata. L’attività non è ancora visibile ai fedeli.");
+      : "Bozza salvata. L’attività non è ancora visibile ai fedeli.") + avvisoTipologia);
   }
 
   return (
@@ -594,18 +632,26 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
           <h2>{bozza.id ? "Modifica attività" : principaleBozza?.tipo?.toLowerCase() === "grest" ? `Nuova attività del ${principaleBozza.titolo}` : "Nuova attività"}</h2>
           {bozza.attivitaPrincipaleId && <p>Questa attività fa parte {principaleBozza?.tipo?.toLowerCase() === "grest" ? `del ${principaleBozza.titolo}` : `di «${principaleBozza?.titolo || "attività principale"}»`}.</p>}
           {bozza.statoOriginale === "pubblicata" && <p>Le modifiche salvate saranno subito visibili nell’attività pubblicata.</p>}
-          <label style={stile.campo}>Tipo di attività
-            <select style={stile.controllo} value={bozza.tipo} disabled={salvataggio || caricamentoInformativa || Boolean(bozza.id)} onChange={(e) => cambiaTipo(e.target.value)}>
-              <option value="altro">Altra attività</option>
-              <option value="grest">GREST</option>
-              <option value="gita">Gita</option>
-              <option value="picnic">Picnic</option>
-              <option value="pellegrinaggio">Pellegrinaggio</option>
-              <option value="catechismo">Catechismo</option>
-              {!["altro", "grest", "gita", "picnic", "pellegrinaggio", "catechismo"].includes(bozza.tipo) && <option value={bozza.tipo}>{bozza.tipo}</option>}
-            </select>
-          </label>
-          <label style={stile.campo}>Titolo <input style={stile.controllo} required value={bozza.titolo} onChange={(e) => {
+                     <label style={stile.campo}>Tipo di attività
+             <select style={stile.controllo} value={bozza.tipo} disabled={salvataggio || caricamentoInformativa || Boolean(bozza.id)} onChange={(e) => cambiaTipo(e.target.value)}>
+               <option value="altro">Altra attività (scrivi la tipologia)</option>
+               <option value="grest">GREST</option>
+               <option value="gita">Gita</option>
+               <option value="picnic">Picnic</option>
+               <option value="pellegrinaggio">Pellegrinaggio</option>
+               <option value="catechismo">Catechismo</option>
+               {tipologiePersonalizzate.filter((nome) => !tipiPredefiniti.includes(nome.toLocaleLowerCase("it-IT"))).map((nome) =>
+                 <option key={nome} value={nome}>{nome}</option>)}
+               {!tipiPredefiniti.includes(bozza.tipo) && !tipologiePersonalizzate.includes(bozza.tipo) && <option value={bozza.tipo}>{bozza.tipo}</option>}
+             </select>
+           </label>
+           {bozza.tipo === "altro" && !bozza.id && <label style={stile.campo}>Nome della nuova tipologia
+             <input style={stile.controllo} maxLength={80} required value={bozza.tipoPersonalizzato}
+               placeholder="Es. Ritiri spirituali" disabled={salvataggio}
+               onChange={(e) => setBozza((precedente) => ({ ...precedente, tipoPersonalizzato: e.target.value }))} />
+             <small>La tipologia sarà disponibile per le prossime attività solo dopo il salvataggio.</small>
+           </label>}
+           <label style={stile.campo}>Titolo <input style={stile.controllo} required value={bozza.titolo} onChange={(e) => {
             const titolo = e.target.value;
             setBozza({ ...bozza, titolo, informativaPrivacy: bozza.tipo === "grest" && informativaAutomatica && !bozza.usaInformativaDiversa && datiInformativa
               ? modelloInformativaGrest(datiInformativa, titolo) : bozza.informativaPrivacy });
