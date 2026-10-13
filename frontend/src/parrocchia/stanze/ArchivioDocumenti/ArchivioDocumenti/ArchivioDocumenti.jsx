@@ -4,6 +4,8 @@ import {
   leggiDocumentiInArchivio,
 } from "../../../motoreDocumentale/MotoreDocumentale";
 
+import ArchivioAttivita from "../ArchivioAttivita";
+
 import "./ArchivioDocumenti.css";
 
 const FILTRI_STATO = [
@@ -50,6 +52,7 @@ export default function ArchivioDocumenti({
   parrocchiaId,
   tornaDashboard,
 }) {
+  const [sezione, setSezione] = useState("documenti");
   const [documenti, setDocumenti] = useState([]);
   const [statoFiltro, setStatoFiltro] = useState("in_essere");
   const [ricerca, setRicerca] = useState("");
@@ -192,6 +195,15 @@ export default function ArchivioDocumenti({
         )}
       </header>
 
+      <nav aria-label="Sezioni archivio" className="archivio-documenti__filtri">
+        <button type="button" className={sezione === "documenti" ? "archivio-documenti__filtro archivio-documenti__filtro--attivo" : "archivio-documenti__filtro"} onClick={() => setSezione("documenti")}>Documenti</button>
+        <button type="button" className={sezione === "attivita" ? "archivio-documenti__filtro archivio-documenti__filtro--attivo" : "archivio-documenti__filtro"} onClick={() => setSezione("attivita")}>Attività</button>
+      </nav>
+
+      {sezione === "attivita" ? (
+        <ArchivioAttivita parrocchiaId={parrocchiaId} />
+      ) : (
+      <>
       <nav
         className="archivio-documenti__filtri"
         aria-label="Filtra documenti per stato"
@@ -424,6 +436,8 @@ export default function ArchivioDocumenti({
             </div>
           </article>
         </div>
+      )}
+      </>
       )}
     </section>
   );
