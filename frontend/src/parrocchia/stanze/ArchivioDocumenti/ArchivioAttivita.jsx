@@ -1,6 +1,6 @@
 
 import React, { useEffect, useMemo, useState } from "react";
-import { supabase } from "../../supabaseClient";
+import { supabase } from "../../../supabaseClient";
 
 export default function ArchivioAttivita({ parrocchiaId }) {
   const [attivita, setAttivita] = useState([]);
