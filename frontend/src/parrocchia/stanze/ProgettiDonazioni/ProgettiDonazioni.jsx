@@ -12,6 +12,11 @@ const nuovoMetodo = (tipo = "bonifico") => ({
   bic_swift: "", email_paypal: "", link_pagamento: "", istruzioni: "",
   attivo: true, ordine: 0,
 });
+const iconeMetodo = { bonifico: "🏦", paypal: "💳", link_pagamento: "🔗", consegna_diretta: "🤝" };
+const stilePulsante = { background: "#b78b42", color: "#fff", border: "1px solid #a67b35", borderRadius: "10px", padding: "11px 18px", fontWeight: 700, cursor: "pointer", fontSize: "15px" };
+const stilePulsanteSecondario = { ...stilePulsante, background: "#fffaf1", color: "#18334a", border: "1px solid #ddc89d" };
+const stileCartella = { ...stilePulsanteSecondario, display: "flex", width: "100%", alignItems: "center", justifyContent: "space-between", textAlign: "left", padding: "22px", marginBottom: "14px", gap: "12px" };
+
 const stileCampo = { display: "block", width: "100%", boxSizing: "border-box", padding: "10px", marginTop: "5px" };
 const stileScheda = { border: "1px solid #ddc89d", borderRadius: "12px", padding: "20px", margin: "16px 0" };
 
@@ -24,6 +29,7 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard }) {
   const [erroreModulo, setErroreModulo] = useState("");
   const [salvataggio, setSalvataggio] = useState(false);
   const [messaggio, setMessaggio] = useState("");
+  const [sezione, setSezione] = useState("indice");
 
   const caricaDati = useCallback(async () => {
     if (!parrocchiaId) {
@@ -50,7 +56,7 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard }) {
   }, [parrocchiaId]);
 
   useEffect(() => {
-    setModulo(null); setErroreModulo(""); setMessaggio("");
+    setModulo(null); setErroreModulo(""); setMessaggio(""); setSezione("indice");
     caricaDati();
   }, [caricaDati]);
 
@@ -116,18 +122,29 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard }) {
   }
 
   return <div className="progetti-donazioni">
-    <button type="button" className="pulsante-torna-dashboard" onClick={tornaDashboard} disabled={salvataggio}>← Torna alla dashboard</button>
+    <button type="button" style={stilePulsanteSecondario} onClick={() => {
+      if (sezione === "indice") tornaDashboard();
+      else { setSezione("indice"); setModulo(null); setErroreModulo(""); }
+    }} disabled={salvataggio}>← {sezione === "indice" ? "Torna alla dashboard" : "Torna a Progetti e Donazioni"}</button>
     <div className="progetti-donazioni-intestazione">
-      <h2>Progetti e Donazioni</h2>
-      <p>Gestisci i metodi con cui la parrocchia riceve offerte e quote delle attività e presenta alla comunità i progetti da sostenere.</p>
+      <h2>{sezione === "metodi" ? "Metodi di incasso" : sezione === "progetti" ? "Progetti della parrocchia" : "Progetti e Donazioni"}</h2>
+      <p>{sezione === "indice" ? "Scegli la sezione da gestire." : sezione === "metodi" ? "Configura i metodi con cui la parrocchia riceve offerte e quote delle attività." : "Raccolte e iniziative che la comunità può sostenere."}</p>
     </div>
     {errore && <div role="alert" className="messaggio-errore">{errore}</div>}
     {messaggio && <p role="status">{messaggio}</p>}
+    {sezione === "indice" && <nav aria-label="Sezioni Progetti e Donazioni" style={{ marginTop: 24 }}>
+      <button type="button" style={stileCartella} onClick={() => setSezione("metodi")}>
+        <span><span aria-hidden="true">💳 </span><strong>Metodi di incasso</strong><br /><small>Bonifico, PayPal, carta e consegna diretta</small></span><span aria-hidden="true">›</span>
+      </button>
+      <button type="button" style={stileCartella} onClick={() => setSezione("progetti")}>
+        <span><span aria-hidden="true">📁 </span><strong>Progetti della parrocchia</strong><br /><small>Raccolte fondi e iniziative della comunità</small></span><span aria-hidden="true">›</span>
+      </button>
+    </nav>}
     {caricamento ? <p>Caricamento in corso...</p> : <>
-      <section className="sezione-metodi-incasso">
+      {sezione === "metodi" && <section className="sezione-metodi-incasso">
         <div className="intestazione-sezione-donazioni">
           <h3>Metodi di incasso</h3>
-          <p>Bonifico, PayPal, carta di credito/debito e consegna diretta alla parrocchia.</p>
+          <p>Bonifico, PayPal, pagamenti tramite gestore esterno e consegna diretta alla parrocchia.</p>
           <button type="button" className="pulsante-primario" disabled={!parrocchiaId || salvataggio}
             onClick={() => scegliTipo(Object.keys(TIPI).find((tipo) => !metodiIncasso.some((m) => m.tipo === tipo)) || "bonifico")}>
             Aggiungi metodo
@@ -150,7 +167,7 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard }) {
               {campo("bic_swift", "BIC / SWIFT (facoltativo)")}
             </>}
             {modulo.tipo === "paypal" && campo("email_paypal", "Email PayPal", { tipo: "email" })}
-            {modulo.tipo === "link_pagamento" && <p>Inserisci il link per pagare con carta fornito dal servizio della parrocchia, per esempio Stripe.</p>}
+            {modulo.tipo === "link_pagamento" && <p>Inserisci il link per pagare con carta fornito dal servizio della parrocchia, fornito dal gestore scelto dalla parrocchia.</p>}
             {["paypal", "link_pagamento"].includes(modulo.tipo) && campo("link_pagamento", "Link di pagamento", { tipo: "url", obbligatorio: modulo.tipo === "link_pagamento" })}
             <label style={{ display: "block", margin: "12px 0" }}>Istruzioni per chi paga
               <textarea style={stileCampo} rows={3} value={modulo.istruzioni || ""} onChange={(e) => aggiorna("istruzioni", e.target.value)} />
@@ -164,7 +181,7 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard }) {
         </form>}
         {metodiIncasso.length === 0 ? <p>Nessun metodo di incasso è stato ancora configurato.</p> :
           metodiIncasso.map((metodo) => <article key={metodo.id} style={stileScheda}>
-            <h4>{metodo.titolo}</h4>
+            <h4><span aria-hidden="true">{iconeMetodo[metodo.tipo] || "💳"} </span>{metodo.tipo === "paypal" ? "PayPal · " : ""}{metodo.titolo}</h4>
             <p>{TIPI[metodo.tipo] || metodo.tipo} · {metodo.attivo ? "Attivo" : "Non attivo"}</p>
             {metodo.intestatario && <p>Intestatario: {metodo.intestatario}</p>}
             {metodo.tipo === "bonifico" && <>
@@ -174,21 +191,25 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard }) {
             {metodo.tipo === "paypal" && metodo.email_paypal && <p>Email PayPal: {metodo.email_paypal}</p>}
             {metodo.link_pagamento && <p style={{ overflowWrap: "anywhere" }}>Link: {metodo.link_pagamento}</p>}
             {metodo.istruzioni && <p style={{ whiteSpace: "pre-wrap" }}>{metodo.istruzioni}</p>}
-            <button type="button" disabled={salvataggio || !parrocchiaId} onClick={() => apriMetodo(metodo)}>Modifica</button>
+            <button type="button" style={stilePulsanteSecondario} disabled={salvataggio || !parrocchiaId} onClick={() => apriMetodo(metodo)}>Modifica</button>
           </article>)}
-      </section>
-      <section className="sezione-progetti-donazioni">
+        <article style={{ ...stileScheda, background: "#fffaf1", opacity: 0.85 }}>
+          <h4>SumUp <span style={{ fontSize: 13, color: "#875c19" }}>· In attesa di definizione</span></h4>
+          <p>Integrazione in valutazione. Nessun pagamento SumUp è attualmente attivo.</p>
+        </article>
+      </section>}
+      {sezione === "progetti" && <section className="sezione-progetti-donazioni">
         <div className="intestazione-sezione-donazioni">
           <h3>Progetti della parrocchia</h3>
           <p>Raccolte e iniziative che la comunità può sostenere.</p>
-          <button type="button" className="pulsante-primario" disabled title="La funzione sarà attivata nel prossimo passaggio">Nuovo progetto</button>
+          <button type="button" style={stilePulsante} disabled title="La funzione sarà attivata nel prossimo passaggio">Nuovo progetto</button>
         </div>
         {progetti.length === 0 ? <p>Nessun progetto è stato ancora creato.</p> :
           progetti.map((progetto) => <article key={progetto.id}>
             <h4>{progetto.titolo}</h4>
             <p>{progetto.stato} · Raccolto {Number(progetto.raccolto || 0).toLocaleString("it-IT", { style: "currency", currency: progetto.valuta || "EUR" })}</p>
           </article>)}
-      </section>
+      </section>}
     </>}
   </div>;
 }
