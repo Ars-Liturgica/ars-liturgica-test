@@ -16,6 +16,7 @@ import CollaboratoriParrocchia from "./stanze/Collaboratori/CollaboratoriParrocc
 import ProgettiDonazioni from "./stanze/ProgettiDonazioni/ProgettiDonazioni";
 import PagamentiParrocchia from "./stanze/PagamentiParrocchia/PagamentiParrocchia";
 import AttivitaGruppiParroco from "./stanze/AttivitaGruppi/AttivitaGruppiParroco";
+import AttivitaProgetti from "./stanze/AttivitaProgetti/AttivitaProgetti";
 
 export default function DashboardParroco({
   onCambioVista,
@@ -246,10 +247,10 @@ export default function DashboardParroco({
       icona: (
         <i className="fa-solid fa-people-group icona-dashboard"></i>
       ),
-      titolo: "Attività e Gruppi",
+      titolo: "Attività e Progetti",
       descrizione:
-        "Catechismo, GrEst, gruppi e attività della comunità parrocchiale.",
-      stanza: "attivita-gruppi",
+        "Attività, progetti, raccolte fondi, pagamenti e rimborsi.",
+      stanza: "attivita-progetti",
     },
     {
       icona: (
@@ -259,15 +260,6 @@ export default function DashboardParroco({
       descrizione:
         "Archivio, modulistica, verbali e materiali utili.",
       stanza: "archivio-documenti",
-    },
-    {
-      icona: (
-        <i className="fa-solid fa-hand-holding-heart icona-dashboard"></i>
-      ),
-      titolo: "Progetti e Donazioni",
-      descrizione:
-        "Progetti, stanziamenti, raccolte fondi e donazioni online.",
-      stanza: "progetti-donazioni",
     },
     {
       icona: (
@@ -392,6 +384,10 @@ export default function DashboardParroco({
     );
   }
 
+  if (stanzaAperta === "attivita-progetti") {
+    return <AttivitaProgetti parrocchiaId={parrocchia?.id} tornaDashboard={() => setStanzaAperta(null)} />;
+  }
+
   if (stanzaAperta === "attivita-gruppi") {
     return (
       <AttivitaGruppiParroco
@@ -481,7 +477,7 @@ export default function DashboardParroco({
             <p>{sezione.descrizione}</p>
             {!sezione.stanza && <span className="ars-dato-card">In preparazione</span>}
             {riepilogo && sezione.stanza === "celebrazioni" && <span className="ars-dato-card">{riepilogo.intenzioni_oggi} {riepilogo.intenzioni_oggi === 1 ? "intenzione" : "intenzioni"} oggi</span>}
-            {riepilogo && sezione.stanza === "attivita-gruppi" && <span className="ars-dato-card">{riepilogo.attivita_pubblicate} {riepilogo.attivita_pubblicate === 1 ? "attività pubblicata" : "attività pubblicate"}</span>}
+            {riepilogo && sezione.stanza === "attivita-progetti" && <span className="ars-dato-card">{riepilogo.attivita_pubblicate} {riepilogo.attivita_pubblicate === 1 ? "attività pubblicata" : "attività pubblicate"}</span>}
             {riepilogo && sezione.stanza === "pagamenti" && <span className="ars-dato-card">{riepilogo.pagamenti_in_attesa} versamenti in attesa</span>}
           </button>
         ))}
