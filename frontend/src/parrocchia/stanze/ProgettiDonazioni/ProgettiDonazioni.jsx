@@ -20,7 +20,7 @@ const stileCartella = { ...stilePulsanteSecondario, display: "flex", width: "100
 const stileCampo = { display: "block", width: "100%", boxSizing: "border-box", padding: "10px", marginTop: "5px" };
 const stileScheda = { border: "1px solid #ddc89d", borderRadius: "12px", padding: "20px", margin: "16px 0" };
 
-export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard }) {
+export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezioneIniziale = "indice" }) {
   const [metodiIncasso, setMetodiIncasso] = useState([]);
   const [progetti, setProgetti] = useState([]);
   const [caricamento, setCaricamento] = useState(true);
@@ -29,7 +29,7 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard }) {
   const [erroreModulo, setErroreModulo] = useState("");
   const [salvataggio, setSalvataggio] = useState(false);
   const [messaggio, setMessaggio] = useState("");
-  const [sezione, setSezione] = useState("indice");
+  const [sezione, setSezione] = useState(sezioneIniziale);
 
   const caricaDati = useCallback(async () => {
     if (!parrocchiaId) {
@@ -56,9 +56,9 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard }) {
   }, [parrocchiaId]);
 
   useEffect(() => {
-    setModulo(null); setErroreModulo(""); setMessaggio(""); setSezione("indice");
+    setModulo(null); setErroreModulo(""); setMessaggio(""); setSezione(sezioneIniziale);
     caricaDati();
-  }, [caricaDati]);
+  }, [caricaDati, sezioneIniziale]);
 
   function apriMetodo(metodo) {
     setModulo({ ...nuovoMetodo(metodo.tipo), ...metodo });
@@ -123,9 +123,9 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard }) {
 
   return <div className="progetti-donazioni">
     <button type="button" style={stilePulsanteSecondario} onClick={() => {
-      if (sezione === "indice") tornaDashboard();
+      if (sezioneIniziale !== "indice" || sezione === "indice") tornaDashboard();
       else { setSezione("indice"); setModulo(null); setErroreModulo(""); }
-    }} disabled={salvataggio}>← {sezione === "indice" ? "Torna alla dashboard" : "Torna a Progetti e Donazioni"}</button>
+    }} disabled={salvataggio}>← {sezioneIniziale !== "indice" ? "Torna ad Attività e Progetti" : sezione === "indice" ? "Torna alla dashboard" : "Torna a Progetti e Donazioni"}</button>
     <div className="progetti-donazioni-intestazione">
       <h2>{sezione === "metodi" ? "Metodi di incasso" : sezione === "progetti" ? "Progetti della parrocchia" : "Progetti e Donazioni"}</h2>
       <p>{sezione === "indice" ? "Scegli la sezione da gestire." : sezione === "metodi" ? "Configura i metodi con cui la parrocchia riceve offerte e quote delle attività." : "Raccolte e iniziative che la comunità può sostenere."}</p>
