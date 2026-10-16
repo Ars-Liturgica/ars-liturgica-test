@@ -1,11 +1,35 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from "react";
 import { supabase } from "../../../supabaseClient";
+import AnteprimaDocumentoEconomico from "./AnteprimaDocumentoEconomico";
 
 const ETICHETTE_QUOTA = { da_pagare: "Non pagato", parziale: "Parziale", saldata: "Saldato", esente: "Esente", gratuita: "Gratuita", contributo_libero: "Contributo libero" };
 const numero = (v) => Number.isFinite(Number(v)) ? Number(v) : 0;
 const nomeRagazzo = (r) => [r.cognome_partecipante, r.nome_partecipante].filter(Boolean).join(" ");
 const nomeGenitore = (r) => [r.genitore_cognome, r.genitore_nome].filter(Boolean).join(" ") || "Referente non indicato";
 const escapeHtml = (v) => String(v ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+// Legge esclusivamente documenti persistenti attraverso la RPC autorizzata.
+// Non usa SELECT diretto e non assume che l'ultimo documento sia quello giusto.
+async function recuperaDocumentoEconomico(parrocchiaId, origineTipo, origineId, attivitaId = null) {
+  if (!origineId) return null;
+  const { data, error } = await supabase.rpc("ars_elenco_documenti_economici", {
+    p_parrocchia_id: parrocchiaId,
+    p_attivita_id: attivitaId || null,
+  });
+  if (error) throw error;
+  if (!Array.isArray(data)) throw new Error("Elenco dei documenti economici non disponibile.");
+  return data.find(d => d.origine_tipo === origineTipo && d.origine_id === origineId) || null;
+}
+
+// Le RPC possono restituire il movimento direttamente o in un oggetto annidato.
+// Se manca un identificativo certo, non viene mai mostrato un documento altrui.
+function idMovimentoConfermato(data, chiavi = []) {
+  const candidati = [data, ...chiavi.map(k => data?.[k])];
+  for (const c of candidati) {
+    if (c && typeof c === "object" && typeof c.id === "string" && c.id) return c.id;
+  }
+  return null;
+}
+
 const PROMEMORIA = "Gentile famiglia, vi ricordiamo che per l’attività indicata risulta ancora una quota da completare. Se avete già effettuato il versamento, vi chiediamo cortesemente di comunicarlo alla segreteria, così da aggiornare il riepilogo. Grazie per la collaborazione.";
 
 function totaliQuote(righe) {
@@ -63,6 +87,7 @@ function QuoteAttivita({ parrocchiaId, tornaDashboard, nomeParrocchia, attivitaI
   const [salvataggio, setSalvataggio] = useState(false);
   const [errorePagamento, setErrorePagamento] = useState("");
   const [messaggio, setMessaggio] = useState("");
+  const [documentoAnteprima, setDocumentoAnteprima] = useState(null);
   const [famigliaPromemoria, setFamigliaPromemoria] = useState("");
   const [testoPromemoria, setTestoPromemoria] = useState(PROMEMORIA);
   const [intestazioneStampa, setIntestazioneStampa] = useState(nomeParrocchia || "Segreteria parrocchiale");
@@ -164,13 +189,27 @@ function QuoteAttivita({ parrocchiaId, tornaDashboard, nomeParrocchia, attivitaI
     if (Number.isNaN(data.getTime())) { setErrorePagamento("Indica una data valida."); return; }
     salvaInCorso.current = true; setSalvataggio(true); setErrorePagamento("");
     try {
-      const { error } = await supabase.rpc("ars_registra_pagamento_attivita", {
+      const { data: esito, error } = await supabase.rpc("ars_registra_pagamento_attivita", {
         p_parrocchia_id: parrocchiaId, p_iscrizione_attivita_id: pagamento.riga.id,
         p_importo: importo, p_metodo: pagamento.metodo, p_stato: "completata",
         p_data_pagamento: data.toISOString(), p_pagante_utente_id: null, p_note_private: pagamento.note.trim() || null,
       });
       if (error) throw error;
       if (vivo.current) { setPagamento(null); setMessaggio("Pagamento registrato. Il riepilogo viene aggiornato."); setRevisione((v) => v + 1); }
+      const id = idMovimentoConfermato(esito, ["pagamento", "movimento"]);
+      if (id) {
+        try {
+          const documento = await recuperaDocumentoEconomico(parrocchiaId, "pagamento", id, attivitaId);
+          if (vivo.current) {
+            if (documento) setDocumentoAnteprima(documento);
+            else setMessaggio("Pagamento registrato. La ricevuta non è ancora disponibile nell'elenco documenti: controlla l'Archivio Documenti.");
+          }
+        } catch (lettura) {
+          if (vivo.current) setMessaggio(`Pagamento registrato. Impossibile aprire la ricevuta: ${lettura.message || "verifica l'Archivio Documenti"}. Non ripetere il pagamento.`);
+        }
+      } else if (vivo.current) {
+        setMessaggio("Pagamento registrato. La risposta non contiene l'identificativo del movimento: consulta l'Archivio Documenti. Non ripetere il pagamento.");
+      }
     } catch (err) { if (vivo.current) setErrorePagamento(err.message || "Impossibile registrare il pagamento."); }
     finally { salvaInCorso.current = false; if (vivo.current) setSalvataggio(false); }
   }
@@ -196,6 +235,7 @@ function QuoteAttivita({ parrocchiaId, tornaDashboard, nomeParrocchia, attivitaI
   }
 
   return <main className="quote-attivita">
+    <AnteprimaDocumentoEconomico documento={documentoAnteprima} nomeParrocchia={nomeParrocchia} onChiudi={() => setDocumentoAnteprima(null)} />
     <style>{STILI_QUOTE}</style>
     <button type="button" className="pulsante-torna-dashboard" onClick={tornaDashboard} disabled={salvataggio}>← Torna alla dashboard</button>
     <h2>Quote delle attività</h2><p>Seleziona l’attività per vedere tutti gli iscritti, compresi quelli che non hanno ancora pagato.</p>
@@ -407,7 +447,7 @@ function ModuloIncasso({ parrocchiaId, attivita = [], progetti = [], attivitaFis
       const {data,error}=await supabase.rpc("ars_registra_incasso_parrocchia",parametri);
       if(error)throw error;
       if(!data?.pagamento?.id)throw new Error("Conferma dell’incasso non disponibile. Riprova per verificarne l’esito.");
-      if(vivo.current)onSalvato();
+      if(vivo.current)onSalvato(data.pagamento.id);
     }catch(err){if(vivo.current){setErrore(err.message||"Registrazione non confermata. Riprova per verificarne l’esito.");
       // Un errore esplicito del database annulla la chiamata; una risposta persa resta ritentabile con gli stessi dati.
       if(err.code)setTentativo(null);
@@ -446,6 +486,7 @@ function RegistroMovimenti({ parrocchiaId, tornaDashboard, nomeParrocchia, attiv
   const [caricamento, setCaricamento] = useState(true);
   const [errore, setErrore] = useState("");
   const [messaggio, setMessaggio] = useState("");
+  const [documentoAnteprima, setDocumentoAnteprima] = useState(null);
   const [revisione, setRevisione] = useState(0);
   const [spesa, setSpesa] = useState(null);
   const [incassoAperto, setIncassoAperto] = useState(false);
@@ -545,6 +586,15 @@ function RegistroMovimenti({ parrocchiaId, tornaDashboard, nomeParrocchia, attiv
         const nuoviFiltri = { attivitaId: spesa.attivitaId, dataDa: "", dataA: "" };
         setFiltri(nuoviFiltri); setApplicati(nuoviFiltri); setRevisione(v => v + 1);
       }
+      try {
+        const documento = await recuperaDocumentoEconomico(parrocchiaId, "spesa", spesa.id, spesa.attivitaId);
+        if (vivo.current) {
+          if (documento) setDocumentoAnteprima(documento);
+          else setMessaggio("Spesa registrata. Documento non ancora disponibile: consulta l'Archivio Documenti.");
+        }
+      } catch (lettura) {
+        if (vivo.current) setMessaggio(`Spesa registrata. Impossibile aprire il documento: ${lettura.message || "verifica l'Archivio Documenti"}. Non ripetere la spesa.`);
+      }
     } catch (e) { if (vivo.current) setErroreSpesa(e.message || "Impossibile registrare la spesa. Puoi riprovare."); }
     finally { salvataggioRef.current = false; if (vivo.current) setSalvataggio(false); }
   }
@@ -559,6 +609,7 @@ function RegistroMovimenti({ parrocchiaId, tornaDashboard, nomeParrocchia, attiv
   }
 
   return <main className="ars-bilancio">
+    <AnteprimaDocumentoEconomico documento={documentoAnteprima} nomeParrocchia={nomeParrocchia} onChiudi={() => setDocumentoAnteprima(null)} />
     <style>{STILI_ECONOMIA}</style>
     <button type="button" className="azioni-non-stampabili" onClick={tornaDashboard} disabled={salvataggio}>{dettaglio ? "← Torna all’attività" : "← Torna alla dashboard"}</button>
     <h2>{dettaglio ? `Bilancio · ${titoloSelezione}` : "Bilancio generale delle attività"}</h2>
@@ -577,8 +628,11 @@ function RegistroMovimenti({ parrocchiaId, tornaDashboard, nomeParrocchia, attiv
     </form>
     {messaggio && <p role="status">{messaggio}</p>}
     {errore && <p role="alert">{errore}</p>}
-    {incassoAperto && <ModuloIncasso parrocchiaId={parrocchiaId} attivita={attivita} attivitaFissa={attivitaId} onOccupato={setSalvataggio} onAnnulla={()=>setIncassoAperto(false)} onSalvato={()=>{
+    {incassoAperto && <ModuloIncasso parrocchiaId={parrocchiaId} attivita={attivita} attivitaFissa={attivitaId} onOccupato={setSalvataggio} onAnnulla={()=>setIncassoAperto(false)} onSalvato={(idPagamento)=>{
       setIncassoAperto(false);setSalvataggio(false);setMessaggio("Incasso registrato. Il bilancio viene aggiornato.");
+      recuperaDocumentoEconomico(parrocchiaId, "pagamento", idPagamento, null)
+        .then(doc => { if (vivo.current) { if (doc) setDocumentoAnteprima(doc); else setMessaggio("Incasso registrato. Ricevuta non disponibile nell'elenco: consulta l'Archivio Documenti."); } })
+        .catch(err => { if (vivo.current) setMessaggio(`Incasso registrato. Impossibile aprire la ricevuta: ${err.message}. Non ripetere l'incasso.`); });
       const f={attivitaId,dataDa:"",dataA:""};setFiltri(f);setApplicati(f);setRevisione(v=>v+1);
     }} />}
     {spesa && <section ref={pannello} className="ars-spesa-pannello azioni-non-stampabili"><h3>Registra una spesa</h3><p>Inserisci una spesa già sostenuta per l’attività. I rimborsi agli iscritti richiedono la gestione dedicata.</p>
@@ -686,6 +740,7 @@ function EconomiaPerCausale({ parrocchiaId, tornaDashboard, nomeParrocchia, moda
   const [salvataggio, setSalvataggio] = useState(false);
   const [erroreSpesa, setErroreSpesa] = useState("");
   const [messaggio, setMessaggio] = useState("");
+  const [documentoAnteprima, setDocumentoAnteprima] = useState(null);
   const inCorso = useRef(false);
   const vivo = useRef(true);
   const pannello = useRef(null);
@@ -766,6 +821,12 @@ function EconomiaPerCausale({ parrocchiaId, tornaDashboard, nomeParrocchia, moda
       if(error)throw error;
       if(vivo.current){setSpesa(null);setMessaggio("Spesa registrata. Il bilancio viene aggiornato.");
         setFiltri(f=>({...f,tipo:"",collegamento:"",dataDa:"",dataA:""}));setDateApplicate({dataDa:"",dataA:""});setRevisione(n=>n+1);}
+      try {
+        const doc = await recuperaDocumentoEconomico(parrocchiaId, "spesa", spesa.id, spesa.tipo === "quota_attivita" ? spesa.collegamento : null);
+        if(vivo.current) { if(doc) setDocumentoAnteprima(doc); else setMessaggio("Spesa registrata. Documento non disponibile nell'elenco: consulta l'Archivio Documenti."); }
+      } catch(lettura) {
+        if(vivo.current) setMessaggio(`Spesa registrata. Impossibile aprire il documento: ${lettura.message}. Non ripetere la spesa.`);
+      }
     }catch(e){if(vivo.current)setErroreSpesa(e.message||"Registrazione non riuscita. Puoi riprovare.");}
     finally{inCorso.current=false;if(vivo.current)setSalvataggio(false);}
   }
@@ -782,6 +843,7 @@ function EconomiaPerCausale({ parrocchiaId, tornaDashboard, nomeParrocchia, moda
 
   if(quoteAperte)return <QuoteAttivita parrocchiaId={parrocchiaId} nomeParrocchia={nomeParrocchia} attivitaIniziale={filtri.collegamento} onOccupato={onOccupato} tornaDashboard={()=>setQuoteAperte(false)} />;
   return <main className="ars-bilancio">
+    <AnteprimaDocumentoEconomico documento={documentoAnteprima} nomeParrocchia={nomeParrocchia} onChiudi={() => setDocumentoAnteprima(null)} />
     <style>{STILI_ECONOMIA}</style>
     <button type="button" onClick={tornaDashboard} disabled={salvataggio}>← Torna alla dashboard</button>
     <h2>{titolo}</h2><p>{bilancio?"Entrate, spese e saldo della parrocchia, distinti per causale.":"Tutti i versamenti della parrocchia: quote, offerte per le Messe, donazioni e progetti."}</p>
@@ -801,8 +863,11 @@ function EconomiaPerCausale({ parrocchiaId, tornaDashboard, nomeParrocchia, moda
       <button type="button" disabled={caricamento||salvataggio} onClick={()=>setRevisione(n=>n+1)}>Aggiorna</button>
     </form>
     {messaggio&&<p role="status">{messaggio}</p>}{errore&&<p role="alert">{errore}</p>}
-    {incassoAperto&&<ModuloIncasso parrocchiaId={parrocchiaId} attivita={dati?.attivita||[]} progetti={dati?.progetti||[]} tipoIniziale={filtri.tipo === "attivita_tutte" ? "donazione_attivita" : filtri.tipo} collegamentoIniziale={filtri.collegamento} onOccupato={setSalvataggio} onAnnulla={()=>setIncassoAperto(false)} onSalvato={()=>{
+    {incassoAperto&&<ModuloIncasso parrocchiaId={parrocchiaId} attivita={dati?.attivita||[]} progetti={dati?.progetti||[]} tipoIniziale={filtri.tipo === "attivita_tutte" ? "donazione_attivita" : filtri.tipo} collegamentoIniziale={filtri.collegamento} onOccupato={setSalvataggio} onAnnulla={()=>setIncassoAperto(false)} onSalvato={(idPagamento)=>{
       setIncassoAperto(false);setSalvataggio(false);setMessaggio("Incasso registrato. Il bilancio viene aggiornato.");
+      recuperaDocumentoEconomico(parrocchiaId, "pagamento", idPagamento, null)
+        .then(doc => { if (vivo.current) { if (doc) setDocumentoAnteprima(doc); else setMessaggio("Incasso registrato. Ricevuta non disponibile nell'elenco: consulta l'Archivio Documenti."); } })
+        .catch(err => { if (vivo.current) setMessaggio(`Incasso registrato. Impossibile aprire la ricevuta: ${err.message}. Non ripetere l'incasso.`); });
       setFiltri(f=>({...f,tipo:"",collegamento:"",dataDa:"",dataA:"",stato:"",ricerca:""}));setDateApplicate({dataDa:"",dataA:""});setRevisione(n=>n+1);
     }}/>}
     {spesa&&<section className="ars-spesa-pannello" ref={pannello}><h3>Registra una spesa</h3><p>Registra una spesa già sostenuta. Può essere generale oppure collegata a una causale, attività o progetto.</p>
