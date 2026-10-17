@@ -112,10 +112,35 @@ function QuoteAttivita({ parrocchiaId, tornaDashboard, nomeParrocchia, attivitaI
         const { data, error } = await supabase.rpc("ars_elenco_attivita_parroco", { p_parrocchia_id: parrocchiaId });
         if (error) throw error;
         if (!Array.isArray(data)) throw new Error("Impossibile leggere l’elenco delle attività.");
+        // La sezione Quote mostra soltanto attività pubblicate con quota fissa positiva.
+        // La RPC può non includere tutti i campi economici: in tal caso li leggiamo
+        // dalla tabella, limitandoci agli ID già autorizzati dalla RPC del parroco.
+        let dettagli = data;
+        if (data.length && !data.every(a =>
+          Object.prototype.hasOwnProperty.call(a, "stato") &&
+          Object.prototype.hasOwnProperty.call(a, "modello_quota") &&
+          Object.prototype.hasOwnProperty.call(a, "importo_quota")
+        )) {
+          const { data: campiQuota, error: erroreCampi } = await supabase
+            .from("attivita_parrocchiali")
+            .select("id, stato, modello_quota, importo_quota")
+            .in("id", data.map(a => a.id));
+          if (erroreCampi) throw new Error(`Impossibile verificare le quote delle attività: ${erroreCampi.message}`);
+          if (!Array.isArray(campiQuota) || campiQuota.length !== data.length) {
+            throw new Error("Impossibile verificare tutte le attività: controllare i permessi di lettura delle quote.");
+          }
+          const perId = new Map(campiQuota.map(a => [a.id, a]));
+          dettagli = data.map(a => ({ ...a, ...perId.get(a.id) }));
+        }
+        const attivitaConQuota = dettagli.filter(a =>
+          a.stato === "pubblicata" &&
+          a.modello_quota === "quota_fissa" &&
+          Number(a.importo_quota) > 0
+        );
         if (!attuale) return;
-        setAttivita(data);
-        setAttivitaId(data.find(a => a.id === attivitaIniziale)?.id || data[0]?.id || "");
-        if (!data.length) setCaricamento(false);
+        setAttivita(attivitaConQuota);
+        setAttivitaId(attivitaConQuota.find(a => a.id === attivitaIniziale)?.id || attivitaConQuota[0]?.id || "");
+        if (!attivitaConQuota.length) { setDati(null); setCaricamento(false); }
       } catch (e) { if (attuale) { setErrore(e.message || "Impossibile caricare le attività."); setCaricamento(false); } }
     }
     carica();
