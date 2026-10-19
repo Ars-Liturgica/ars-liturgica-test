@@ -10,12 +10,12 @@ const voci = [
   { id: "quote", icona: "fa-receipt", titolo: "Gestione economica e contabilità", descrizione: "Quote e iscrizioni, pagamenti e incassi, offerte e donazioni, spese e acquisti, rimborsi, crediti e somme da riscuotere, trasferimenti tra progetti, registri contabili, saldi, rendiconti e bilanci generali e per attività. I rimborsi delle attività cancellate si gestiscono nel relativo fascicolo.", sfondo: "#eee2f7" },
 ];
 
-export default function AttivitaProgetti({ parrocchiaId, tornaDashboard }) {
+export default function AttivitaProgetti({ parrocchiaId, nomeParrocchia = "", tornaDashboard }) {
   const [sezione, setSezione] = useState(null);
   const tornaIndice = () => setSezione(null);
   if (sezione === "attivita") return <AttivitaGruppiParroco parrocchiaId={parrocchiaId} tornaDashboard={tornaIndice} />;
   if (sezione === "progetti" || sezione === "metodi") return <ProgettiDonazioni parrocchiaId={parrocchiaId} tornaDashboard={tornaIndice} sezioneIniziale={sezione} />;
-  if (sezione === "quote") return <PagamentiParrocchia parrocchiaId={parrocchiaId} tornaDashboard={tornaIndice} />;
+  if (sezione === "quote") return <PagamentiParrocchia parrocchiaId={parrocchiaId} nomeParrocchia={nomeParrocchia} tornaDashboard={tornaIndice} />;
   return <main style={{ maxWidth: 1000, margin: "0 auto", padding: "24px 16px", color: "#302b28" }}>
     <button type="button" onClick={tornaDashboard} style={pulsante}>← Torna alla dashboard</button>
     <h1 style={{ margin: "24px 0 8px" }}>Attività e Progetti</h1>
