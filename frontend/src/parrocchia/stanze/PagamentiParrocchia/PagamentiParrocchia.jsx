@@ -766,6 +766,7 @@ function EconomiaPerCausale({ parrocchiaId, tornaDashboard, nomeParrocchia, moda
   const [erroreSpesa, setErroreSpesa] = useState("");
   const [messaggio, setMessaggio] = useState("");
   const [documentoAnteprima, setDocumentoAnteprima] = useState(null);
+  const [stampaInCorso, setStampaInCorso] = useState(null);
   const inCorso = useRef(false);
   const vivo = useRef(true);
   const pannello = useRef(null);
@@ -866,6 +867,28 @@ function EconomiaPerCausale({ parrocchiaId, tornaDashboard, nomeParrocchia, moda
     }catch(e){setErrore(e.message);}
   }
 
+  async function ristampaRicevuta(p) {
+    if (stampaInCorso || p.stato !== "completata") return;
+    setStampaInCorso(p.id);
+    setMessaggio("");
+    try {
+      const doc = await recuperaDocumentoEconomico(parrocchiaId, "pagamento", p.id, null);
+      if (!doc) {
+        setMessaggio("Documento non disponibile per questo versamento. Nessuna nuova ricevuta è stata emessa.");
+        return;
+      }
+      if (doc.tipo_documento !== "ricevuta") {
+        setMessaggio("Il documento collegato non è una ricevuta. Verificare l'archivio.");
+        return;
+      }
+      setDocumentoAnteprima(doc);
+    } catch (e) {
+      setMessaggio(`Impossibile recuperare la ricevuta: ${e.message || "errore di lettura"}. Nessuna nuova ricevuta è stata emessa.`);
+    } finally {
+      setStampaInCorso(null);
+    }
+  }
+
   if(quoteAperte)return <QuoteAttivita parrocchiaId={parrocchiaId} nomeParrocchia={nomeParrocchia} attivitaIniziale={filtri.collegamento} onOccupato={onOccupato} tornaDashboard={()=>setQuoteAperte(false)} />;
   return <main className="ars-bilancio">
     <AnteprimaDocumentoEconomico documento={documentoAnteprima} nomeParrocchia={nomeParrocchia} onChiudi={() => setDocumentoAnteprima(null)} />
@@ -918,7 +941,7 @@ function EconomiaPerCausale({ parrocchiaId, tornaDashboard, nomeParrocchia, moda
         <div className="ars-economia-azioni"><label>Stato<select value={filtri.stato} onChange={e=>setFiltri({...filtri,stato:e.target.value})}><option value="">Tutti gli stati</option>{["completata","in_attesa","fallita","annullata","rimborsata"].map(id=><option key={id} value={id}>{etichettaStato(id)}</option>)}</select></label><label>Cerca<input value={filtri.ricerca} onChange={e=>setFiltri({...filtri,ricerca:e.target.value})} placeholder="Pagante, partecipante o descrizione"/></label></div>
         <p>{versamentiVisibili.length} versamenti nella selezione.</p>
         {[...new Set(versamentiVisibili.map(p=>p.valuta||"EUR"))].map(valuta=><p key={valuta}><strong>Incassi confermati: {formattaImporto(versamentiVisibili.filter(p=>p.valuta===valuta&&p.stato==="completata").reduce((t,p)=>t+Math.round(numero(p.importo)*100),0)/100,valuta)}</strong></p>)}
-        {!versamentiVisibili.length?<p>Nessun versamento per i filtri scelti.</p>:<div className="ars-economia-tabella"><table><thead><tr><th>Data</th><th>Causale</th><th>Pagante</th><th>Partecipante</th><th>Descrizione</th><th>Metodo</th><th>Stato</th><th>Importo</th></tr></thead><tbody>{versamentiVisibili.map(p=><tr key={p.id}><td>{formattaData(p.data)}</td><td>{causaleMovimento(p)}</td><td>{p.pagante||"—"}</td><td>{p.partecipante||"—"}</td><td>{p.causale||"—"}</td><td>{metodoIncasso(p)}</td><td>{etichettaStato(p.stato)}</td><td>{formattaImporto(p.importo,p.valuta)}</td></tr>)}</tbody></table></div>}
+        {!versamentiVisibili.length?<p>Nessun versamento per i filtri scelti.</p>:<div className="ars-economia-tabella"><table><thead><tr><th>Data</th><th>Causale</th><th>Pagante</th><th>Partecipante</th><th>Descrizione</th><th>Metodo</th><th>Stato</th><th>Importo</th><th>Ricevuta</th></tr></thead><tbody>{versamentiVisibili.map(p=><tr key={p.id}><td>{formattaData(p.data)}</td><td>{causaleMovimento(p)}</td><td>{p.pagante||"—"}</td><td>{p.partecipante||"—"}</td><td>{p.causale||"—"}</td><td>{metodoIncasso(p)}</td><td>{etichettaStato(p.stato)}</td><td>{formattaImporto(p.importo,p.valuta)}</td><td>{p.stato === "completata" ? <button type="button" disabled={!!stampaInCorso} onClick={() => ristampaRicevuta(p)}>{stampaInCorso === p.id ? "Apertura…" : "Stampa"}</button> : "—"}</td></tr>)}</tbody></table></div>}
       </>}
     </>}
   </main>;
