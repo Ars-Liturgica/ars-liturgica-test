@@ -376,7 +376,7 @@ export default function DashboardParroco({
   }
 
   if (stanzaAperta === "attivita-progetti") {
-    return <AttivitaProgetti parrocchiaId={parrocchia?.id} tornaDashboard={() => setStanzaAperta(null)} />;
+    return <AttivitaProgetti parrocchiaId={parrocchia?.id} nomeParrocchia={parrocchia?.nome || ""} tornaDashboard={() => setStanzaAperta(null)} />;
   }
 
   if (stanzaAperta === "attivita-gruppi") {
@@ -394,6 +394,7 @@ export default function DashboardParroco({
     return (
       <PagamentiParrocchia
         parrocchiaId={parrocchia?.id}
+        nomeParrocchia={parrocchia?.nome || ""}
         tornaDashboard={() =>
           setStanzaAperta(null)
         }
