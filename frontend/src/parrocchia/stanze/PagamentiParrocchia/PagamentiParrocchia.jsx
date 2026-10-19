@@ -2,6 +2,37 @@ import React, { useEffect, useMemo, useRef, useState, useCallback } from "react"
 import { supabase } from "../../../supabaseClient";
 import AnteprimaDocumentoEconomico from "./AnteprimaDocumentoEconomico";
 
+// Recupera l'anagrafica effettiva per le intestazioni dei documenti.
+// Nessuna modifica ai documenti economici archiviati.
+function AnteprimaConAnagrafica({ documento, parrocchiaId, nomeParrocchia, onChiudi }) {
+  const [anagrafica, setAnagrafica] = useState(null);
+  useEffect(() => {
+    if (!documento || !parrocchiaId) return;
+    let attivo = true;
+    setAnagrafica(null);
+    async function caricaAnagrafica() {
+      const { data, error } = await supabase.from("parrocchie")
+        .select("id, nome, indirizzo, cap, comune, provincia, telefono, email")
+        .eq("id", parrocchiaId).single();
+      if (error) {
+        console.error("Impossibile caricare l'anagrafica della parrocchia:", error);
+        return;
+      }
+      if (attivo) {
+        const indirizzoCompleto = [data.indirizzo,
+          [data.cap, data.comune, data.provincia ? `(${data.provincia})` : ""].filter(Boolean).join(" ")]
+          .filter(Boolean).join(" – ");
+        setAnagrafica({ ...data, indirizzo: indirizzoCompleto });
+      }
+    }
+    caricaAnagrafica();
+    return () => { attivo = false; };
+  }, [documento, parrocchiaId]);
+  return <AnteprimaDocumentoEconomico documento={documento}
+    nomeParrocchia={nomeParrocchia} parrocchia={anagrafica}
+    onChiudi={onChiudi} />;
+}
+
 const ETICHETTE_QUOTA = { da_pagare: "Non pagato", parziale: "Parziale", saldata: "Saldato", esente: "Esente", gratuita: "Gratuita", contributo_libero: "Contributo libero" };
 const numero = (v) => Number.isFinite(Number(v)) ? Number(v) : 0;
 const nomeRagazzo = (r) => [r.cognome_partecipante, r.nome_partecipante].filter(Boolean).join(" ");
@@ -260,7 +291,7 @@ function QuoteAttivita({ parrocchiaId, tornaDashboard, nomeParrocchia, attivitaI
   }
 
   return <main className="quote-attivita">
-    <AnteprimaDocumentoEconomico documento={documentoAnteprima} nomeParrocchia={nomeParrocchia} onChiudi={() => setDocumentoAnteprima(null)} />
+    <AnteprimaConAnagrafica documento={documentoAnteprima} parrocchiaId={parrocchiaId} nomeParrocchia={nomeParrocchia} onChiudi={() => setDocumentoAnteprima(null)} />
     <style>{STILI_QUOTE}</style>
     <button type="button" className="pulsante-torna-dashboard" onClick={tornaDashboard} disabled={salvataggio}>← Torna alla dashboard</button>
     <h2>Quote delle attività</h2><p>Seleziona l’attività per vedere tutti gli iscritti, compresi quelli che non hanno ancora pagato.</p>
@@ -634,7 +665,7 @@ function RegistroMovimenti({ parrocchiaId, tornaDashboard, nomeParrocchia, attiv
   }
 
   return <main className="ars-bilancio">
-    <AnteprimaDocumentoEconomico documento={documentoAnteprima} nomeParrocchia={nomeParrocchia} onChiudi={() => setDocumentoAnteprima(null)} />
+    <AnteprimaConAnagrafica documento={documentoAnteprima} parrocchiaId={parrocchiaId} nomeParrocchia={nomeParrocchia} onChiudi={() => setDocumentoAnteprima(null)} />
     <style>{STILI_ECONOMIA}</style>
     <button type="button" className="azioni-non-stampabili" onClick={tornaDashboard} disabled={salvataggio}>{dettaglio ? "← Torna all’attività" : "← Torna alla dashboard"}</button>
     <h2>{dettaglio ? `Bilancio · ${titoloSelezione}` : "Bilancio generale delle attività"}</h2>
@@ -891,7 +922,7 @@ function EconomiaPerCausale({ parrocchiaId, tornaDashboard, nomeParrocchia, moda
 
   if(quoteAperte)return <QuoteAttivita parrocchiaId={parrocchiaId} nomeParrocchia={nomeParrocchia} attivitaIniziale={filtri.collegamento} onOccupato={onOccupato} tornaDashboard={()=>setQuoteAperte(false)} />;
   return <main className="ars-bilancio">
-    <AnteprimaDocumentoEconomico documento={documentoAnteprima} nomeParrocchia={nomeParrocchia} onChiudi={() => setDocumentoAnteprima(null)} />
+    <AnteprimaConAnagrafica documento={documentoAnteprima} parrocchiaId={parrocchiaId} nomeParrocchia={nomeParrocchia} onChiudi={() => setDocumentoAnteprima(null)} />
     <style>{STILI_ECONOMIA}</style>
     <button type="button" onClick={tornaDashboard} disabled={salvataggio}>← Torna alla dashboard</button>
     <h2>{titolo}</h2><p>{bilancio?"Entrate, spese e saldo della parrocchia, distinti per causale.":"Tutti i versamenti della parrocchia: quote, offerte per le Messe, donazioni e progetti."}</p>
