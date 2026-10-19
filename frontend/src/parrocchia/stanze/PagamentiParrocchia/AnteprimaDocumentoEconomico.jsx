@@ -68,7 +68,7 @@ const STILI_DOCUMENTO = `
   .ars-doc-importo { font-size:25pt; font-weight:700; margin:38px 0; }
   .ars-doc-contatti { font-size:10pt; margin:4px 0; line-height:1.45; overflow-wrap:anywhere; }
   .ars-doc-intestazione { min-width:0; }
-  .ars-doc-riga span:empty::after { content:"\00a0"; }
+  .ars-doc-riga span:empty::after { content:"\\00a0"; }
   .ars-doc-firma { margin-top:48px; margin-left:auto; width:48%; text-align:center; break-inside:avoid; }
   .ars-doc-firma-titolo { font-size:12pt; font-weight:bold; margin:0 0 8px; }
   .ars-doc-firma-nome { font-size:12pt; margin:0 0 30px; overflow-wrap:anywhere; }
