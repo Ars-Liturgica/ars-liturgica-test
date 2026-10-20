@@ -112,21 +112,32 @@ function IscrizioneOrdinaria({ attivita, parrocchiaId, utenteId, metodi, erroreM
       setCaricamento(true);
       setErrore("");
       try {
-        const richieste = [
-          supabase.from("parrocchie").select("privacy_iscrizioni_testo").eq("id", parrocchiaId).single(),
-          utenteId ? supabase.from("utenti").select("nome,cognome,telefono,email").eq("id", utenteId).single() : Promise.resolve({ data: null, error: new Error("Identificativo fedele non disponibile") }),
-        ];
-        const [privacy, anagrafica] = await Promise.all(richieste);
+        const { data: privacyData, error: privacyError } = await supabase
+          .from("parrocchie")
+          .select("privacy_iscrizioni_testo")
+          .eq("id", parrocchiaId)
+          .single();
         if (!attivo) return;
-        if (privacy.error) setErrore("Impossibile leggere l'informativa privacy della parrocchia.");
-        else setInformativa(privacy.data?.privacy_iscrizioni_testo?.trim() || "");
-        if (anagrafica.error || !anagrafica.data) {
-          setErrore((precedente) => [precedente, "Impossibile recuperare l'anagrafica del fedele. Riprova o contatta la parrocchia."].filter(Boolean).join(" "));
+        if (privacyError) setErrore("Impossibile leggere l'informativa privacy della parrocchia.");
+        else setInformativa(privacyData?.privacy_iscrizioni_testo?.trim() || "");
+
+        // L'anagrafica proviene dall'accesso del fedele, non da una SELECT pubblica su utenti.
+        let anagrafica = null;
+        try {
+          const salvata = sessionStorage.getItem("ars_anagrafica_fedele");
+          const valore = salvata ? JSON.parse(salvata) : null;
+          if (valore?.utente_id === utenteId && valore?.parrocchia_id === parrocchiaId) {
+            anagrafica = valore;
+          }
+        } catch { /* Sessione anagrafica non disponibile */ }
+        if (!anagrafica) {
+          setErrore((precedente) => [precedente,
+            "Anagrafica non disponibile: esci e accedi nuovamente alla parrocchia."
+          ].filter(Boolean).join(" "));
         } else {
-          const u = anagrafica.data;
-          setPartecipanti([{ nome: u.nome || "", cognome: u.cognome || "" }]);
-          setTelefono(u.telefono || "");
-          setEmail(u.email || "");
+          setPartecipanti([{ nome: anagrafica.nome || "", cognome: anagrafica.cognome || "" }]);
+          setTelefono(anagrafica.telefono || "");
+          setEmail(anagrafica.email || "");
         }
       } catch {
         if (attivo) setErrore("Caricamento non riuscito. Riprova ad aprire l'iscrizione.");
@@ -221,7 +232,7 @@ function IscrizioneOrdinaria({ attivita, parrocchiaId, utenteId, metodi, erroreM
         </> : <p role="alert">La parrocchia non ha ancora pubblicato l'informativa per le iscrizioni. La conferma non è disponibile.</p>}
       </>}
       {errore && <p role="alert" style={{ color: "#a22" }}>{errore}</p>}
-      <button type="submit" style={stile.pulsante} disabled={caricamento || !informativa || !presaVisione || !utenteId || invio || !!errore && errore.includes("anagrafica")}>
+      <button type="submit" style={stile.pulsante} disabled={caricamento || !informativa || !presaVisione || !utenteId || invio || !!errore && (errore.includes("Anagrafica") || errore.includes("anagrafica"))}>
         {invio ? "Invio in corso…" : `Conferma iscrizione (${partecipanti.length} partecipant${partecipanti.length === 1 ? "e" : "i"})`}
       </button>
     </form>}
