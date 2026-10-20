@@ -114,6 +114,7 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
   const [pdfParrocchia, setPdfParrocchia] = useState(null);
   const [bilancioAttivita, setBilancioAttivita] = useState(null);
   const [grestIscrizioni, setGrestIscrizioni] = useState(null);
+  const [iscrizioniOrdinarie, setIscrizioniOrdinarie] = useState(null);
   const [grestGruppi, setGrestGruppi] = useState(null);
   const tipiPredefiniti = ["altro", "grest", "gita", "picnic", "pellegrinaggio", "catechismo"];
   const caricaTipologie = useCallback(async () => {
@@ -561,6 +562,12 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
       attivita={grestIscrizioni}
       onIndietro={() => { setGrestIscrizioni(null); caricaAttivita(); }}
     /> :
+    iscrizioniOrdinarie ? <ElencoIscrizioniOrdinarieParroco
+      key={iscrizioniOrdinarie.id}
+      attivita={iscrizioniOrdinarie}
+      parrocchiaId={parrocchiaId}
+      onIndietro={() => { setIscrizioniOrdinarie(null); caricaAttivita(); }}
+    /> :
     grestGruppi ? <GestioneGruppiGrestParroco
       attivita={grestGruppi}
       parrocchiaId={parrocchiaId}
@@ -667,6 +674,7 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
             {cartella.stato === "pubblicata" && <> {" "}<button type="button" style={stile.pulsante} onClick={() => setGrestIscrizioni(cartella)}>Vedi iscrizioni</button></>}
             {" "}<button type="button" style={stile.pulsante} onClick={() => setGrestGruppi(cartella)}>Gestisci gruppi</button>
           </>}
+          {cartella.stato === "pubblicata" && cartella.tipo?.toLowerCase() !== "grest" && cartella.prevede_iscrizioni === true && <>{" "}<button type="button" style={stile.pulsante} onClick={() => setIscrizioniOrdinarie(cartella)}>Vedi iscrizioni</button></>}
         </>}
         {" "}<button type="button" style={stile.pulsante} disabled={rimborsiOccupati} onClick={() => setBilancioAttivita(cartella)}>Entrate, uscite e saldo</button>
         {" "}{pulsanteCancellazione(cartella)}
@@ -813,6 +821,7 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
                   {voce.stato === "pubblicata" && <>{" "}<button type="button" style={stile.pulsante} onClick={() => setGrestIscrizioni(voce)}>Vedi iscrizioni</button></>}
                   {" "}<button type="button" style={stile.pulsante} onClick={() => setGrestGruppi(voce)}>Gestisci gruppi</button>
                 </>}
+                {voce.stato === "pubblicata" && voce.tipo?.toLowerCase() !== "grest" && voce.prevede_iscrizioni === true && <>{" "}<button type="button" style={stile.pulsante} onClick={() => setIscrizioniOrdinarie(voce)}>Vedi iscrizioni</button></>}
                 {" "}{pulsanteCancellazione(voce)}
               </article>
             );
@@ -822,6 +831,76 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
     </main>
   );
 }
+
+function ElencoIscrizioniOrdinarieParroco({ attivita, parrocchiaId, onIndietro }) {
+  const [righe, setRighe] = useState([]);
+  const [caricamento, setCaricamento] = useState(true);
+  const [errore, setErrore] = useState("");
+  const [ricerca, setRicerca] = useState("");
+  const [revisione, setRevisione] = useState(0);
+  const valuta = attivita.valuta || "EUR";
+  const soldi = (valore) => new Intl.NumberFormat("it-IT", { style: "currency", currency: valuta }).format(Number(valore || 0));
+
+  useEffect(() => {
+    let attivo = true;
+    setCaricamento(true);
+    setErrore("");
+    supabase.rpc("ars_riepilogo_quote_attivita_parroco", {
+      p_parrocchia_id: parrocchiaId,
+      p_attivita_id: attivita.id,
+    }).then(({ data, error }) => {
+      if (!attivo) return;
+      if (error) throw error;
+      if (!Array.isArray(data?.iscrizioni)) throw new Error("Formato delle iscrizioni non riconosciuto.");
+      setRighe(data.iscrizioni);
+      setCaricamento(false);
+    }).catch((e) => {
+      if (attivo) { setErrore(e.message || "Impossibile caricare le iscrizioni."); setCaricamento(false); }
+    });
+    return () => { attivo = false; };
+  }, [attivita.id, parrocchiaId, revisione]);
+
+  const visibili = righe.filter((r) => [r.nome_partecipante, r.cognome_partecipante, r.genitore_nome, r.genitore_cognome]
+    .some((v) => String(v || "").toLocaleLowerCase("it-IT").includes(ricerca.trim().toLocaleLowerCase("it-IT"))));
+  const totale = (chiave) => visibili.reduce((somma, r) => somma + Number(r[chiave] || 0), 0);
+  const stampa = () => window.print();
+
+  return <main style={stile.pagina}>
+    <button type="button" style={stile.pulsante} onClick={onIndietro}>← Torna alle attività</button>
+    <h1>Iscrizioni a {attivita.titolo}</h1>
+    <p>Elenco dei partecipanti iscritti all’attività. Le quote ancora dovute non sono incassi.</p>
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 12, alignItems: "end", marginBottom: 18 }}>
+      <label style={stile.campo}>Cerca partecipante o referente
+        <input style={stile.controllo} value={ricerca} onChange={(e) => setRicerca(e.target.value)} placeholder="Nome o cognome" />
+      </label>
+      <button type="button" style={stile.pulsante} disabled={caricamento} onClick={() => setRevisione(v => v + 1)}>Aggiorna elenco</button>
+      <button type="button" style={stile.pulsante} disabled={caricamento || Boolean(errore)} onClick={stampa}>Stampa elenco</button>
+    </div>
+    {caricamento && <p role="status">Caricamento iscrizioni…</p>}
+    {errore && <p role="alert">{errore}</p>}
+    {!caricamento && !errore && <>
+      <p><strong>Partecipanti:</strong> {visibili.length} · <strong>Dovuto:</strong> {soldi(totale("dovuto"))} · <strong>Pagato:</strong> {soldi(totale("pagato"))} · <strong>Residuo:</strong> {soldi(totale("residuo"))}</p>
+      {visibili.length === 0 ? <p>Nessuna iscrizione corrisponde alla ricerca.</p> :
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
+            <thead><tr>{["Partecipante", "Referente", "Recapiti", "Iscrizione", "Dovuto", "Pagato", "Residuo", "Quota"].map(t => <th key={t} style={{ padding: 10, borderBottom: "1px solid #ded5c6" }}>{t}</th>)}</tr></thead>
+            <tbody>{visibili.map(r => <tr key={r.id}>
+              <td style={{ padding: 10, borderBottom: "1px solid #eee4d6" }}>{[r.nome_partecipante, r.cognome_partecipante].filter(Boolean).join(" ") || "Non indicato"}</td>
+              <td style={{ padding: 10, borderBottom: "1px solid #eee4d6" }}>{[r.genitore_nome, r.genitore_cognome].filter(Boolean).join(" ") || "Non indicato"}</td>
+              <td style={{ padding: 10, borderBottom: "1px solid #eee4d6" }}>{[r.telefono_contatto, r.email_contatto].filter(Boolean).join(" · ") || "Non disponibili"}</td>
+              <td style={{ padding: 10, borderBottom: "1px solid #eee4d6" }}>{r.stato_iscrizione || "—"}</td>
+              <td style={{ padding: 10, borderBottom: "1px solid #eee4d6" }}>{soldi(r.dovuto)}</td>
+              <td style={{ padding: 10, borderBottom: "1px solid #eee4d6" }}>{soldi(r.pagato)}</td>
+              <td style={{ padding: 10, borderBottom: "1px solid #eee4d6" }}><strong>{soldi(r.residuo)}</strong></td>
+              <td style={{ padding: 10, borderBottom: "1px solid #eee4d6" }}>{String(r.stato_quota || "—").replaceAll("_", " ")}</td>
+            </tr>)}</tbody>
+          </table>
+        </div>}
+      <p style={{ marginTop: 16 }}>I recapiti del richiedente vengono mostrati soltanto se restituiti dal registro delle iscrizioni. Per le iscrizioni ordinarie potrebbero non essere ancora disponibili.</p>
+    </>}
+  </main>;
+}
+
 function RimborsiAttivita({ attivita, pratica, onAggiorna, onOccupato }) {
   const [righe, setRighe] = useState([]);
   const [caricamento, setCaricamento] = useState(true);
