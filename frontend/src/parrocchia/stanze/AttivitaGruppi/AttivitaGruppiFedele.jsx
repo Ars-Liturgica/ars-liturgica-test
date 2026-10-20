@@ -88,6 +88,78 @@ function MetodiPagamento({ metodi, errore }) {
   </section>;
 }
 
+function IscrizioneOrdinaria({ attivita, parrocchiaId, utenteId, onIndietro }) {
+  const [telefono, setTelefono] = useState("");
+  const [email, setEmail] = useState("");
+  const [presaVisione, setPresaVisione] = useState(false);
+  const [informativa, setInformativa] = useState("");
+  const [caricamento, setCaricamento] = useState(true);
+  const [invio, setInvio] = useState(false);
+  const [errore, setErrore] = useState("");
+  const [risultato, setRisultato] = useState(null);
+
+  useEffect(() => {
+    let attivo = true;
+    async function caricaPrivacy() {
+      const { data, error } = await supabase
+        .from("parrocchie")
+        .select("privacy_iscrizioni_testo")
+        .eq("id", parrocchiaId)
+        .single();
+      if (!attivo) return;
+      if (error) setErrore("Informativa non disponibile. Contatta la parrocchia.");
+      else setInformativa(data?.privacy_iscrizioni_testo?.trim() || "");
+      setCaricamento(false);
+    }
+    caricaPrivacy();
+    return () => { attivo = false; };
+  }, [parrocchiaId]);
+
+  async function conferma(evento) {
+    evento.preventDefault();
+    if (!utenteId || !informativa || !presaVisione || invio) return;
+    setInvio(true);
+    setErrore("");
+    const { data, error } = await supabase.rpc("ars_iscrivi_attivita_ordinaria", {
+      p_attivita_id: attivita.id,
+      p_utente_id: utenteId,
+      p_telefono: telefono.trim() || null,
+      p_email: email.trim() || null,
+      p_privacy_accettata: true,
+    });
+    if (error) setErrore(error.message || "Impossibile inviare l'iscrizione.");
+    else setRisultato(data);
+    setInvio(false);
+  }
+
+  return <section style={stile.card}>
+    <button type="button" style={stile.pulsante} onClick={onIndietro}>← Torna alle attività</button>
+    <h1>Iscrizione: {attivita.titolo}</h1>
+    {risultato ? <>
+      <p role="status"><strong>Iscrizione ricevuta.</strong></p>
+      {Number(risultato.importo_dovuto) > 0
+        ? <p>Quota prevista: {Number(risultato.importo_dovuto).toLocaleString("it-IT", { style: "currency", currency: "EUR" })}. L'iscrizione sarà confermata con il saldo della quota, registrato dalla parrocchia.</p>
+        : <p>La tua richiesta è stata registrata. Non è previsto alcun pagamento.</p>}
+      <button type="button" style={stile.pulsante} onClick={onIndietro}>Torna all'elenco</button>
+    </> : <form onSubmit={conferma}>
+      <p>Inserisci un recapito, se desideri essere contattato dalla parrocchia.</p>
+      <p><label>Telefono (facoltativo)<br /><input type="tel" maxLength={30} value={telefono} onChange={(e) => setTelefono(e.target.value)} style={{ width: "100%", maxWidth: 420, padding: 10 }} /></label></p>
+      <p><label>Email (facoltativa)<br /><input type="email" maxLength={254} value={email} onChange={(e) => setEmail(e.target.value)} style={{ width: "100%", maxWidth: 420, padding: 10 }} /></label></p>
+      {caricamento ? <p>Caricamento informativa…</p> : informativa ? <>
+        <details style={{ margin: "16px 0" }}>
+          <summary style={{ cursor: "pointer", fontWeight: "bold" }}>Leggi l'informativa privacy</summary>
+          <div style={{ whiteSpace: "pre-wrap", padding: 14, border: "1px solid #e5d9ca", borderRadius: 8, marginTop: 8 }}>{informativa}</div>
+        </details>
+        <p><label><input type="checkbox" checked={presaVisione} onChange={(e) => setPresaVisione(e.target.checked)} /> Ho preso visione dell'informativa privacy</label></p>
+      </> : <p>La parrocchia non ha ancora pubblicato l'informativa per le iscrizioni.</p>}
+      {errore && <p role="alert" style={{ color: "#a22" }}>{errore}</p>}
+      <button type="submit" style={stile.pulsante} disabled={caricamento || !informativa || !presaVisione || !utenteId || invio}>
+        {invio ? "Invio in corso…" : "Conferma iscrizione"}
+      </button>
+    </form>}
+  </section>;
+}
+
 export default function AttivitaGruppiFedele({ parrocchiaId, tornaDashboard }) {
   const utenteId = localStorage.getItem("ars_utente_id");
   const [attivita, setAttivita] = useState([]);
@@ -96,6 +168,7 @@ export default function AttivitaGruppiFedele({ parrocchiaId, tornaDashboard }) {
   const [caricamento, setCaricamento] = useState(true);
   const [errore, setErrore] = useState("");
   const [grestSelezionato, setGrestSelezionato] = useState(null);
+  const [ordinariaSelezionata, setOrdinariaSelezionata] = useState(null);
   const richiesta = useRef(0);
 
   const caricaAttivita = useCallback(async () => {
@@ -125,12 +198,12 @@ export default function AttivitaGruppiFedele({ parrocchiaId, tornaDashboard }) {
   }, [parrocchiaId]);
 
   useEffect(() => {
-    setGrestSelezionato(null); caricaAttivita();
+    setGrestSelezionato(null); setOrdinariaSelezionata(null); caricaAttivita();
     return () => { richiesta.current += 1; };
   }, [caricaAttivita]);
 
   return <div style={stile.sfondo}><main style={stile.pagina}>
-    {grestSelezionato ? <IscrizioneGrestFedele attivita={grestSelezionato} utenteId={utenteId} onIndietro={() => setGrestSelezionato(null)} /> : <>
+    {grestSelezionato ? <IscrizioneGrestFedele attivita={grestSelezionato} utenteId={utenteId} onIndietro={() => setGrestSelezionato(null)} /> : ordinariaSelezionata ? <IscrizioneOrdinaria attivita={ordinariaSelezionata} parrocchiaId={parrocchiaId} utenteId={utenteId} onIndietro={() => setOrdinariaSelezionata(null)} /> : <>
       <header style={stile.intestazione}>
         <div>
           <button type="button" style={stile.pulsante} onClick={tornaDashboard}>← Torna alla dashboard</button>
@@ -155,6 +228,10 @@ export default function AttivitaGruppiFedele({ parrocchiaId, tornaDashboard }) {
             {moduliCartacei(voce).map((modulo) => <p key={modulo.url}><a href={modulo.url} target="_blank" rel="noopener noreferrer" style={{ ...stile.pulsante, display: "inline-block", textDecoration: "none" }}>{modulo.etichetta}</a></p>)}
             <p>Compila il modulo e consegnalo alla segreteria della parrocchia.</p>
           </>}
+          {voce.stato === "pubblicata" && voce.prevede_iscrizioni === true &&
+            String(voce.tipo).toLowerCase() !== "grest" &&
+            voce.configurazione_modulo?.abilita_iscrizioni_grest !== true &&
+            <p><button type="button" style={stile.pulsante} onClick={() => setOrdinariaSelezionata(voce)}>Iscriviti</button></p>}
           {["quota_fissa", "contributo_libero"].includes(voce.modello_quota) && <MetodiPagamento metodi={metodi} errore={erroreMetodi} />}
         </article>)}
       </div>}
