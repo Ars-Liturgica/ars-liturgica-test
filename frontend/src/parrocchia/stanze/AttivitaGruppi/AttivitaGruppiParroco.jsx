@@ -80,6 +80,24 @@ I tuoi diritti. Puoi chiedere alla parrocchia accesso, correzione o cancellazion
 Confermare la lettura di questa informativa permette di passare al modulo d'iscrizione. Le autorizzazioni e gli eventuali consensi specifici vengono richiesti separatamente.`;
 }
 
+function modelloInformativaOrdinaria(parrocchia, titolo) {
+  const pulisci = (v) => String(v || "").trim();
+  const sede = [parrocchia.indirizzo, parrocchia.cap, parrocchia.comune, parrocchia.provincia].map(pulisci).filter(Boolean).join(", ");
+  const contatti = [parrocchia.email ? `email ${pulisci(parrocchia.email)}` : "", parrocchia.telefono ? `telefono ${pulisci(parrocchia.telefono)}` : ""].filter(Boolean).join(", ");
+  const attivita = pulisci(titolo) || "attività parrocchiale";
+  return `INFORMATIVA PER L'ISCRIZIONE A ${attivita.toUpperCase()}
+
+La Parrocchia ${pulisci(parrocchia.nome)}, con sede in ${sede}${contatti ? `, contattabile a ${contatti}` : ""}, è titolare del trattamento dei dati personali raccolti per l'iscrizione a ${attivita}.
+
+Dati trattati e finalità. Raccogliamo nome e cognome dei partecipanti e i recapiti facoltativi del richiedente per gestire l'iscrizione, organizzare l'attività, comunicare eventuali aggiornamenti e amministrare le quote, quando previste. I dati sono utilizzati per lo svolgimento dell'attività parrocchiale e gli adempimenti amministrativi connessi.
+
+Accesso e conservazione. I dati sono accessibili al parroco e alle persone autorizzate per i rispettivi compiti. Sono conservati per il tempo necessario all'organizzazione dell'attività e per gli eventuali obblighi amministrativi e di legge.
+
+Diritti. Puoi rivolgerti alla parrocchia per esercitare i diritti previsti dalla normativa sulla protezione dei dati personali e, ove applicabile, presentare reclamo al Garante per la protezione dei dati personali.
+
+La conferma di presa visione permette di procedere all'iscrizione. Eventuali consensi specifici, ove necessari, vengono richiesti separatamente.`;
+}
+
 export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) {
   const [attivita, setAttivita] = useState([]);
   const [tipologiePersonalizzate, setTipologiePersonalizzate] = useState([]);
@@ -269,8 +287,9 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
   }
 
   async function cambiaTipo(tipo) {
-    if (tipo !== "grest") {
-      setBozza((precedente) => ({ ...precedente, tipo, tipoPersonalizzato: "" }));
+    if (tipo !== "grest" && !bozza.iscrizioniOnline) {
+      setBozza((precedente) => ({ ...precedente, tipo, tipoPersonalizzato: "", informativaPrivacy: "", usaInformativaDiversa: false }));
+      setInformativaAutomatica(false);
       return;
     }
     setCaricamentoInformativa(true);
@@ -280,15 +299,44 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
     setCaricamentoInformativa(false);
     if (error || !data?.nome?.trim() || !data?.indirizzo?.trim() || !data?.comune?.trim() ||
         !(data?.email?.trim() || data?.telefono?.trim())) {
-      setErrore("Per preparare il GREST, completa nome, indirizzo, comune e almeno un recapito nella scheda della parrocchia.");
+      setErrore("Per preparare l'informativa, completa nome, indirizzo, comune e almeno un recapito nella scheda della parrocchia.");
       return;
     }
     setDatiInformativa(data);
     setInformativaAutomatica(true);
     setErrore("");
-    setBozza((precedente) => ({ ...precedente, tipo,
+    setBozza((precedente) => ({ ...precedente, tipo, tipoPersonalizzato: "",
       usaInformativaDiversa: false,
-      informativaPrivacy: modelloInformativaGrest(data, precedente.titolo),
+      informativaPrivacy: tipo === "grest" ? modelloInformativaGrest(data, precedente.titolo) : modelloInformativaOrdinaria(data, precedente.titolo),
+    }));
+  }
+
+  async function cambiaIscrizioniOnline(abilita) {
+    if (!abilita) {
+      setBozza((precedente) => ({ ...precedente, iscrizioniOnline: false }));
+      return;
+    }
+    if (bozza.informativaPrivacy.trim()) {
+      setBozza((precedente) => ({ ...precedente, iscrizioniOnline: true }));
+      return;
+    }
+    setCaricamentoInformativa(true);
+    const { data, error } = await supabase.rpc("ars_dati_parrocchia_informativa", {
+      p_parrocchia_id: parrocchiaId,
+    });
+    setCaricamentoInformativa(false);
+    if (error || !data?.nome?.trim() || !data?.indirizzo?.trim() || !data?.comune?.trim() ||
+        !(data?.email?.trim() || data?.telefono?.trim())) {
+      setErrore("Per attivare le iscrizioni, completa nome, indirizzo, comune e almeno un recapito della parrocchia.");
+      return;
+    }
+    setDatiInformativa(data);
+    setInformativaAutomatica(true);
+    setErrore("");
+    setBozza((precedente) => ({ ...precedente, iscrizioniOnline: true, usaInformativaDiversa: false,
+      informativaPrivacy: precedente.tipo === "grest"
+        ? modelloInformativaGrest(data, precedente.titolo)
+        : modelloInformativaOrdinaria(data, precedente.titolo),
     }));
   }
 
@@ -339,7 +387,7 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
       configurazione.informativa_privacy_modalita !== "standard";
 
     if (!parrocchiaId) return setErrore("La parrocchia non è ancora disponibile.");
-    if (tipo === "grest") {
+    {
     setCaricamentoInformativa(true);
     const { data, error } = await supabase.rpc("ars_dati_parrocchia_informativa", {
       p_parrocchia_id: parrocchiaId,
@@ -353,7 +401,7 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
     }
     // Un testo già salvato non viene rigenerato all'apertura.
     if (!informativaPrivacy.trim()) {
-      informativaPrivacy = modelloInformativaGrest(datiParrocchia, voce?.titolo || "GREST");
+      informativaPrivacy = tipo === "grest" ? modelloInformativaGrest(datiParrocchia, voce?.titolo || "GREST") : modelloInformativaOrdinaria(datiParrocchia, voce?.titolo || "attività parrocchiale");
     }
 
     }
@@ -403,7 +451,7 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
     const tipoDaSalvare = tipoEsistente || nuovoTipo;
     const nuovaTipologia = !tipiPredefiniti.includes(tipoDaSalvare) &&
       !tipologiePersonalizzate.some((nome) => nome.toLocaleLowerCase("it-IT") === tipoDaSalvare.toLocaleLowerCase("it-IT"));
-    if (stato === "pubblicata" && bozza.tipo === "grest" && bozza.iscrizioniOnline && !bozza.informativaPrivacy.trim()) {
+    if (stato === "pubblicata" && bozza.iscrizioniOnline && !bozza.informativaPrivacy.trim()) {
       return setErrore("Controlla e completa l'informativa prima di aprire le iscrizioni online.");
     }
     if (bozza.dataInizio && bozza.dataFine && new Date(bozza.dataFine) < new Date(bozza.dataInizio)) {
@@ -443,14 +491,15 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
       const { data: pubblico } = supabase.storage.from(bucketModuli).getPublicUrl(percorso);
       urlPersonalizzato = `${pubblico.publicUrl}?v=${Date.now()}`;
     }
-    const configurazioneModulo = bozza.tipo === "grest" ? { ...bozza.configurazioneModulo,
+    const configurazioneModulo = { ...bozza.configurazioneModulo,
       tipo: bozza.tipo,
       informativa_privacy_testo: bozza.informativaPrivacy.trim(),
       informativa_privacy_modalita: bozza.usaInformativaDiversa ? "diversa" : "standard",
       prevede_iscrizioni: bozza.iscrizioniOnline,
       abilita_iscrizioni_grest: stato === "pubblicata" && bozza.iscrizioniOnline,
       modulo_cartaceo_modalita: bozza.moduloScelto,
-    } : { ...bozza.configurazioneModulo, tipo: bozza.tipo, prevede_iscrizioni: bozza.iscrizioniOnline, abilita_iscrizioni_grest: false };
+    };
+    if (bozza.tipo !== "grest") { configurazioneModulo.abilita_iscrizioni_grest = false; delete configurazioneModulo.modulo_cartaceo_modalita; }
     if (bozza.tipo === "grest" && bozza.moduloScelto !== "ars" && urlPersonalizzato) configurazioneModulo.modulo_cartaceo_url = urlPersonalizzato;
     else delete configurazioneModulo.modulo_cartaceo_url;
     const { data, error } = await supabase.rpc("ars_salva_attivita_collegata", {
@@ -653,8 +702,8 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
            </label>}
            <label style={stile.campo}>Titolo <input style={stile.controllo} required value={bozza.titolo} onChange={(e) => {
             const titolo = e.target.value;
-            setBozza({ ...bozza, titolo, informativaPrivacy: bozza.tipo === "grest" && informativaAutomatica && !bozza.usaInformativaDiversa && datiInformativa
-              ? modelloInformativaGrest(datiInformativa, titolo) : bozza.informativaPrivacy });
+            setBozza({ ...bozza, titolo, informativaPrivacy: informativaAutomatica && !bozza.usaInformativaDiversa && datiInformativa
+              ? (bozza.tipo === "grest" ? modelloInformativaGrest(datiInformativa, titolo) : modelloInformativaOrdinaria(datiInformativa, titolo)) : bozza.informativaPrivacy });
           }} /></label>
           <label style={stile.campo}>Descrizione <textarea style={stile.controllo} rows={4} value={bozza.descrizione} onChange={(e) => setBozza({ ...bozza, descrizione: e.target.value })} /></label>
           <label style={stile.campo}>Luogo <input style={stile.controllo} value={bozza.luogo} onChange={(e) => setBozza({ ...bozza, luogo: e.target.value })} /></label>
@@ -671,8 +720,7 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
             <label style={stile.campo}>Quota fissa in euro <input style={stile.controllo} type="number" min="0.01" step="0.01" required value={bozza.importoQuota} onChange={(e) => setBozza({ ...bozza, importoQuota: e.target.value })} /></label>
             <label style={stile.campo}>Scadenza quota <input style={stile.controllo} type="date" value={bozza.scadenzaQuota} onChange={(e) => setBozza({ ...bozza, scadenzaQuota: e.target.value })} /></label>
           </>}
-          {bozza.tipo === "grest" && <>
-          <fieldset style={{ border: "1px solid #ded5c6", borderRadius: 10, margin: "16px 0", padding: 16 }}>
+          {bozza.iscrizioniOnline && <fieldset style={{ border: "1px solid #ded5c6", borderRadius: 10, margin: "16px 0", padding: 16 }}>
             <legend>Informativa privacy per le iscrizioni online</legend>
             <p>L'informativa standard usa i dati della parrocchia. Verifica che i recapiti e le modalità descritte corrispondano alla tua attività.</p>
             <label style={{ display: "block", marginBottom: 12 }}>
@@ -689,7 +737,7 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
                 }
                 setTestoInformativaDiversa(bozza.informativaPrivacy);
                 setBozza({ ...bozza, usaInformativaDiversa: false,
-                  informativaPrivacy: modelloInformativaGrest(datiInformativa, bozza.titolo) });
+                  informativaPrivacy: bozza.tipo === "grest" ? modelloInformativaGrest(datiInformativa, bozza.titolo) : modelloInformativaOrdinaria(datiInformativa, bozza.titolo) });
                 setInformativaAutomatica(true);
                 setErrore("");
               }} /> Usa un'informativa diversa
@@ -700,7 +748,8 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
                 onChange={(e) => { setBozza({ ...bozza, informativaPrivacy: e.target.value }); }}
                 placeholder="Incolla l’informativa della parrocchia per questa attività" />
             </label>
-          </fieldset>
+          </fieldset>}
+          {bozza.tipo === "grest" && <>
           <fieldset style={{ border: "1px solid #ded5c6", borderRadius: 10, margin: "16px 0", padding: 16 }}>
             <legend>Modulo cartaceo per chi non ha email</legend>
             <label style={{ display: "block", marginBottom: 10 }}>
@@ -723,8 +772,8 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
           </fieldset>
           </>}
           <label style={{ display: "flex", gap: 9, alignItems: "flex-start", marginBottom: 16 }}>
-            <input type="checkbox" checked={bozza.iscrizioniOnline} onChange={(e) => setBozza({ ...bozza, iscrizioniOnline: e.target.checked })} />
-            <span><strong>Questa attività prevede iscrizioni?</strong><small style={{ display: "block", marginTop: 4 }}>Se selezionato, le iscrizioni sono previste dalla pubblicazione. Il modulo GREST è già disponibile; per gli altri tipi il modulo per i fedeli sarà collegato nei prossimi passaggi.</small></span>
+            <input type="checkbox" checked={bozza.iscrizioniOnline} onChange={(e) => cambiaIscrizioniOnline(e.target.checked)} />
+            <span><strong>Questa attività prevede iscrizioni?</strong><small style={{ display: "block", marginTop: 4 }}>Se selezionato, le iscrizioni sono disponibili dalla pubblicazione. Compila l’informativa privacy qui sopra.</small></span>
           </label>
           <button type="submit" style={stile.pulsante} disabled={salvataggio || caricamentoInformativa}>{salvataggio ? "Salvataggio…" : bozza.statoOriginale === "pubblicata" ? "Salva modifiche" : "Salva bozza"}</button>{" "}
           {bozza.id && bozza.statoOriginale !== "pubblicata" && <button type="button" style={stile.pulsante} disabled={salvataggio || caricamentoInformativa} onClick={(evento) => {
