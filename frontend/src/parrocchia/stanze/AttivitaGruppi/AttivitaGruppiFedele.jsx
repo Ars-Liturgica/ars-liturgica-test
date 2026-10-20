@@ -225,7 +225,8 @@ function IscrizioneOrdinaria({ attivita, parrocchiaId, utenteId, metodi, erroreM
             <summary style={{ cursor: "pointer", fontWeight: "bold" }}>Leggi l'informativa privacy</summary>
             <div style={{ whiteSpace: "pre-wrap", padding: 14, border: "1px solid #e5d9ca", borderRadius: 8, marginTop: 8 }}>{informativa}</div>
           </details>
-          <p><label><input type="checkbox" checked={presaVisione} onChange={(e) => setPresaVisione(e.target.checked)} /> Ho preso visione dell'informativa privacy</label></p>
+          <p><label><input type="checkbox" checked={presaVisione} onChange={(e) => { setPresaVisione(e.target.checked); if (e.target.checked) setErrore(""); }} /> <strong>Ho preso visione dell'informativa privacy (obbligatorio)</strong></label></p>
+          {!presaVisione && <p role="status" style={{ color: "#8a3b16", fontWeight: 600, marginTop: 6 }}>Per completare l'iscrizione, leggi l'informativa privacy e seleziona la casella di presa visione qui sopra.</p>}
         </> : <p role="alert">La parrocchia non ha ancora pubblicato l'informativa per le iscrizioni. La conferma non è disponibile.</p>}
       </>}
       {errore && <p role="alert" style={{ color: "#a22" }}>{errore}</p>}
