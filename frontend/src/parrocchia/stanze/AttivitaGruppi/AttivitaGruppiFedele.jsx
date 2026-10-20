@@ -112,14 +112,11 @@ function IscrizioneOrdinaria({ attivita, parrocchiaId, utenteId, metodi, erroreM
       setCaricamento(true);
       setErrore("");
       try {
-        const { data: privacyData, error: privacyError } = await supabase
-          .from("parrocchie")
-          .select("privacy_iscrizioni_testo")
-          .eq("id", parrocchiaId)
-          .single();
+        // L'informativa è quella associata all'attività, come per il GREST.
+        // Non usare il testo generale della parrocchia al posto di quello scelto dal parroco.
+        const testoAttivita = attivita.configurazione_modulo?.informativa_privacy_testo;
         if (!attivo) return;
-        if (privacyError) setErrore("Impossibile leggere l'informativa privacy della parrocchia.");
-        else setInformativa(privacyData?.privacy_iscrizioni_testo?.trim() || "");
+        setInformativa(typeof testoAttivita === "string" ? testoAttivita.trim() : "");
 
         // L'anagrafica proviene dall'accesso del fedele, non da una SELECT pubblica su utenti.
         let anagrafica = null;
@@ -147,7 +144,7 @@ function IscrizioneOrdinaria({ attivita, parrocchiaId, utenteId, metodi, erroreM
     }
     caricaDati();
     return () => { attivo = false; };
-  }, [parrocchiaId, utenteId]);
+  }, [parrocchiaId, utenteId, attivita.id, attivita.configurazione_modulo]);
 
   function modificaPartecipante(indice, campo, valore) {
     setPartecipanti((precedenti) => precedenti.map((p, i) => i === indice ? { ...p, [campo]: valore } : p));
