@@ -88,7 +88,12 @@ function MetodiPagamento({ metodi, errore }) {
   </section>;
 }
 
-function IscrizioneOrdinaria({ attivita, parrocchiaId, utenteId, onIndietro }) {
+function euro(valore, valuta = "EUR") {
+  return Number(valore || 0).toLocaleString("it-IT", { style: "currency", currency: valuta || "EUR" });
+}
+
+function IscrizioneOrdinaria({ attivita, parrocchiaId, utenteId, metodi, erroreMetodi, onIndietro }) {
+  const [partecipanti, setPartecipanti] = useState([{ nome: "", cognome: "" }]);
   const [telefono, setTelefono] = useState("");
   const [email, setEmail] = useState("");
   const [presaVisione, setPresaVisione] = useState(false);
@@ -97,64 +102,127 @@ function IscrizioneOrdinaria({ attivita, parrocchiaId, utenteId, onIndietro }) {
   const [invio, setInvio] = useState(false);
   const [errore, setErrore] = useState("");
   const [risultato, setRisultato] = useState(null);
+  const quota = attivita.modello_quota === "quota_fissa" ? Number(attivita.importo_quota || 0) : 0;
+  const valuta = attivita.valuta || "EUR";
+  const totale = Math.round(quota * 100) * partecipanti.length / 100;
 
   useEffect(() => {
     let attivo = true;
-    async function caricaPrivacy() {
-      const { data, error } = await supabase
-        .from("parrocchie")
-        .select("privacy_iscrizioni_testo")
-        .eq("id", parrocchiaId)
-        .single();
-      if (!attivo) return;
-      if (error) setErrore("Informativa non disponibile. Contatta la parrocchia.");
-      else setInformativa(data?.privacy_iscrizioni_testo?.trim() || "");
-      setCaricamento(false);
+    async function caricaDati() {
+      setCaricamento(true);
+      setErrore("");
+      try {
+        const richieste = [
+          supabase.from("parrocchie").select("privacy_iscrizioni_testo").eq("id", parrocchiaId).single(),
+          utenteId ? supabase.from("utenti").select("nome,cognome,telefono,email").eq("id", utenteId).single() : Promise.resolve({ data: null, error: new Error("Identificativo fedele non disponibile") }),
+        ];
+        const [privacy, anagrafica] = await Promise.all(richieste);
+        if (!attivo) return;
+        if (privacy.error) setErrore("Impossibile leggere l'informativa privacy della parrocchia.");
+        else setInformativa(privacy.data?.privacy_iscrizioni_testo?.trim() || "");
+        if (anagrafica.error || !anagrafica.data) {
+          setErrore((precedente) => [precedente, "Impossibile recuperare l'anagrafica del fedele. Riprova o contatta la parrocchia."].filter(Boolean).join(" "));
+        } else {
+          const u = anagrafica.data;
+          setPartecipanti([{ nome: u.nome || "", cognome: u.cognome || "" }]);
+          setTelefono(u.telefono || "");
+          setEmail(u.email || "");
+        }
+      } catch {
+        if (attivo) setErrore("Caricamento non riuscito. Riprova ad aprire l'iscrizione.");
+      } finally {
+        if (attivo) setCaricamento(false);
+      }
     }
-    caricaPrivacy();
+    caricaDati();
     return () => { attivo = false; };
-  }, [parrocchiaId]);
+  }, [parrocchiaId, utenteId]);
+
+  function modificaPartecipante(indice, campo, valore) {
+    setPartecipanti((precedenti) => precedenti.map((p, i) => i === indice ? { ...p, [campo]: valore } : p));
+  }
 
   async function conferma(evento) {
     evento.preventDefault();
-    if (!utenteId || !informativa || !presaVisione || invio) return;
+    if (invio || caricamento) return;
+    if (!utenteId || !informativa || !presaVisione) {
+      setErrore("Per confermare servono l'anagrafica del fedele e la presa visione dell'informativa privacy.");
+      return;
+    }
+    if (partecipanti.some((p) => !p.nome.trim() || !p.cognome.trim())) {
+      setErrore("Inserisci nome e cognome di tutti i partecipanti.");
+      return;
+    }
     setInvio(true);
     setErrore("");
-    const { data, error } = await supabase.rpc("ars_iscrivi_attivita_ordinaria", {
-      p_attivita_id: attivita.id,
-      p_utente_id: utenteId,
-      p_telefono: telefono.trim() || null,
-      p_email: email.trim() || null,
-      p_privacy_accettata: true,
-    });
-    if (error) setErrore(error.message || "Impossibile inviare l'iscrizione.");
-    else setRisultato(data);
-    setInvio(false);
+    try {
+      const { data, error } = await supabase.rpc("ars_iscrivi_attivita_famiglia", {
+        p_attivita_id: attivita.id,
+        p_utente_id: utenteId,
+        p_partecipanti: partecipanti.map((p) => ({ nome: p.nome.trim(), cognome: p.cognome.trim() })),
+        p_telefono: telefono.trim() || null,
+        p_email: email.trim() || null,
+        p_privacy_accettata: true,
+      });
+      if (error) setErrore(error.message || "Impossibile inviare l'iscrizione.");
+      else setRisultato(data);
+    } catch {
+      setErrore("Connessione non disponibile. Verifica prima di ripetere l'invio.");
+    } finally {
+      setInvio(false);
+    }
   }
 
+  const campo = { width: "100%", maxWidth: 420, padding: 10, boxSizing: "border-box", borderRadius: 7, border: "1px solid #cdbda9" };
   return <section style={stile.card}>
     <button type="button" style={stile.pulsante} onClick={onIndietro}>← Torna alle attività</button>
     <h1>Iscrizione: {attivita.titolo}</h1>
     {risultato ? <>
-      <p role="status"><strong>Iscrizione ricevuta.</strong></p>
-      {Number(risultato.importo_dovuto) > 0
-        ? <p>Quota prevista: {Number(risultato.importo_dovuto).toLocaleString("it-IT", { style: "currency", currency: "EUR" })}. L'iscrizione sarà confermata con il saldo della quota, registrato dalla parrocchia.</p>
-        : <p>La tua richiesta è stata registrata. Non è previsto alcun pagamento.</p>}
-      <button type="button" style={stile.pulsante} onClick={onIndietro}>Torna all'elenco</button>
+      <p role="status"><strong>Iscrizione ricevuta per {risultato.numero_partecipanti} partecipant{risultato.numero_partecipanti === 1 ? "e" : "i"}.</strong></p>
+      <p><strong>Totale dovuto: {euro(risultato.totale_dovuto, risultato.valuta || valuta)}</strong></p>
+      <p>Il pagamento non è ancora registrato. La parrocchia verificherà gli importi versati.</p>
+      {Number(risultato.totale_dovuto) > 0 && <MetodiPagamento metodi={metodi} errore={erroreMetodi} />}
+      <p><button type="button" style={stile.pulsante} onClick={onIndietro}>Torna all'elenco</button></p>
     </> : <form onSubmit={conferma}>
-      <p>Inserisci un recapito, se desideri essere contattato dalla parrocchia.</p>
-      <p><label>Telefono (facoltativo)<br /><input type="tel" maxLength={30} value={telefono} onChange={(e) => setTelefono(e.target.value)} style={{ width: "100%", maxWidth: 420, padding: 10 }} /></label></p>
-      <p><label>Email (facoltativa)<br /><input type="email" maxLength={254} value={email} onChange={(e) => setEmail(e.target.value)} style={{ width: "100%", maxWidth: 420, padding: 10 }} /></label></p>
-      {caricamento ? <p>Caricamento informativa…</p> : informativa ? <>
-        <details style={{ margin: "16px 0" }}>
-          <summary style={{ cursor: "pointer", fontWeight: "bold" }}>Leggi l'informativa privacy</summary>
-          <div style={{ whiteSpace: "pre-wrap", padding: 14, border: "1px solid #e5d9ca", borderRadius: 8, marginTop: 8 }}>{informativa}</div>
-        </details>
-        <p><label><input type="checkbox" checked={presaVisione} onChange={(e) => setPresaVisione(e.target.checked)} /> Ho preso visione dell'informativa privacy</label></p>
-      </> : <p>La parrocchia non ha ancora pubblicato l'informativa per le iscrizioni.</p>}
+      {caricamento ? <p role="status">Caricamento anagrafica e informativa…</p> : <>
+        <h2>Partecipanti</h2>
+        <p>Il primo nominativo è quello del fedele registrato. Puoi modificarlo o aggiungere familiari.</p>
+        {partecipanti.map((p, indice) => <div key={indice} style={{ padding: 14, marginBottom: 12, border: "1px solid #e5d9ca", borderRadius: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 }}>
+            <strong>Partecipante {indice + 1}</strong>
+            {partecipanti.length > 1 && <button type="button" style={stile.pulsante} onClick={() => setPartecipanti((prev) => prev.filter((_, i) => i !== indice))}>Rimuovi</button>}
+          </div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 14, marginTop: 12 }}>
+            <label style={{ flex: "1 1 180px" }}>Nome<br /><input required maxLength={100} style={campo} value={p.nome} onChange={(e) => modificaPartecipante(indice, "nome", e.target.value)} /></label>
+            <label style={{ flex: "1 1 180px" }}>Cognome<br /><input required maxLength={100} style={campo} value={p.cognome} onChange={(e) => modificaPartecipante(indice, "cognome", e.target.value)} /></label>
+          </div>
+        </div>)}
+        <button type="button" style={stile.pulsante} disabled={partecipanti.length >= 30} onClick={() => setPartecipanti((prev) => [...prev, { nome: "", cognome: "" }])}>+ Aggiungi partecipante</button>
+        <h2>Recapiti del richiedente</h2>
+        <p>I dati disponibili sono già compilati. Puoi correggerli per questa iscrizione.</p>
+        <p><label>Telefono (facoltativo)<br /><input type="tel" maxLength={30} value={telefono} onChange={(e) => setTelefono(e.target.value)} style={campo} /></label></p>
+        <p><label>Email (facoltativa)<br /><input type="email" maxLength={254} value={email} onChange={(e) => setEmail(e.target.value)} style={campo} /></label></p>
+        <div style={{ padding: 18, background: "#fff4db", border: "2px solid #c99536", borderRadius: 12, margin: "22px 0" }}>
+          <h2 style={{ marginTop: 0 }}>Riepilogo e pagamento</h2>
+          <p>Partecipanti: <strong>{partecipanti.length}</strong></p>
+          {attivita.modello_quota === "quota_fissa" ? <>
+            <p>Quota per partecipante: <strong>{euro(quota, valuta)}</strong></p>
+            <p>{partecipanti.length} × {euro(quota, valuta)}</p>
+            <p style={{ fontSize: 23, marginBottom: 0 }}><strong>TOTALE DA PAGARE: {euro(totale, valuta)}</strong></p>
+          </> : attivita.modello_quota === "contributo_libero" ? <p><strong>Contributo libero:</strong> nessuna quota fissa dovuta.</p> : <p><strong>Partecipazione gratuita: nessun pagamento richiesto.</strong></p>}
+          {attivita.modello_quota !== "gratuita" && <MetodiPagamento metodi={metodi} errore={erroreMetodi} />}
+        </div>
+        {informativa ? <>
+          <details style={{ margin: "16px 0" }}>
+            <summary style={{ cursor: "pointer", fontWeight: "bold" }}>Leggi l'informativa privacy</summary>
+            <div style={{ whiteSpace: "pre-wrap", padding: 14, border: "1px solid #e5d9ca", borderRadius: 8, marginTop: 8 }}>{informativa}</div>
+          </details>
+          <p><label><input type="checkbox" checked={presaVisione} onChange={(e) => setPresaVisione(e.target.checked)} /> Ho preso visione dell'informativa privacy</label></p>
+        </> : <p role="alert">La parrocchia non ha ancora pubblicato l'informativa per le iscrizioni. La conferma non è disponibile.</p>}
+      </>}
       {errore && <p role="alert" style={{ color: "#a22" }}>{errore}</p>}
-      <button type="submit" style={stile.pulsante} disabled={caricamento || !informativa || !presaVisione || !utenteId || invio}>
-        {invio ? "Invio in corso…" : "Conferma iscrizione"}
+      <button type="submit" style={stile.pulsante} disabled={caricamento || !informativa || !presaVisione || !utenteId || invio || !!errore && errore.includes("anagrafica")}>
+        {invio ? "Invio in corso…" : `Conferma iscrizione (${partecipanti.length} partecipant${partecipanti.length === 1 ? "e" : "i"})`}
       </button>
     </form>}
   </section>;
@@ -203,7 +271,7 @@ export default function AttivitaGruppiFedele({ parrocchiaId, tornaDashboard }) {
   }, [caricaAttivita]);
 
   return <div style={stile.sfondo}><main style={stile.pagina}>
-    {grestSelezionato ? <IscrizioneGrestFedele attivita={grestSelezionato} utenteId={utenteId} onIndietro={() => setGrestSelezionato(null)} /> : ordinariaSelezionata ? <IscrizioneOrdinaria attivita={ordinariaSelezionata} parrocchiaId={parrocchiaId} utenteId={utenteId} onIndietro={() => setOrdinariaSelezionata(null)} /> : <>
+    {grestSelezionato ? <IscrizioneGrestFedele attivita={grestSelezionato} utenteId={utenteId} onIndietro={() => setGrestSelezionato(null)} /> : ordinariaSelezionata ? <IscrizioneOrdinaria attivita={ordinariaSelezionata} parrocchiaId={parrocchiaId} utenteId={utenteId} metodi={metodi} erroreMetodi={erroreMetodi} onIndietro={() => setOrdinariaSelezionata(null)} /> : <>
       <header style={stile.intestazione}>
         <div>
           <button type="button" style={stile.pulsante} onClick={tornaDashboard}>← Torna alla dashboard</button>
