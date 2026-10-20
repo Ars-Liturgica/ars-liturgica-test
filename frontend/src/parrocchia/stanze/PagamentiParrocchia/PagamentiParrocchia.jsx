@@ -117,6 +117,7 @@ function QuoteAttivita({ parrocchiaId, tornaDashboard, nomeParrocchia, attivitaI
   const [pagamento, setPagamento] = useState(null);
   const [salvataggio, setSalvataggio] = useState(false);
   const [errorePagamento, setErrorePagamento] = useState("");
+  const [tentativoQuota, setTentativoQuota] = useState(null);
   const [messaggio, setMessaggio] = useState("");
   const [documentoAnteprima, setDocumentoAnteprima] = useState(null);
   const [famigliaPromemoria, setFamigliaPromemoria] = useState("");
@@ -227,47 +228,80 @@ function QuoteAttivita({ parrocchiaId, tornaDashboard, nomeParrocchia, attivitaI
 
   function cambiaAttivita(e) {
     richiestaQuote.current += 1;
-    setDati(null); setCaricamento(true); setAttivitaId(e.target.value); setGruppoId(""); setPagamento(null); setFamigliaPromemoria(""); setMessaggio("");
+    setDati(null); setCaricamento(true); setAttivitaId(e.target.value); setGruppoId(""); setPagamento(null); setTentativoQuota(null); setFamigliaPromemoria(""); setMessaggio("");
   }
 
   function nuovoPagamento(r) {
-    setErrorePagamento(""); setMessaggio("");
+    setErrorePagamento(""); setMessaggio(""); setTentativoQuota(null);
     setPagamento({ riga: r, importo: numero(r.residuo) > 0 ? numero(r.residuo).toFixed(2) : "", metodo: "consegna_diretta", data: new Date().toLocaleDateString("sv-SE"), note: "" });
   }
 
   async function salvaPagamento(e) {
     e.preventDefault();
     if (!pagamento || salvaInCorso.current) return;
-    const importo = numero(String(pagamento.importo).replace(",", "."));
-    if (importo <= 0) { setErrorePagamento("Indica un importo maggiore di zero."); return; }
-    if (pagamento.riga.stato_quota !== "contributo_libero" && importo > numero(pagamento.riga.residuo)) { setErrorePagamento("L’importo supera il residuo dell’iscrizione."); return; }
-    const data = new Date(`${pagamento.data}T12:00:00`);
-    if (Number.isNaN(data.getTime())) { setErrorePagamento("Indica una data valida."); return; }
+    let parametri = tentativoQuota;
+    if (!parametri) {
+      const importo = Number(String(pagamento.importo).replace(",", "."));
+      if (!Number.isFinite(importo) || importo <= 0 || Math.abs(importo * 100 - Math.round(importo * 100)) > 0.000001) {
+        setErrorePagamento("Indica un importo positivo con massimo due decimali."); return;
+      }
+      if (pagamento.riga.stato_quota !== "contributo_libero" && importo > numero(pagamento.riga.residuo)) {
+        setErrorePagamento("L’importo supera il residuo dell’iscrizione."); return;
+      }
+      let data;
+      try { data = dataIncassoRoma(pagamento.data); }
+      catch (err) { setErrorePagamento(err.message); return; }
+      parametri = {
+        p_parrocchia_id: parrocchiaId,
+        p_causale_tipo: "quota_attivita",
+        p_attivita_id: attivitaId,
+        p_progetto_donazione_id: null,
+        p_iscrizione_attivita_id: pagamento.riga.id,
+        p_causale_descrizione: null,
+        p_importo: importo,
+        p_valuta: valuta,
+        p_metodo: pagamento.metodo,
+        p_data_incasso: data,
+        p_riferimento_esterno: null,
+        p_note_private: pagamento.note.trim() || null,
+        p_incasso_id: crypto.randomUUID(),
+      };
+      setTentativoQuota(parametri);
+    }
     salvaInCorso.current = true; setSalvataggio(true); setErrorePagamento("");
     try {
-      const { data: esito, error } = await supabase.rpc("ars_registra_pagamento_attivita", {
-        p_parrocchia_id: parrocchiaId, p_iscrizione_attivita_id: pagamento.riga.id,
-        p_importo: importo, p_metodo: pagamento.metodo, p_stato: "completata",
-        p_data_pagamento: data.toISOString(), p_pagante_utente_id: null, p_note_private: pagamento.note.trim() || null,
-      });
+      const { data: esito, error } = await supabase.rpc("ars_registra_incasso_parrocchia", parametri);
       if (error) throw error;
-      if (vivo.current) { setPagamento(null); setMessaggio("Pagamento registrato. Il riepilogo viene aggiornato."); setRevisione((v) => v + 1); }
-      const id = idMovimentoConfermato(esito, ["pagamento", "movimento"]);
-      if (id) {
-        try {
-          const documento = await recuperaDocumentoEconomico(parrocchiaId, "pagamento", id, attivitaId);
-          if (vivo.current) {
-            if (documento) setDocumentoAnteprima(documento);
-            else setMessaggio("Pagamento registrato. La ricevuta non è ancora disponibile nell'elenco documenti: controlla l'Archivio Documenti.");
-          }
-        } catch (lettura) {
-          if (vivo.current) setMessaggio(`Pagamento registrato. Impossibile aprire la ricevuta: ${lettura.message || "verifica l'Archivio Documenti"}. Non ripetere il pagamento.`);
-        }
-      } else if (vivo.current) {
-        setMessaggio("Pagamento registrato. La risposta non contiene l'identificativo del movimento: consulta l'Archivio Documenti. Non ripetere il pagamento.");
+      const id = esito?.pagamento?.id;
+      if (!id) throw new Error("Conferma del pagamento non disponibile. Riprova con lo stesso identificativo.");
+      if (vivo.current) {
+        setTentativoQuota(null);
+        setPagamento(null);
+        setMessaggio("Pagamento registrato. Il riepilogo viene aggiornato.");
+        setRevisione((v) => v + 1);
       }
-    } catch (err) { if (vivo.current) setErrorePagamento(err.message || "Impossibile registrare il pagamento."); }
-    finally { salvaInCorso.current = false; if (vivo.current) setSalvataggio(false); }
+      try {
+        const documento = await recuperaDocumentoEconomico(parrocchiaId, "pagamento", id, attivitaId);
+        if (vivo.current) {
+          if (documento) setDocumentoAnteprima(documento);
+          else setMessaggio("Pagamento registrato. La ricevuta non è ancora disponibile nell'elenco documenti: controlla l'Archivio Documenti.");
+        }
+      } catch (lettura) {
+        if (vivo.current) setMessaggio(`Pagamento registrato. Impossibile aprire la ricevuta: ${lettura.message || "verifica l'Archivio Documenti"}. Non ripetere il pagamento.`);
+      }
+    } catch (err) {
+      if (vivo.current) {
+        // Gli errori espliciti di Postgres annullano la transazione: consentiamo la correzione.
+        // Una risposta persa invece si ritenta con lo stesso UUID e gli stessi parametri.
+        if (err.code) setTentativoQuota(null);
+        setErrorePagamento(err.code
+          ? (err.message || "Impossibile registrare il pagamento.")
+          : "Conferma non ricevuta. Riprova la registrazione: verrà usato lo stesso identificativo per evitare duplicati.");
+      }
+    } finally {
+      salvaInCorso.current = false;
+      if (vivo.current) setSalvataggio(false);
+    }
   }
 
   function stampaElenco(soloResidui = false) {
@@ -316,12 +350,12 @@ function QuoteAttivita({ parrocchiaId, tornaDashboard, nomeParrocchia, attivitaI
       </React.Fragment>)}</tbody></table></div>}
     </>}
     {pagamento && <section ref={pannelloPagamento} className="qa-pannello"><h3>Registra pagamento · {nomeRagazzo(pagamento.riga)}</h3><p>{nomeGenitore(pagamento.riga)} · Residuo: {formattaImporto(pagamento.riga.residuo, valuta)}</p><p>Registra un versamento già ricevuto. Per più figli, registra la quota attribuita a ciascuno.</p>
-      <form onSubmit={salvaPagamento}><fieldset disabled={salvataggio}><div className="qa-filtri">
+      <form onSubmit={salvaPagamento}><fieldset disabled={salvataggio || !!tentativoQuota}><div className="qa-filtri">
         <label>Importo ({valuta})<input type="number" min="0.01" step="0.01" required value={pagamento.importo} onChange={(e) => setPagamento({ ...pagamento, importo: e.target.value })} /></label>
         <label>Metodo<select value={pagamento.metodo} onChange={(e) => setPagamento({ ...pagamento, metodo: e.target.value })}><option value="consegna_diretta">Versamento in parrocchia</option><option value="bonifico">Bonifico ricevuto</option></select></label>
         <label>Data<input type="date" required value={pagamento.data} onChange={(e) => setPagamento({ ...pagamento, data: e.target.value })} /></label>
         <label>Note private<input value={pagamento.note} onChange={(e) => setPagamento({ ...pagamento, note: e.target.value })} /></label>
-      </div>{errorePagamento && <p role="alert">{errorePagamento}</p>}<div className="qa-filtri"><button type="submit">{salvataggio ? "Registrazione…" : "Registra versamento"}</button><button type="button" onClick={() => setPagamento(null)}>Annulla</button></div></fieldset></form>
+      </div>{errorePagamento && <p role="alert">{errorePagamento}</p>}<div className="qa-filtri"><button type="submit">{salvataggio ? "Registrazione…" : tentativoQuota ? "Riprova la registrazione" : "Registra versamento"}</button><button type="button" disabled={!!tentativoQuota} onClick={() => setPagamento(null)}>Annulla</button></div></fieldset></form>
     </section>}
     {famigliaPromemoria && !caricamento && !errore && <section ref={pannelloPromemoria} className="qa-pannello"><h3>Promemoria riservato · {famiglieComplete.find((f) => f.id === famigliaPromemoria)?.nomi}</h3><p>Comprende tutti i figli della famiglia in questa attività, anche se sono in gruppi diversi. Puoi stampare oppure salvare in PDF e inviarlo personalmente.</p><label>Testo del promemoria<textarea rows={5} value={testoPromemoria} onChange={(e) => setTestoPromemoria(e.target.value)} /></label>{erroreMetodi && <p role="status">{erroreMetodi}</p>}<div className="qa-filtri"><button type="button" onClick={stampaPromemoria}>Anteprima / Salva PDF</button><button type="button" onClick={() => setFamigliaPromemoria("")}>Chiudi</button></div></section>}
   </main>;
