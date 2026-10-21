@@ -2,9 +2,10 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   eliminaDocumentoDaArchivio,
   leggiDocumentiInArchivio,
-} from "../../motoreDocumentale/MotoreDocumentale";
+} from "../../../motoreDocumentale/MotoreDocumentale";
 
 import ArchivioAttivita from "../ArchivioAttivita";
+import ArchivioRicevute from "../../PagamentiParrocchia/ArchivioRicevute";
 
 import "./ArchivioDocumenti.css";
 
@@ -198,10 +199,13 @@ export default function ArchivioDocumenti({
       <nav aria-label="Sezioni archivio" className="archivio-documenti__filtri">
         <button type="button" className={sezione === "documenti" ? "archivio-documenti__filtro archivio-documenti__filtro--attivo" : "archivio-documenti__filtro"} onClick={() => setSezione("documenti")}>Documenti</button>
         <button type="button" className={sezione === "attivita" ? "archivio-documenti__filtro archivio-documenti__filtro--attivo" : "archivio-documenti__filtro"} onClick={() => setSezione("attivita")}>Attività</button>
+        <button type="button" className={sezione === "ricevute" ? "archivio-documenti__filtro archivio-documenti__filtro--attivo" : "archivio-documenti__filtro"} onClick={() => setSezione("ricevute")}>Ricevute e documenti economici</button>
       </nav>
 
       {sezione === "attivita" ? (
         <ArchivioAttivita parrocchiaId={parrocchiaId} />
+      ) : sezione === "ricevute" ? (
+        <ArchivioRicevute parrocchiaId={parrocchiaId} tornaIndietro={() => setSezione("documenti")} />
       ) : (
       <>
       <nav
