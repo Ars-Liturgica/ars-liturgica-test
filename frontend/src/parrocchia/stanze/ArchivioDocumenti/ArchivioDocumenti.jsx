@@ -205,7 +205,7 @@ export default function ArchivioDocumenti({
       {sezione === "attivita" ? (
         <ArchivioAttivita parrocchiaId={parrocchiaId} />
       ) : sezione === "ricevute" ? (
-        <ArchivioRicevute parrocchiaId={parrocchiaId} />
+        <ArchivioRicevute parrocchiaId={parrocchiaId} tornaIndietro={() => setSezione("documenti")} />
       ) : (
       <>
       <nav
