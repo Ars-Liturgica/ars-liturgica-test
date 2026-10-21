@@ -865,7 +865,7 @@ function ElencoIscrizioniOrdinarieParroco({ attivita, parrocchiaId, onIndietro }
   const totale = (chiave) => visibili.reduce((somma, r) => somma + Number(r[chiave] || 0), 0);
   const stampa = () => window.print();
 
-  return <main style={stile.pagina}>
+  return <main style={{ ...stile.pagina, color: "#173850" }}>
     <button type="button" style={stile.pulsante} onClick={onIndietro}>← Torna alle attività</button>
     <h1>Iscrizioni a {attivita.titolo}</h1>
     <p>Elenco dei partecipanti iscritti all’attività. Le quote ancora dovute non sono incassi.</p>
@@ -882,17 +882,17 @@ function ElencoIscrizioniOrdinarieParroco({ attivita, parrocchiaId, onIndietro }
       <p><strong>Partecipanti:</strong> {visibili.length} · <strong>Dovuto:</strong> {soldi(totale("dovuto"))} · <strong>Pagato:</strong> {soldi(totale("pagato"))} · <strong>Residuo:</strong> {soldi(totale("residuo"))}</p>
       {visibili.length === 0 ? <p>Nessuna iscrizione corrisponde alla ricerca.</p> :
         <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left" }}>
-            <thead><tr>{["Partecipante", "Referente", "Recapiti", "Iscrizione", "Dovuto", "Pagato", "Residuo", "Quota"].map(t => <th key={t} style={{ padding: 10, borderBottom: "1px solid #ded5c6" }}>{t}</th>)}</tr></thead>
+          <table style={{ width: "100%", borderCollapse: "collapse", textAlign: "left", color: "#173850", background: "#ffffff" }}>
+            <thead><tr>{["Partecipante", "Referente", "Recapiti", "Iscrizione", "Dovuto", "Pagato", "Residuo", "Quota"].map(t => <th key={t} style={{ padding: 10, borderBottom: "1px solid #ded5c6", color: "#173850", background: "#f3f6f9", fontWeight: 700 }}>{t}</th>)}</tr></thead>
             <tbody>{visibili.map(r => <tr key={r.id}>
-              <td style={{ padding: 10, borderBottom: "1px solid #eee4d6" }}>{[r.nome_partecipante, r.cognome_partecipante].filter(Boolean).join(" ") || "Non indicato"}</td>
-              <td style={{ padding: 10, borderBottom: "1px solid #eee4d6" }}>{[r.genitore_nome, r.genitore_cognome].filter(Boolean).join(" ") || "Non indicato"}</td>
-              <td style={{ padding: 10, borderBottom: "1px solid #eee4d6" }}>{[r.telefono_contatto, r.email_contatto].filter(Boolean).join(" · ") || "Non disponibili"}</td>
-              <td style={{ padding: 10, borderBottom: "1px solid #eee4d6" }}>{r.stato_iscrizione || "—"}</td>
-              <td style={{ padding: 10, borderBottom: "1px solid #eee4d6" }}>{soldi(r.dovuto)}</td>
-              <td style={{ padding: 10, borderBottom: "1px solid #eee4d6" }}>{soldi(r.pagato)}</td>
-              <td style={{ padding: 10, borderBottom: "1px solid #eee4d6" }}><strong>{soldi(r.residuo)}</strong></td>
-              <td style={{ padding: 10, borderBottom: "1px solid #eee4d6" }}>{String(r.stato_quota || "—").replaceAll("_", " ")}</td>
+              <td style={{ padding: 10, borderBottom: "1px solid #eee4d6", color: "#173850" }}>{[r.nome_partecipante, r.cognome_partecipante].filter(Boolean).join(" ") || "Non indicato"}</td>
+              <td style={{ padding: 10, borderBottom: "1px solid #eee4d6", color: "#173850" }}>{[r.genitore_nome, r.genitore_cognome].filter(Boolean).join(" ") || "Non indicato"}</td>
+              <td style={{ padding: 10, borderBottom: "1px solid #eee4d6", color: "#173850" }}>{[r.telefono_contatto, r.email_contatto].filter(Boolean).join(" · ") || "Non disponibili"}</td>
+              <td style={{ padding: 10, borderBottom: "1px solid #eee4d6", color: "#173850" }}>{r.stato_iscrizione || "—"}</td>
+              <td style={{ padding: 10, borderBottom: "1px solid #eee4d6", color: "#173850" }}>{soldi(r.dovuto)}</td>
+              <td style={{ padding: 10, borderBottom: "1px solid #eee4d6", color: "#173850" }}>{soldi(r.pagato)}</td>
+              <td style={{ padding: 10, borderBottom: "1px solid #eee4d6", color: "#173850" }}><strong>{soldi(r.residuo)}</strong></td>
+              <td style={{ padding: 10, borderBottom: "1px solid #eee4d6", color: "#173850" }}>{String(r.stato_quota || "—").replaceAll("_", " ")}</td>
             </tr>)}</tbody>
           </table>
         </div>}
