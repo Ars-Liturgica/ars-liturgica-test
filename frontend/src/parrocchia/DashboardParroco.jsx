@@ -7,7 +7,7 @@ import { supabase } from "../supabaseClient";
 
 import CalendariParroco from "./stanze/Calendari/CalendariParroco";
 import BachecaAvvisi from "./stanze/BachecaAvvisi/BachecaAvvisi";
-import ArchivioDocumenti from "./stanze/ArchivioDocumenti/ArchivioDocumenti/ArchivioDocumenti";
+import ArchivioDocumenti from "./stanze/ArchivioDocumenti/ArchivioDocumenti";
 import ComunitaParrocchia from "./stanze/Comunita/ComunitaParrocchia";
 import Celebrazioni from "./stanze/Celebrazioni/Celebrazioni";
 import IntenzioniMesseParroco from "./stanze/Celebrazioni/IntenzioniMesseParroco";
