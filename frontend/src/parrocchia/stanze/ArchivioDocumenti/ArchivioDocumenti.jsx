@@ -4,10 +4,10 @@ import {
   leggiDocumentiInArchivio,
 } from "../../motoreDocumentale/MotoreDocumentale";
 
-import ArchivioAttivita from "../ArchivioAttivita";
-import ArchivioRicevute from "../../PagamentiParrocchia/ArchivioRicevute";
+import ArchivioAttivita from "./ArchivioAttivita";
+import ArchivioRicevute from "../PagamentiParrocchia/ArchivioRicevute";
 
-import "./ArchivioDocumenti.css";
+import "./ArchivioDocumenti/ArchivioDocumenti.css";
 
 const FILTRI_STATO = [
   { valore: "bozza", etichetta: "Bozze" },
