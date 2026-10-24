@@ -4,7 +4,7 @@ import { supabase } from "../../../supabaseClient";
 const TIPI = {
   bonifico: "Bonifico",
   paypal: "PayPal",
-  link_pagamento: "Carta di credito/debito",
+  link_pagamento: "Carta di credito/debito tramite Stripe",
   consegna_diretta: "Consegna diretta in parrocchia",
 };
 const nuovoMetodo = (tipo = "bonifico") => ({
@@ -12,7 +12,7 @@ const nuovoMetodo = (tipo = "bonifico") => ({
   bic_swift: "", email_paypal: "", link_pagamento: "", istruzioni: "",
   attivo: true, ordine: 0,
 });
-const iconeMetodo = { bonifico: "🏦", paypal: "💳", link_pagamento: "🔗", consegna_diretta: "🤝" };
+const iconeMetodo = { bonifico: "🏦", paypal: "💳", link_pagamento: "💳", consegna_diretta: "🤝" };
 const stilePulsante = { background: "#b78b42", color: "#fff", border: "1px solid #a67b35", borderRadius: "10px", padding: "11px 18px", fontWeight: 700, cursor: "pointer", fontSize: "15px" };
 const stilePulsanteSecondario = { ...stilePulsante, background: "#fffaf1", color: "#18334a", border: "1px solid #ddc89d" };
 const stileCartella = { ...stilePulsanteSecondario, display: "flex", width: "100%", alignItems: "center", justifyContent: "space-between", textAlign: "left", padding: "22px", marginBottom: "14px", gap: "12px" };
@@ -144,7 +144,7 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
       {sezione === "metodi" && <section className="sezione-metodi-incasso">
         <div className="intestazione-sezione-donazioni">
           <h3>Metodi di incasso</h3>
-          <p>Bonifico, PayPal, pagamenti tramite gestore esterno e consegna diretta alla parrocchia.</p>
+          <p>Attiva e configura separatamente bonifico, PayPal, carta tramite Stripe e pagamento in parrocchia. Gli incassi arrivano direttamente alla parrocchia.</p>
           <button type="button" className="pulsante-primario" disabled={!parrocchiaId || salvataggio}
             onClick={() => scegliTipo(Object.keys(TIPI).find((tipo) => !metodiIncasso.some((m) => m.tipo === tipo)) || "bonifico")}>
             Aggiungi metodo
@@ -166,9 +166,34 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
               {campo("iban", "IBAN", { obbligatorio: true })}
               {campo("bic_swift", "BIC / SWIFT (facoltativo)")}
             </>}
-            {modulo.tipo === "paypal" && campo("email_paypal", "Email PayPal", { tipo: "email" })}
-            {modulo.tipo === "link_pagamento" && <p>Inserisci il link per pagare con carta fornito dal servizio della parrocchia, fornito dal gestore scelto dalla parrocchia.</p>}
-            {["paypal", "link_pagamento"].includes(modulo.tipo) && campo("link_pagamento", "Link di pagamento", { tipo: "url", obbligatorio: modulo.tipo === "link_pagamento" })}
+            {modulo.tipo === "paypal" && <>
+              <p>Inserisci il link PayPal della parrocchia oppure la sua email PayPal.</p>
+              <details style={{ margin: "12px 0", padding: "12px", background: "#fffaf1", borderRadius: 8 }}>
+                <summary style={{ cursor: "pointer", fontWeight: 700 }}>Come ottenere il link PayPal?</summary>
+                <ol style={{ lineHeight: 1.6, paddingLeft: 22 }}>
+                  <li>Vai sul <a href="https://www.paypal.com/it" target="_blank" rel="noopener noreferrer">sito ufficiale PayPal</a>.</li>
+                  <li>Se non hai già un conto, segui le indicazioni del sito per crearne uno adatto alla parrocchia.</li>
+                  <li>Accedi alle funzioni disponibili per ricevere pagamenti e ottieni il relativo link.</li>
+                  <li>Copia il link nel campo sottostante, attiva il metodo e salva.</li>
+                </ol>
+                <small>La scelta del servizio e la verifica delle condizioni e delle eventuali commissioni spettano alla parrocchia.</small>
+              </details>
+              {campo("email_paypal", "Email PayPal", { tipo: "email" })}
+            </>}
+            {modulo.tipo === "link_pagamento" && <>
+              <p>Inserisci il link di pagamento Stripe della parrocchia. Ars Liturgica non incassa denaro e non verifica automaticamente l’esito del pagamento.</p>
+              <details style={{ margin: "12px 0", padding: "12px", background: "#fffaf1", borderRadius: 8 }}>
+                <summary style={{ cursor: "pointer", fontWeight: 700 }}>Come ottenere il link Stripe?</summary>
+                <ol style={{ lineHeight: 1.6, paddingLeft: 22 }}>
+                  <li>Vai sul <a href="https://stripe.com/it" target="_blank" rel="noopener noreferrer">sito ufficiale Stripe</a>.</li>
+                  <li>Se non hai già un account, segui le istruzioni per crearne uno per la parrocchia.</li>
+                  <li>Completa le verifiche richieste e apri la sezione Payment Links.</li>
+                  <li>Crea un link adatto ai versamenti che intendi ricevere, copialo qui, attiva il metodo e salva.</li>
+                </ol>
+                <small>Verifica che il link consenta gli importi necessari, anche per eventuali acconti, e controlla le condizioni e le commissioni del servizio.</small>
+              </details>
+            </>}
+            {["paypal", "link_pagamento"].includes(modulo.tipo) && campo("link_pagamento", modulo.tipo === "link_pagamento" ? "Link Stripe della parrocchia" : "Link PayPal della parrocchia", { tipo: "url", obbligatorio: modulo.tipo === "link_pagamento" })}
             <label style={{ display: "block", margin: "12px 0" }}>Istruzioni per chi paga
               <textarea style={stileCampo} rows={3} value={modulo.istruzioni || ""} onChange={(e) => aggiorna("istruzioni", e.target.value)} />
             </label>
@@ -193,9 +218,10 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
             {metodo.istruzioni && <p style={{ whiteSpace: "pre-wrap" }}>{metodo.istruzioni}</p>}
             <button type="button" style={stilePulsanteSecondario} disabled={salvataggio || !parrocchiaId} onClick={() => apriMetodo(metodo)}>Modifica</button>
           </article>)}
-        <article style={{ ...stileScheda, background: "#fffaf1", opacity: 0.85 }}>
-          <h4>SumUp <span style={{ fontSize: 13, color: "#875c19" }}>· In attesa di definizione</span></h4>
-          <p>Integrazione in valutazione. Nessun pagamento SumUp è attualmente attivo.</p>
+        <article style={{ ...stileScheda, background: "#fffaf1" }}>
+          <h4>Vuoi automatizzare la gestione dei pagamenti?</h4>
+          <p>Ars Liturgica offre la possibilità di collegare i servizi di pagamento online per ricevere automaticamente le conferme degli incassi, riducendo le verifiche manuali e semplificando la gestione delle ricevute.</p>
+          <p>Per maggiori informazioni e una valutazione tecnica, contatta l'assistenza di Ars Liturgica.</p>
         </article>
       </section>}
       {sezione === "progetti" && <section className="sezione-progetti-donazioni">
