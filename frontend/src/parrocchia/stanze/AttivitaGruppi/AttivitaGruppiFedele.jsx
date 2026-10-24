@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "../../../supabaseClient";
 import IscrizioneGrestFedele from "./IscrizioneGrestFedele";
+import { stampaDocumento } from "../ArchivioDocumenti/stampaDocumentoEconomico";
 
 const stile = {
   sfondo: { minHeight: "100vh", background: "#f7f3ed" },
@@ -237,6 +238,87 @@ function IscrizioneOrdinaria({ attivita, parrocchiaId, utenteId, metodi, erroreM
   </section>;
 }
 
+function MieIscrizioniPagamenti({ parrocchiaId, utenteId, onIndietro }) {
+  const [righe, setRighe] = useState([]);
+  const [caricamento, setCaricamento] = useState(true);
+  const [errore, setErrore] = useState("");
+  const [aggiornamento, setAggiornamento] = useState(0);
+
+  useEffect(() => {
+    let attivo = true;
+    async function carica() {
+      setCaricamento(true);
+      setErrore("");
+      try {
+        if (!parrocchiaId || !utenteId) throw new Error("Accedi nuovamente alla parrocchia per consultare le tue iscrizioni.");
+        const { data, error } = await supabase.rpc("ars_mie_iscrizioni_pagamenti", {
+          p_parrocchia_id: parrocchiaId,
+          p_utente_id: utenteId,
+        });
+        if (error) throw error;
+        const risultato = typeof data === "string" ? JSON.parse(data) : data;
+        if (!Array.isArray(risultato)) throw new Error("Risposta delle iscrizioni non valida.");
+        if (attivo) setRighe(risultato);
+      } catch (e) {
+        if (attivo) setErrore(e?.message || "Impossibile caricare le iscrizioni.");
+      } finally {
+        if (attivo) setCaricamento(false);
+      }
+    }
+    carica();
+    return () => { attivo = false; };
+  }, [parrocchiaId, utenteId, aggiornamento]);
+
+  function stampa(ricevuta, riga) {
+    try {
+      // La RPC restituisce i dati del documento originale, non una nuova emissione.
+      stampaDocumento({
+        ...ricevuta,
+        id: ricevuta.documento_id,
+        tipo_documento: "ricevuta",
+        data_documento: ricevuta.data,
+        valuta: riga.valuta || "EUR",
+        dati_documento: ricevuta.dati_documento || {},
+      }, riga.nome_parrocchia || "Parrocchia");
+    } catch (e) {
+      setErrore(e?.message || "Impossibile aprire la stampa.");
+    }
+  }
+
+  const gruppi = righe.reduce((acc, riga) => {
+    const chiave = riga.attivita_id || riga.attivita || "attivita";
+    if (!acc[chiave]) acc[chiave] = { titolo: riga.attivita || "Attività", righe: [] };
+    acc[chiave].righe.push(riga);
+    return acc;
+  }, {});
+
+  return <section>
+    <button type="button" style={stile.pulsante} onClick={onIndietro}>← Torna alle attività</button>
+    <h1>Le mie iscrizioni e pagamenti</h1>
+    <p>Consulta le iscrizioni effettuate, i versamenti registrati e le ricevute originali.</p>
+    <button type="button" style={stile.pulsante} disabled={caricamento} onClick={() => setAggiornamento((v) => v + 1)}>Aggiorna</button>
+    {caricamento && <p role="status">Caricamento iscrizioni…</p>}
+    {errore && <p role="alert" style={{ color: "#a32626" }}>{errore}</p>}
+    {!caricamento && !errore && righe.length === 0 && <p>Non risultano iscrizioni associate al tuo account in questa parrocchia.</p>}
+    {!caricamento && Object.entries(gruppi).map(([id, gruppo]) => <article key={id} style={{ ...stile.card, marginTop: 18 }}>
+      <h2 style={{ marginTop: 0 }}>{gruppo.titolo}</h2>
+      {gruppo.righe.map((riga) => <div key={riga.iscrizione_id || riga.partecipante} style={{ borderTop: "1px solid #e5d9ca", padding: "14px 0" }}>
+        <h3 style={{ margin: "0 0 8px" }}>{riga.partecipante || "Partecipante"}</h3>
+        <p>Quota dovuta: <strong>{euro(riga.quota_dovuta, riga.valuta)}</strong></p>
+        <p>Versato: <strong>{euro(riga.totale_versato, riga.valuta)}</strong></p>
+        <p>Residuo: <strong>{euro(riga.residuo, riga.valuta)}</strong></p>
+        {Array.isArray(riga.ricevute) && riga.ricevute.length > 0 && <div>
+          <h4>Ricevute</h4>
+          {riga.ricevute.map((ricevuta) => <div key={ricevuta.documento_id || `${ricevuta.anno}-${ricevuta.numero}`} style={{ marginBottom: 12 }}>
+            <span>Ricevuta n. {ricevuta.numero}/{ricevuta.anno} — {euro(ricevuta.importo, riga.valuta)}</span>{" "}
+            <button type="button" style={stile.pulsante} onClick={() => stampa(ricevuta, riga)}>Stampa / Salva PDF</button>
+          </div>)}
+        </div>}
+      </div>)}
+    </article>)}
+  </section>;
+}
+
 export default function AttivitaGruppiFedele({ parrocchiaId, tornaDashboard }) {
   const utenteId = localStorage.getItem("ars_utente_id");
   const [attivita, setAttivita] = useState([]);
@@ -244,6 +326,7 @@ export default function AttivitaGruppiFedele({ parrocchiaId, tornaDashboard }) {
   const [erroreMetodi, setErroreMetodi] = useState("");
   const [caricamento, setCaricamento] = useState(true);
   const [errore, setErrore] = useState("");
+  const [mieIscrizioniAperte, setMieIscrizioniAperte] = useState(false);
   const [grestSelezionato, setGrestSelezionato] = useState(null);
   const [ordinariaSelezionata, setOrdinariaSelezionata] = useState(null);
   const richiesta = useRef(0);
@@ -275,12 +358,12 @@ export default function AttivitaGruppiFedele({ parrocchiaId, tornaDashboard }) {
   }, [parrocchiaId]);
 
   useEffect(() => {
-    setGrestSelezionato(null); setOrdinariaSelezionata(null); caricaAttivita();
+    setGrestSelezionato(null); setOrdinariaSelezionata(null); setMieIscrizioniAperte(false); caricaAttivita();
     return () => { richiesta.current += 1; };
   }, [caricaAttivita]);
 
   return <div style={stile.sfondo}><main style={stile.pagina}>
-    {grestSelezionato ? <IscrizioneGrestFedele attivita={grestSelezionato} utenteId={utenteId} onIndietro={() => setGrestSelezionato(null)} /> : ordinariaSelezionata ? <IscrizioneOrdinaria attivita={ordinariaSelezionata} parrocchiaId={parrocchiaId} utenteId={utenteId} metodi={metodi} erroreMetodi={erroreMetodi} onIndietro={() => setOrdinariaSelezionata(null)} /> : <>
+    {mieIscrizioniAperte ? <MieIscrizioniPagamenti parrocchiaId={parrocchiaId} utenteId={utenteId} onIndietro={() => setMieIscrizioniAperte(false)} /> : grestSelezionato ? <IscrizioneGrestFedele attivita={grestSelezionato} utenteId={utenteId} onIndietro={() => setGrestSelezionato(null)} /> : ordinariaSelezionata ? <IscrizioneOrdinaria attivita={ordinariaSelezionata} parrocchiaId={parrocchiaId} utenteId={utenteId} metodi={metodi} erroreMetodi={erroreMetodi} onIndietro={() => setOrdinariaSelezionata(null)} /> : <>
       <header style={stile.intestazione}>
         <div>
           <button type="button" style={stile.pulsante} onClick={tornaDashboard}>← Torna alla dashboard</button>
@@ -288,6 +371,11 @@ export default function AttivitaGruppiFedele({ parrocchiaId, tornaDashboard }) {
         </div>
         <button type="button" style={stile.pulsante} onClick={caricaAttivita} disabled={caricamento}>Aggiorna elenco</button>
       </header>
+      <section style={{ ...stile.card, marginBottom: 22, borderColor: "#c99536" }}>
+        <h2 style={{ marginTop: 0 }}>Le mie iscrizioni e pagamenti</h2>
+        <p>Quote, versamenti, residui e ricevute delle iscrizioni tue e dei tuoi familiari.</p>
+        <button type="button" style={stile.pulsante} onClick={() => setMieIscrizioniAperte(true)}>Apri le mie iscrizioni e pagamenti</button>
+      </section>
       {caricamento && <p role="status">Caricamento delle attività…</p>}
       {errore && <p role="alert">{errore}</p>}
       {!caricamento && !errore && attivita.length === 0 && <section style={stile.card}><h2>Nessuna attività aperta</h2><p>Le prossime attività della parrocchia compariranno qui.</p></section>}
