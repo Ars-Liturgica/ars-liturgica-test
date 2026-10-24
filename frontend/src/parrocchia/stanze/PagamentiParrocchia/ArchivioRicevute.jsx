@@ -1,7 +1,7 @@
 
 import React, { useEffect, useMemo, useState } from "react";
 import { stampaDocumento } from "../ArchivioDocumenti/stampaDocumentoEconomico";
-import { stampaDocumento } from "./stampaDocumentoEconomico";
+
 
 const TIPI = {
   ricevuta: "Ricevuta",
