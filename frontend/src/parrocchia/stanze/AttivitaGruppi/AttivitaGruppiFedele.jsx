@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "../../../supabaseClient";
 import IscrizioneGrestFedele from "./IscrizioneGrestFedele";
-import { stampaDocumento } from "../ArchivioDocumenti/stampaDocumentoEconomico";
+import AnteprimaDocumentoEconomico from "../PagamentiParrocchia/AnteprimaDocumentoEconomico";
 
 const stile = {
   sfondo: { minHeight: "100vh", background: "#f7f3ed" },
@@ -243,6 +243,7 @@ function MieIscrizioniPagamenti({ parrocchiaId, utenteId, onIndietro }) {
   const [caricamento, setCaricamento] = useState(true);
   const [errore, setErrore] = useState("");
   const [aggiornamento, setAggiornamento] = useState(0);
+  const [documentoAperto, setDocumentoAperto] = useState(null);
 
   useEffect(() => {
     let attivo = true;
@@ -269,20 +270,26 @@ function MieIscrizioniPagamenti({ parrocchiaId, utenteId, onIndietro }) {
     return () => { attivo = false; };
   }, [parrocchiaId, utenteId, aggiornamento]);
 
-  function stampa(ricevuta, riga) {
-    try {
-      // La RPC restituisce i dati del documento originale, non una nuova emissione.
-      stampaDocumento({
+  function apriRicevuta(ricevuta, riga) {
+    // Si consulta il documento archiviato senza generare un nuovo numero o movimento.
+    // L'anteprima è la stessa usata nella gestione economica del parroco.
+    const dati = ricevuta.dati_documento || {};
+    const metodo = NOMI_METODI[ricevuta.metodo] || ricevuta.metodo || null;
+    setDocumentoAperto({
+      documento: {
         ...ricevuta,
         id: ricevuta.documento_id,
         tipo_documento: "ricevuta",
         data_documento: ricevuta.data,
         valuta: riga.valuta || "EUR",
-        dati_documento: ricevuta.dati_documento || {},
-      }, riga.nome_parrocchia || "Parrocchia");
-    } catch (e) {
-      setErrore(e?.message || "Impossibile aprire la stampa.");
-    }
+        dati_documento: {
+          ...dati,
+          attivita: dati.attivita || riga.attivita || null,
+          metodo_pagamento: dati.metodo_pagamento || metodo,
+        },
+      },
+      nomeParrocchia: riga.nome_parrocchia || dati.nome_parrocchia || "",
+    });
   }
 
   const gruppi = righe.reduce((acc, riga) => {
@@ -293,6 +300,7 @@ function MieIscrizioniPagamenti({ parrocchiaId, utenteId, onIndietro }) {
   }, {});
 
   return <section>
+    {documentoAperto && <AnteprimaDocumentoEconomico documento={documentoAperto.documento} nomeParrocchia={documentoAperto.nomeParrocchia} onChiudi={() => setDocumentoAperto(null)} />}
     <button type="button" style={stile.pulsante} onClick={onIndietro}>← Torna alle attività</button>
     <h1>Le mie iscrizioni e pagamenti</h1>
     <p>Consulta le iscrizioni effettuate, i versamenti registrati e le ricevute originali.</p>
@@ -311,7 +319,7 @@ function MieIscrizioniPagamenti({ parrocchiaId, utenteId, onIndietro }) {
           <h4>Ricevute</h4>
           {riga.ricevute.map((ricevuta) => <div key={ricevuta.documento_id || `${ricevuta.anno}-${ricevuta.numero}`} style={{ marginBottom: 12 }}>
             <span>Ricevuta n. {ricevuta.numero}/{ricevuta.anno} — {euro(ricevuta.importo, riga.valuta)}</span>{" "}
-            <button type="button" style={stile.pulsante} onClick={() => stampa(ricevuta, riga)}>Stampa / Salva PDF</button>
+            <button type="button" style={stile.pulsante} onClick={() => apriRicevuta(ricevuta, riga)}>Stampa / Salva PDF</button>
           </div>)}
         </div>}
       </div>)}
