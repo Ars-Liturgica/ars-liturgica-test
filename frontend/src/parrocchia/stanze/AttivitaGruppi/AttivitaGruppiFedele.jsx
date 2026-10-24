@@ -244,12 +244,16 @@ function MieIscrizioniPagamenti({ parrocchiaId, utenteId, onIndietro }) {
   const [errore, setErrore] = useState("");
   const [aggiornamento, setAggiornamento] = useState(0);
   const [documentoAperto, setDocumentoAperto] = useState(null);
+  const [anagraficaParrocchia, setAnagraficaParrocchia] = useState(null);
+  const [erroreAnagrafica, setErroreAnagrafica] = useState("");
 
   useEffect(() => {
     let attivo = true;
     async function carica() {
       setCaricamento(true);
       setErrore("");
+      setErroreAnagrafica("");
+      setAnagraficaParrocchia(null);
       try {
         if (!parrocchiaId || !utenteId) throw new Error("Accedi nuovamente alla parrocchia per consultare le tue iscrizioni.");
         const { data, error } = await supabase.rpc("ars_mie_iscrizioni_pagamenti", {
@@ -260,6 +264,18 @@ function MieIscrizioniPagamenti({ parrocchiaId, utenteId, onIndietro }) {
         const risultato = typeof data === "string" ? JSON.parse(data) : data;
         if (!Array.isArray(risultato)) throw new Error("Risposta delle iscrizioni non valida.");
         if (attivo) setRighe(risultato);
+        // Leggiamo soltanto i campi necessari all'intestazione, senza modificare le policy.
+        const { data: anagrafica, error: erroreLettura } = await supabase
+          .from("parrocchie")
+          .select("nome, indirizzo, cap, comune, provincia, telefono, email")
+          .eq("id", parrocchiaId)
+          .maybeSingle();
+        if (!attivo) return;
+        if (erroreLettura || !anagrafica) {
+          setErroreAnagrafica("Intestazione della parrocchia non accessibile: verificare i permessi di lettura esistenti.");
+        } else {
+          setAnagraficaParrocchia(anagrafica);
+        }
       } catch (e) {
         if (attivo) setErrore(e?.message || "Impossibile caricare le iscrizioni.");
       } finally {
@@ -288,7 +304,7 @@ function MieIscrizioniPagamenti({ parrocchiaId, utenteId, onIndietro }) {
           metodo_pagamento: dati.metodo_pagamento || metodo,
         },
       },
-      nomeParrocchia: riga.nome_parrocchia || dati.nome_parrocchia || "",
+      nomeParrocchia: anagraficaParrocchia?.nome || riga.nome_parrocchia || dati.nome_parrocchia || "",
     });
   }
 
@@ -300,13 +316,21 @@ function MieIscrizioniPagamenti({ parrocchiaId, utenteId, onIndietro }) {
   }, {});
 
   return <section>
-    {documentoAperto && <AnteprimaDocumentoEconomico documento={documentoAperto.documento} nomeParrocchia={documentoAperto.nomeParrocchia} onChiudi={() => setDocumentoAperto(null)} />}
+    {documentoAperto && <AnteprimaDocumentoEconomico
+      documento={documentoAperto.documento}
+      nomeParrocchia={documentoAperto.nomeParrocchia}
+      indirizzoParrocchia={anagraficaParrocchia ? [anagraficaParrocchia.indirizzo, [anagraficaParrocchia.cap, anagraficaParrocchia.comune, anagraficaParrocchia.provincia ? `(${anagraficaParrocchia.provincia})` : ""].filter(Boolean).join(" ")].filter(Boolean).join(", ") : ""}
+      telefonoParrocchia={anagraficaParrocchia?.telefono || ""}
+      emailParrocchia={anagraficaParrocchia?.email || ""}
+      onChiudi={() => setDocumentoAperto(null)}
+    />}
     <button type="button" style={stile.pulsante} onClick={onIndietro}>← Torna alle attività</button>
     <h1>Le mie iscrizioni e pagamenti</h1>
     <p>Consulta le iscrizioni effettuate, i versamenti registrati e le ricevute originali.</p>
     <button type="button" style={stile.pulsante} disabled={caricamento} onClick={() => setAggiornamento((v) => v + 1)}>Aggiorna</button>
     {caricamento && <p role="status">Caricamento iscrizioni…</p>}
     {errore && <p role="alert" style={{ color: "#a32626" }}>{errore}</p>}
+    {erroreAnagrafica && <p role="alert" style={{ color: "#a32626" }}>{erroreAnagrafica}</p>}
     {!caricamento && !errore && righe.length === 0 && <p>Non risultano iscrizioni associate al tuo account in questa parrocchia.</p>}
     {!caricamento && Object.entries(gruppi).map(([id, gruppo]) => <article key={id} style={{ ...stile.card, marginTop: 18 }}>
       <h2 style={{ marginTop: 0 }}>{gruppo.titolo}</h2>
