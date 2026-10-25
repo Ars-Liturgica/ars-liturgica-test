@@ -12,7 +12,29 @@ const nuovoMetodo = (tipo = "bonifico") => ({
   bic_swift: "", email_paypal: "", link_pagamento: "", istruzioni: "",
   attivo: true, ordine: 0,
 });
-const iconeMetodo = { bonifico: "🏦", paypal: "💳", link_pagamento: "💳", consegna_diretta: "🤝" };
+const ORDINE_METODI = ["paypal", "link_pagamento", "bonifico", "consegna_diretta"];
+const DESCRIZIONI_METODI = {
+  paypal: "Pagamenti tramite PayPal",
+  link_pagamento: "Carte di credito e debito tramite Stripe",
+  bonifico: "Versamenti sul conto bancario della parrocchia",
+  consegna_diretta: "Pagamento direttamente in parrocchia",
+};
+function LogoMetodo({ tipo }) {
+  if (tipo === "paypal" || tipo === "link_pagamento") {
+    const nome = tipo === "paypal" ? "PayPal" : "Stripe";
+    const src = tipo === "paypal"
+      ? "https://cdn.jsdelivr.net/npm/simple-icons@v15/icons/paypal.svg"
+      : "https://cdn.jsdelivr.net/npm/simple-icons@v15/icons/stripe.svg";
+    return <span style={{ display: "inline-flex", alignItems: "center", gap: 9 }}>
+      <img src={src} alt="" aria-hidden="true" width="27" height="27" style={{ objectFit: "contain" }} />
+      <strong style={{ color: tipo === "paypal" ? "#003087" : "#635bff" }}>{nome}</strong>
+    </span>;
+  }
+  return <span style={{ display: "inline-flex", alignItems: "center", gap: 9 }}>
+    <span aria-hidden="true" style={{ fontSize: 25 }}>{tipo === "bonifico" ? "🏦" : "🤝"}</span>
+    <strong>{tipo === "bonifico" ? "Bonifico bancario" : "Pagamento in parrocchia"}</strong>
+  </span>;
+}
 const stilePulsante = { background: "#b78b42", color: "#fff", border: "1px solid #a67b35", borderRadius: "10px", padding: "11px 18px", fontWeight: 700, cursor: "pointer", fontSize: "15px" };
 const stilePulsanteSecondario = { ...stilePulsante, background: "#fffaf1", color: "#18334a", border: "1px solid #ddc89d" };
 const stileCartella = { ...stilePulsanteSecondario, display: "flex", width: "100%", alignItems: "center", justifyContent: "space-between", textAlign: "left", padding: "22px", marginBottom: "14px", gap: "12px" };
@@ -143,23 +165,31 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
     {caricamento ? <p>Caricamento in corso...</p> : <>
       {sezione === "metodi" && <section className="sezione-metodi-incasso">
         <div className="intestazione-sezione-donazioni">
-          <h3>Metodi di incasso</h3>
-          <p>Attiva e configura separatamente bonifico, PayPal, carta tramite Stripe e pagamento in parrocchia. Gli incassi arrivano direttamente alla parrocchia.</p>
-          <button type="button" className="pulsante-primario" disabled={!parrocchiaId || salvataggio}
-            onClick={() => scegliTipo(Object.keys(TIPI).find((tipo) => !metodiIncasso.some((m) => m.tipo === tipo)) || "bonifico")}>
-            Aggiungi metodo
-          </button>
+          <p>Configura i metodi di incasso della parrocchia. I fedeli vedranno soltanto quelli attivi.</p>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))", gap: 14, margin: "18px 0" }}>
+          {ORDINE_METODI.map((tipo) => {
+            const esistente = metodiIncasso.find((m) => m.tipo === tipo);
+            const attivo = Boolean(esistente?.attivo);
+            return <article key={tipo} style={{ ...stileScheda, margin: 0, background: "#fffdf9" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, flexWrap: "wrap" }}>
+                <LogoMetodo tipo={tipo} />
+                <span style={{ fontSize: 12, fontWeight: 700, color: attivo ? "#24613a" : "#765c37", background: attivo ? "#e6f4e9" : "#f5ecdb", padding: "5px 9px", borderRadius: 16 }}>
+                  {attivo ? "Attivo" : "Non attivo"}
+                </span>
+              </div>
+              <p style={{ minHeight: 38, color: "#40566a", margin: "14px 0" }}>{DESCRIZIONI_METODI[tipo]}</p>
+              <button type="button" style={stilePulsanteSecondario} disabled={!parrocchiaId || salvataggio}
+                onClick={() => scegliTipo(tipo)} aria-label={`${esistente ? "Modifica" : "Configura"} ${TIPI[tipo]}`}>
+                {esistente ? "Modifica" : "Configura"}
+              </button>
+            </article>;
+          })}
         </div>
         {modulo && <form onSubmit={salvaMetodo} style={stileScheda}>
-          <h4>{modulo.id ? "Modifica metodo" : "Nuovo metodo"}</h4>
+          <h4>{modulo.id ? "Modifica metodo" : "Configura metodo"}: {TIPI[modulo.tipo]}</h4>
           {erroreModulo && <p role="alert">{erroreModulo}</p>}
           <fieldset disabled={salvataggio} style={{ border: 0, padding: 0, margin: 0 }}>
-            <label>Metodo di incasso
-              <select style={stileCampo} value={modulo.tipo} onChange={(e) => scegliTipo(e.target.value)} disabled={Boolean(modulo.id)}>
-                {Object.entries(TIPI).map(([tipo, titolo]) => <option key={tipo} value={tipo}>{titolo}</option>)}
-              </select>
-            </label>
-            <p>Puoi configurare un metodo per ciascun tipo. Per aggiornare un metodo già presente usa «Modifica».</p>
             {campo("titolo", "Nome da mostrare", { obbligatorio: true })}
             {modulo.tipo !== "consegna_diretta" && campo("intestatario", "Intestatario")}
             {modulo.tipo === "bonifico" && <>
@@ -204,20 +234,6 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
             <button type="button" onClick={() => { setModulo(null); setErroreModulo(""); }}>Annulla</button>
           </fieldset>
         </form>}
-        {metodiIncasso.length === 0 ? <p>Nessun metodo di incasso è stato ancora configurato.</p> :
-          metodiIncasso.map((metodo) => <article key={metodo.id} style={stileScheda}>
-            <h4><span aria-hidden="true">{iconeMetodo[metodo.tipo] || "💳"} </span>{metodo.tipo === "paypal" ? "PayPal · " : ""}{metodo.titolo}</h4>
-            <p>{TIPI[metodo.tipo] || metodo.tipo} · {metodo.attivo ? "Attivo" : "Non attivo"}</p>
-            {metodo.intestatario && <p>Intestatario: {metodo.intestatario}</p>}
-            {metodo.tipo === "bonifico" && <>
-              <p>IBAN: {metodo.iban}</p>
-              {metodo.bic_swift && <p>BIC / SWIFT: {metodo.bic_swift}</p>}
-            </>}
-            {metodo.tipo === "paypal" && metodo.email_paypal && <p>Email PayPal: {metodo.email_paypal}</p>}
-            {metodo.link_pagamento && <p style={{ overflowWrap: "anywhere" }}>Link: {metodo.link_pagamento}</p>}
-            {metodo.istruzioni && <p style={{ whiteSpace: "pre-wrap" }}>{metodo.istruzioni}</p>}
-            <button type="button" style={stilePulsanteSecondario} disabled={salvataggio || !parrocchiaId} onClick={() => apriMetodo(metodo)}>Modifica</button>
-          </article>)}
         <article style={{ ...stileScheda, background: "#fffaf1" }}>
           <h4>Vuoi automatizzare la gestione dei pagamenti?</h4>
           <p>Ars Liturgica offre la possibilità di collegare i servizi di pagamento online per ricevere automaticamente le conferme degli incassi, riducendo le verifiche manuali e semplificando la gestione delle ricevute.</p>
