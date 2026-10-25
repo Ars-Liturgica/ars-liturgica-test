@@ -1,5 +1,6 @@
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { supabase } from "../../../supabaseClient";
+import MetodiPagamento from "../PagamentiParrocchia/MetodiPagamento";
 
 const campo = { display: "grid", gap: 6, marginBottom: 16 };
 const input = { width: "100%", boxSizing: "border-box", padding: 10, border: "1px solid #b8aa99", borderRadius: 8, font: "inherit" };
@@ -12,21 +13,7 @@ function euro(valore, valuta = "EUR") {
     : "Importo da confermare";
 }
 
-function linkSicuro(valore) {
-  try {
-    const url = new URL(valore);
-    return url.protocol === "https:" ? url.href : null;
-  } catch {
-    return null;
-  }
-}
-
-const nomiMetodi = {
-  bonifico: "Bonifico bancario", paypal: "PayPal",
-  link_pagamento: "Pagamento online", consegna_diretta: "Pagamento in parrocchia",
-};
-
-export default function IscrizioneGrestFedele({ attivita, utenteId, onIndietro }) {
+export default function IscrizioneGrestFedele({ attivita, parrocchiaId, metodi, erroreMetodi, utenteId, onIndietro }) {
   const informativa = attivita.configurazione_modulo?.informativa_privacy_testo?.trim() || "";
   const [presaVisione, setPresaVisione] = useState(null);
   const [confermaLettura, setConfermaLettura] = useState(false);
@@ -39,40 +26,9 @@ export default function IscrizioneGrestFedele({ attivita, utenteId, onIndietro }
   const [occupato, setOccupato] = useState(false);
   const [errore, setErrore] = useState("");
   const [ricevuta, setRicevuta] = useState(null);
-  const [metodiIncasso, setMetodiIncasso] = useState([]);
-  const [caricamentoMetodi, setCaricamentoMetodi] = useState(false);
-  const [erroreMetodi, setErroreMetodi] = useState("");
   const contributoLibero = attivita.modello_quota === "contributo_libero";
-  const mostraMetodi = ricevuta && (Number(ricevuta.importo_dovuto) > 0 || contributoLibero);
-
-  useEffect(() => {
-    if (!mostraMetodi) return;
-    const parrocchiaId = ricevuta.parrocchia_id || attivita.parrocchia_id;
-    if (!parrocchiaId) {
-      setErroreMetodi("Non riesco a leggere i metodi di pagamento. Contatta la parrocchia per le istruzioni.");
-      return;
-    }
-    let attivo = true;
-    setCaricamentoMetodi(true);
-    setErroreMetodi("");
-    supabase.rpc("ars_elenco_metodi_incasso_pubblici", { p_parrocchia_id: parrocchiaId })
-      .then(({ data, error }) => {
-        if (!attivo) return;
-        if (error || !Array.isArray(data)) {
-          console.error("Caricamento metodi incasso:", error || data);
-          setErroreMetodi("Non riesco a leggere i metodi di pagamento. Contatta la parrocchia per le istruzioni.");
-        } else {
-          setMetodiIncasso(data);
-        }
-      })
-      .catch((error) => {
-        if (!attivo) return;
-        console.error("Caricamento metodi incasso:", error);
-        setErroreMetodi("Non riesco a leggere i metodi di pagamento. Contatta la parrocchia per le istruzioni.");
-      })
-      .finally(() => { if (attivo) setCaricamentoMetodi(false); });
-    return () => { attivo = false; };
-  }, [ricevuta, attivita.parrocchia_id, mostraMetodi]);
+  const richiedePagamento = ["quota_fissa", "contributo_libero"].includes(attivita.modello_quota);
+  const mostraMetodi = richiedePagamento && (contributoLibero || !ricevuta || Number(ricevuta.importo_dovuto) > 0);
 
   async function invia(evento) {
     evento.preventDefault();
@@ -161,24 +117,12 @@ export default function IscrizioneGrestFedele({ attivita, utenteId, onIndietro }
       <p>La parrocchia ha ricevuto la richiesta per {ragazzo.nome} {ragazzo.cognome}. Potrà confermarla dopo il pagamento o secondo le decisioni del parroco.</p>
       <p>{contributoLibero ? "Contributo libero: scegli tu l'importo." : <>Quota dovuta: <strong>{euro(ricevuta.importo_dovuto, ricevuta.valuta || "EUR")}</strong>.</>}</p>
       {mostraMetodi ? <>
-        <h3>{contributoLibero ? "Come lasciare un contributo" : "Come pagare"}</h3>
-        {caricamentoMetodi && <p>Caricamento dei metodi di pagamento…</p>}
-        {erroreMetodi && <p role="alert">{erroreMetodi}</p>}
-        {!caricamentoMetodi && !erroreMetodi && metodiIncasso.length === 0 &&
-          <p>La parrocchia non ha ancora indicato un metodo di pagamento. Contattala per le istruzioni.</p>}
-        {metodiIncasso.map((metodo) => {
-          const url = linkSicuro(metodo.link_pagamento);
-          return <div key={metodo.id} style={{ border: "1px solid #ded5c6", borderRadius: 10, padding: 14, marginBottom: 12 }}>
-            <h4 style={{ margin: "0 0 8px" }}>{metodo.titolo || nomiMetodi[metodo.tipo] || "Metodo di pagamento"}</h4>
-            {metodo.intestatario && <p>Intestatario: {metodo.intestatario}</p>}
-            {metodo.iban && <p>IBAN: <strong style={{ overflowWrap: "anywhere" }}>{metodo.iban}</strong></p>}
-            {metodo.bic_swift && <p>BIC/SWIFT: {metodo.bic_swift}</p>}
-            {metodo.email_paypal && <p>Email PayPal: {metodo.email_paypal}</p>}
-            {url && <p><a href={url} target="_blank" rel="noopener noreferrer">Apri il link di pagamento</a></p>}
-            {metodo.istruzioni && <p style={{ whiteSpace: "pre-wrap" }}>{metodo.istruzioni}</p>}
-          </div>;
-        })}
-        {metodiIncasso.length > 0 && <p>Per bonifici, PayPal e pagamenti in parrocchia, comunica il nome del ragazzo e l'attività. La parrocchia registrerà il versamento e aggiornerà lo stato della quota.</p>}
+        <MetodiPagamento parrocchiaId={parrocchiaId || ricevuta?.parrocchia_id || attivita.parrocchia_id}
+          metodi={metodi} errore={erroreMetodi}
+          importo={contributoLibero ? null : ricevuta?.importo_dovuto}
+          valuta={ricevuta?.valuta || attivita.valuta || "EUR"}
+          contesto={attivita.titolo} modelloQuota={attivita.modello_quota} />
+        <p>Comunica il nome del ragazzo e l'attività. La parrocchia registrerà il versamento e aggiornerà la quota.</p>
       </> : <p>Nessun pagamento richiesto per questa iscrizione.</p>}
     </div> : <form onSubmit={invia}>
       <h2>Genitore o tutore</h2>
@@ -213,6 +157,12 @@ export default function IscrizioneGrestFedele({ attivita, utenteId, onIndietro }
       {spunta("Autorizzo il ragazzo a tornare a casa autonomamente a fine giornata.", "uscita_autonoma")}
       <p>L'eventuale autorizzazione per foto e video sarà richiesta quando la parrocchia avrà fornito la relativa informativa.</p>
       <p>Per ogni gita, escursione o visita, la parrocchia comunicherà programma e dettagli e richiederà un consenso specifico prima della partecipazione.</p>
+      {richiedePagamento && <MetodiPagamento
+        parrocchiaId={parrocchiaId || attivita.parrocchia_id}
+        metodi={metodi} errore={erroreMetodi}
+        importo={contributoLibero ? null : attivita.importo_quota}
+        valuta={attivita.valuta || "EUR"}
+        contesto={attivita.titolo} modelloQuota={attivita.modello_quota} />}
       {errore && <p role="alert">{errore}</p>}
       <button type="submit" style={pulsante} disabled={occupato}>{occupato ? "Invio in corso…" : "Invia iscrizione"}</button>
     </form>}
