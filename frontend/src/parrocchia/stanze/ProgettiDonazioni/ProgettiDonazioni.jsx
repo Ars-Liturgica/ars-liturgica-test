@@ -230,8 +230,15 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
             <label style={{ display: "block", margin: "12px 0" }}>
               <input type="checkbox" checked={Boolean(modulo.attivo)} onChange={(e) => aggiorna("attivo", e.target.checked)} /> Metodo attivo
             </label>
-            <button type="submit" className="pulsante-primario">{salvataggio ? "Salvataggio..." : "Salva metodo"}</button>{" "}
-            <button type="button" onClick={() => { setModulo(null); setErroreModulo(""); }}>Annulla</button>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 20 }}>
+              <button type="submit" style={stilePulsante} disabled={salvataggio}>
+                {salvataggio ? "Salvataggio..." : "Salva metodo"}
+              </button>
+              <button type="button" style={stilePulsanteSecondario} disabled={salvataggio}
+                onClick={() => { setModulo(null); setErroreModulo(""); }}>
+                Annulla
+              </button>
+            </div>
           </fieldset>
         </form>}
         <article style={{ ...stileScheda, background: "#fffaf1" }}>
