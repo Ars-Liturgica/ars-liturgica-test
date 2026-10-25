@@ -39,7 +39,7 @@ function Logo({ tipo }) {
   }
   return <span style={{ display: "inline-flex", alignItems: "center", gap: 9 }}>
     <svg aria-hidden="true" width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#173955" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-      {tipo === "bonifico" ? <><path d="M3 9h18L12 3 3 9Z" /><path d="M5 10v8m5-8v8m5-8v8M3 21h18M4 18h16" /></> : <><path d="M3 13l6 6 12-12" /><path d="M3 8h8M16 4h5v5" /></>}
+      {tipo === "bonifico" ? <><path d="M3 9h18L12 3 3 9Z" /><path d="M5 10v8m5-8v8m5-8v8M3 21h18M4 18h16" /></> : <><path d="M4 11 12 4l8 7" /><path d="M6 10v10h12V10" /><path d="M10 20v-6h4v6" /><path d="M12 7v4M10 9h4" /></>}
     </svg>
     <strong>{ETICHETTE[tipo]}</strong>
   </span>;
@@ -75,7 +75,8 @@ export default function MetodiPagamento({ parrocchiaId, metodi, errore = "", imp
   const importoValido = importoDaMostrare !== null && importo !== undefined && Number.isFinite(Number(importoDaMostrare)) && Number(importoDaMostrare) > 0;
   const importoFormattato = importoValido ? Number(importoDaMostrare).toLocaleString("it-IT", { style: "currency", currency: valuta || "EUR" }) : null;
   const pulsante = { display: "inline-block", background: "#fffaf0", color: "#173955", border: "1px solid #b8aa99", borderRadius: 9, padding: "10px 15px", textDecoration: "none", cursor: "pointer", font: "inherit" };
-  return <section style={{ marginTop: 24, paddingTop: 18, borderTop: bordo, color: "#173955" }}>
+  return <section className="ars-metodi-pagamento" style={{ marginTop: 24, paddingTop: 18, borderTop: bordo, color: "#173955" }}>
+    <style>{`.ars-metodi-pagamento summary:focus:not(:focus-visible) { outline: none; } .ars-metodi-pagamento summary:focus-visible { outline: 2px solid #a67c40; outline-offset: 4px; border-radius: 5px; }`}</style>
     <h3 style={{ margin: "0 0 10px" }}>Come pagare</h3>
     <p style={{ marginTop: 0 }}>Scegli una delle modalità messe a disposizione dalla parrocchia.</p>
     {importoFormattato && <div style={{ background: "#f7f3ed", border: bordo, borderRadius: 12, padding: 14, margin: "12px 0 16px" }}>
