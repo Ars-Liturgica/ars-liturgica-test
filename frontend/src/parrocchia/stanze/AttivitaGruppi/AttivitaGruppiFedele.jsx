@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { supabase } from "../../../supabaseClient";
 import IscrizioneGrestFedele from "./IscrizioneGrestFedele";
 import AnteprimaDocumentoEconomico from "../PagamentiParrocchia/AnteprimaDocumentoEconomico";
+import MetodiPagamento from "../PagamentiParrocchia/MetodiPagamento";
 
 const stile = {
   sfondo: { minHeight: "100vh", background: "#f7f3ed" },
@@ -9,7 +10,7 @@ const stile = {
   intestazione: { display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 18, marginBottom: 28 },
   griglia: { display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(270px, 1fr))", gap: 20 },
   card: { background: "#fffdf9", border: "1px solid #e5d9ca", borderRadius: 18, padding: 24, minWidth: 0 },
-  pulsante: { border: "1px solid #c99536", borderRadius: 10, background: "#fffaf0", color: "#173955", padding: "10px 16px", cursor: "pointer", font: "inherit" },
+  pulsante: { border: "1px solid #b8aa99", borderRadius: 10, background: "#fffaf0", color: "#173955", padding: "10px 16px", cursor: "pointer", font: "inherit" },
 };
 const NOMI_METODI = {
   bonifico: "Bonifico", paypal: "PayPal", link_pagamento: "Carta di credito/debito",
@@ -60,33 +61,6 @@ function moduliCartacei(voce) {
     moduli.push({ etichetta: modalita === "entrambi" ? "Scarica il modulo della parrocchia" : "Scarica il modulo cartaceo", url: urlParrocchia });
   }
   return moduli;
-}
-function MetodiPagamento({ metodi, errore }) {
-  return <section style={{ marginTop: 24, paddingTop: 18, borderTop: "1px solid #e5d9ca" }}>
-    <h3 style={{ marginTop: 0 }}>Come pagare</h3>
-    {errore ? <p role="alert">{errore}</p> : metodi.length === 0 ? <p>Per le modalità di pagamento contatta la segreteria della parrocchia.</p> : <>
-      <p>Scegli una delle modalità disponibili.</p>
-      {metodi.map((metodo) => {
-        const link = linkSicuro(metodo.link_pagamento);
-        const nome = NOMI_METODI[metodo.tipo] || metodo.titolo;
-        return <details key={metodo.id} style={{ border: "1px solid #e5d9ca", borderRadius: 10, padding: 12, marginTop: 10, overflowWrap: "anywhere" }}>
-          <summary style={{ cursor: "pointer" }}>
-            <span style={{ display: "inline-flex", gap: 10, alignItems: "center", verticalAlign: "middle" }}><SimboloPagamento tipo={metodo.tipo} /><strong>{nome}</strong></span>
-          </summary>
-          {metodo.titolo && metodo.titolo !== nome && <p>{metodo.titolo}</p>}
-          {metodo.intestatario && <p>Intestatario: {metodo.intestatario}</p>}
-          {metodo.tipo === "bonifico" && <>
-            <p>IBAN: <strong style={{ userSelect: "all" }}>{metodo.iban}</strong></p>
-            {metodo.bic_swift && <p>BIC / SWIFT: {metodo.bic_swift}</p>}
-          </>}
-          {metodo.tipo === "paypal" && metodo.email_paypal && <p>Email PayPal: <strong style={{ userSelect: "all" }}>{metodo.email_paypal}</strong></p>}
-          {metodo.istruzioni && <p style={{ whiteSpace: "pre-wrap" }}>{metodo.istruzioni}</p>}
-          {metodo.tipo === "consegna_diretta" && !metodo.istruzioni && <p>Consegna la quota alla segreteria della parrocchia.</p>}
-          {["paypal", "link_pagamento"].includes(metodo.tipo) && (link ? <a href={link} target="_blank" rel="noopener noreferrer" style={{ ...stile.pulsante, display: "inline-block", textDecoration: "none" }}>{metodo.tipo === "paypal" ? "Apri PayPal" : "Paga con carta"}</a> : !metodo.email_paypal && <p>Contatta la segreteria per il collegamento di pagamento.</p>)}
-        </details>;
-      })}
-    </>}
-  </section>;
 }
 
 function euro(valore, valuta = "EUR") {
@@ -190,7 +164,7 @@ function IscrizioneOrdinaria({ attivita, parrocchiaId, utenteId, metodi, erroreM
       <p role="status"><strong>Iscrizione ricevuta per {risultato.numero_partecipanti} partecipant{risultato.numero_partecipanti === 1 ? "e" : "i"}.</strong></p>
       <p><strong>Totale dovuto: {euro(risultato.totale_dovuto, risultato.valuta || valuta)}</strong></p>
       <p>Il pagamento non è ancora registrato. La parrocchia verificherà gli importi versati.</p>
-      {Number(risultato.totale_dovuto) > 0 && <MetodiPagamento metodi={metodi} errore={erroreMetodi} />}
+      {Number(risultato.totale_dovuto) > 0 && <MetodiPagamento metodi={metodi} errore={erroreMetodi} importo={risultato.totale_dovuto} valuta={risultato.valuta || valuta} contesto={attivita.titolo} modelloQuota={attivita.modello_quota} />}
       <p><button type="button" style={stile.pulsante} onClick={onIndietro}>Torna all'elenco</button></p>
     </> : <form onSubmit={conferma}>
       {caricamento ? <p role="status">Caricamento anagrafica e informativa…</p> : <>
@@ -211,7 +185,7 @@ function IscrizioneOrdinaria({ attivita, parrocchiaId, utenteId, metodi, erroreM
         <p>I dati disponibili sono già compilati. Puoi correggerli per questa iscrizione.</p>
         <p><label>Telefono (facoltativo)<br /><input type="tel" maxLength={30} value={telefono} onChange={(e) => setTelefono(e.target.value)} style={campo} /></label></p>
         <p><label>Email (facoltativa)<br /><input type="email" maxLength={254} value={email} onChange={(e) => setEmail(e.target.value)} style={campo} /></label></p>
-        <div style={{ padding: 18, background: "#fff4db", border: "2px solid #c99536", borderRadius: 12, margin: "22px 0" }}>
+        <div style={{ padding: 18, background: "#f7f3ed", border: "1px solid #e5d9ca", borderRadius: 12, margin: "22px 0" }}>
           <h2 style={{ marginTop: 0 }}>Riepilogo e pagamento</h2>
           <p>Partecipanti: <strong>{partecipanti.length}</strong></p>
           {attivita.modello_quota === "quota_fissa" ? <>
@@ -219,7 +193,7 @@ function IscrizioneOrdinaria({ attivita, parrocchiaId, utenteId, metodi, erroreM
             <p>{partecipanti.length} × {euro(quota, valuta)}</p>
             <p style={{ fontSize: 23, marginBottom: 0 }}><strong>TOTALE DA PAGARE: {euro(totale, valuta)}</strong></p>
           </> : attivita.modello_quota === "contributo_libero" ? <p><strong>Contributo libero:</strong> nessuna quota fissa dovuta.</p> : <p><strong>Partecipazione gratuita: nessun pagamento richiesto.</strong></p>}
-          {attivita.modello_quota !== "gratuita" && <MetodiPagamento metodi={metodi} errore={erroreMetodi} />}
+          {attivita.modello_quota !== "gratuita" && <MetodiPagamento metodi={metodi} errore={erroreMetodi} importo={totale} valuta={valuta} contesto={attivita.titolo} modelloQuota={attivita.modello_quota} />}
         </div>
         {informativa ? <>
           <details style={{ margin: "16px 0" }}>
@@ -395,7 +369,7 @@ export default function AttivitaGruppiFedele({ parrocchiaId, tornaDashboard }) {
   }, [caricaAttivita]);
 
   return <div style={stile.sfondo}><main style={stile.pagina}>
-    {mieIscrizioniAperte ? <MieIscrizioniPagamenti parrocchiaId={parrocchiaId} utenteId={utenteId} onIndietro={() => setMieIscrizioniAperte(false)} /> : grestSelezionato ? <IscrizioneGrestFedele attivita={grestSelezionato} utenteId={utenteId} onIndietro={() => setGrestSelezionato(null)} /> : ordinariaSelezionata ? <IscrizioneOrdinaria attivita={ordinariaSelezionata} parrocchiaId={parrocchiaId} utenteId={utenteId} metodi={metodi} erroreMetodi={erroreMetodi} onIndietro={() => setOrdinariaSelezionata(null)} /> : <>
+    {mieIscrizioniAperte ? <MieIscrizioniPagamenti parrocchiaId={parrocchiaId} utenteId={utenteId} onIndietro={() => setMieIscrizioniAperte(false)} /> : grestSelezionato ? <IscrizioneGrestFedele attivita={grestSelezionato} parrocchiaId={parrocchiaId} metodi={metodi} erroreMetodi={erroreMetodi} utenteId={utenteId} onIndietro={() => setGrestSelezionato(null)} /> : ordinariaSelezionata ? <IscrizioneOrdinaria attivita={ordinariaSelezionata} parrocchiaId={parrocchiaId} utenteId={utenteId} metodi={metodi} erroreMetodi={erroreMetodi} onIndietro={() => setOrdinariaSelezionata(null)} /> : <>
       <header style={stile.intestazione}>
         <div>
           <button type="button" style={stile.pulsante} onClick={tornaDashboard}>← Torna alla dashboard</button>
@@ -403,7 +377,7 @@ export default function AttivitaGruppiFedele({ parrocchiaId, tornaDashboard }) {
         </div>
         <button type="button" style={stile.pulsante} onClick={caricaAttivita} disabled={caricamento}>Aggiorna elenco</button>
       </header>
-      <section style={{ ...stile.card, marginBottom: 22, borderColor: "#c99536" }}>
+      <section style={{ ...stile.card, marginBottom: 22, borderColor: "#e5d9ca" }}>
         <h2 style={{ marginTop: 0 }}>Le mie iscrizioni e pagamenti</h2>
         <p>Quote, versamenti, residui e ricevute delle iscrizioni tue e dei tuoi familiari.</p>
         <button type="button" style={stile.pulsante} onClick={() => setMieIscrizioniAperte(true)}>Apri le mie iscrizioni e pagamenti</button>
@@ -429,7 +403,7 @@ export default function AttivitaGruppiFedele({ parrocchiaId, tornaDashboard }) {
             String(voce.tipo).toLowerCase() !== "grest" &&
             voce.configurazione_modulo?.abilita_iscrizioni_grest !== true &&
             <p><button type="button" style={stile.pulsante} onClick={() => setOrdinariaSelezionata(voce)}>Iscriviti</button></p>}
-          {["quota_fissa", "contributo_libero"].includes(voce.modello_quota) && <MetodiPagamento metodi={metodi} errore={erroreMetodi} />}
+          {["quota_fissa", "contributo_libero"].includes(voce.modello_quota) && <MetodiPagamento metodi={metodi} errore={erroreMetodi} importo={voce.modello_quota === "quota_fissa" ? voce.importo_quota : null} valuta={voce.valuta || "EUR"} contesto={voce.titolo} modelloQuota={voce.modello_quota} />}
         </article>)}
       </div>}
     </>}
