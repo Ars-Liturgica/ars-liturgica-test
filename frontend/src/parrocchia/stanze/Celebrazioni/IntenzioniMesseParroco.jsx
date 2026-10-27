@@ -28,6 +28,10 @@ export default function IntenzioniMesseParroco({ parrocchiaId, tornaCelebrazioni
   const [al, setAl] = useState("");
   const [selezionata, setSelezionata] = useState(null);
   const [modulo, setModulo] = useState(null);
+  const [nuova, setNuova] = useState(false);
+  const [messe, setMesse] = useState([]);
+  const [caricamentoMesse, setCaricamentoMesse] = useState(false);
+  const [nuovaIntenzione, setNuovaIntenzione] = useState({ evento: "", nome: "", tipo: "defunto", testo: "", pubblicabile: false });
   const invio = useRef(null);
   const occupato = useRef(false);
 
@@ -60,6 +64,41 @@ export default function IntenzioniMesseParroco({ parrocchiaId, tornaCelebrazioni
   }), [intenzioni, ricerca, dal, al]);
   const incassi = selezionata ? offerte.filter((p) => p.intenzione_messa_id === selezionata.intenzione_id) : [];
   const totale = (id) => offerte.filter((p) => p.intenzione_messa_id === id && p.stato === "completata").reduce((n, p) => n + Number(p.importo), 0);
+
+  async function apriNuovaIntenzione() {
+    setErrore(""); setMessaggio(""); setCaricamentoMesse(true);
+    setNuovaIntenzione({ evento: "", nome: "", tipo: "defunto", testo: "", pubblicabile: false });
+    setNuova(true);
+    try {
+      const r = await supabase.rpc("ars_elenco_messe_intenzioni_parrocchia", { p_parrocchia_id: parrocchiaId });
+      if (r.error) throw r.error;
+      setMesse((r.data || []).filter((m) => m.prenotabile));
+    } catch (err) { setErrore(err.message || "Impossibile caricare le Messe disponibili."); setMesse([]); }
+    finally { setCaricamentoMesse(false); }
+  }
+
+  async function registraNuovaIntenzione(e) {
+    e.preventDefault();
+    if (occupato.current) return;
+    const nome = nuovaIntenzione.nome.trim();
+    const testo = nuovaIntenzione.testo.trim();
+    if (!nome || !testo || !nuovaIntenzione.evento) {
+      setErrore("Compila nome del richiedente, Messa e testo dell'intenzione."); return;
+    }
+    occupato.current = true; setSalvataggio(true); setErrore(""); setMessaggio("");
+    try {
+      const r = await supabase.rpc("ars_inserisci_intenzione_parrocchia", {
+        p_parrocchia_id: parrocchiaId, p_evento_id: nuovaIntenzione.evento,
+        p_tipo_intenzione: nuovaIntenzione.tipo, p_testo_intenzione: testo,
+        p_pubblicabile: nuovaIntenzione.pubblicabile, p_nome_richiedente: nome,
+      });
+      if (r.error) throw r.error;
+      setNuova(false);
+      setMessaggio("Intenzione registrata correttamente.");
+      await carica();
+    } catch (err) { setErrore(err.message || "Impossibile registrare l'intenzione."); }
+    finally { occupato.current = false; setSalvataggio(false); }
+  }
 
   function apriOfferta() {
     invio.current = null; setErrore(""); setMessaggio("");
@@ -107,7 +146,38 @@ export default function IntenzioniMesseParroco({ parrocchiaId, tornaCelebrazioni
       {messaggio && <p role="status" style={{ padding: 14, background: "#e8f4e5" }}>{messaggio}</p>}
       {errore && <p role="alert" style={{ padding: 14, background: "#ffe9e5", color: "#812e22" }}>{errore}</p>}
       {erroreOfferte && <p role="alert" style={{ padding: 14, background: "#fff1d4" }}>Offerte non disponibili: {erroreOfferte}</p>}
-      {caricamento ? <p>Caricamento…</p> : selezionata ? <>
+      {caricamento ? <p>Caricamento…</p> : nuova ? <>
+        <button type="button" disabled={salvataggio} style={btn} onClick={() => { setNuova(false); setErrore(""); }}>← Torna all’elenco</button>
+        <form style={scheda} onSubmit={registraNuovaIntenzione}>
+          <h2>Registra intenzione per fedele senza account</h2>
+          <fieldset disabled={salvataggio || caricamentoMesse} style={{ border: 0, padding: 0, margin: 0 }}>
+            <label style={{ display: "block", marginBottom: 16 }}>Nome e cognome del richiedente
+              <input autoFocus required style={campo} value={nuovaIntenzione.nome} onChange={(e) => setNuovaIntenzione((v) => ({ ...v, nome: e.target.value }))} />
+            </label>
+            <label style={{ display: "block", marginBottom: 16 }}>Messa
+              <select required style={campo} value={nuovaIntenzione.evento} onChange={(e) => setNuovaIntenzione((v) => ({ ...v, evento: e.target.value }))}>
+                <option value="">{caricamentoMesse ? "Caricamento Messe…" : "Seleziona una Messa"}</option>
+                {messe.map((m) => <option key={m.evento_id} value={m.evento_id}>
+                  {dataIt(m.data_locale)} · ore {m.ora_locale?.slice(0, 5)} · {m.titolo || m.tipologia || "Santa Messa"}{m.luogo ? ` · ${m.luogo}` : ""}
+                </option>)}
+              </select>
+            </label>
+            {!caricamentoMesse && messe.length === 0 && <p>Nessuna Messa disponibile per nuove intenzioni.</p>}
+            <label style={{ display: "block", marginBottom: 16 }}>Tipo di intenzione
+              <select style={campo} value={nuovaIntenzione.tipo} onChange={(e) => setNuovaIntenzione((v) => ({ ...v, tipo: e.target.value }))}>
+                {Object.entries(tipi).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            </label>
+            <label style={{ display: "block", marginBottom: 16 }}>Testo dell’intenzione
+              <textarea required rows={3} style={campo} value={nuovaIntenzione.testo} onChange={(e) => setNuovaIntenzione((v) => ({ ...v, testo: e.target.value }))} />
+            </label>
+            <label style={{ display: "block", marginBottom: 20 }}>
+              <input type="checkbox" checked={nuovaIntenzione.pubblicabile} onChange={(e) => setNuovaIntenzione((v) => ({ ...v, pubblicabile: e.target.checked }))} /> Visibile alla comunità
+            </label>
+            <button type="submit" disabled={salvataggio || messe.length === 0} style={btn}>{salvataggio ? "Registrazione…" : "Registra intenzione"}</button>
+          </fieldset>
+        </form>
+      </> : selezionata ? <>
         <button type="button" disabled={salvataggio} style={btn} onClick={() => { setSelezionata(null); setModulo(null); invio.current = null; setErrore(""); }}>← Torna all’elenco</button>
         <section style={scheda}>
           <h2 style={{ whiteSpace: "pre-wrap" }}>{selezionata.testo_intenzione}</h2>
@@ -144,6 +214,7 @@ export default function IntenzioniMesseParroco({ parrocchiaId, tornaCelebrazioni
           </fieldset>
         </form>}
       </> : <>
+        <button type="button" style={btn} onClick={apriNuovaIntenzione}>+ Registra intenzione per fedele senza account</button>
         <div style={{ ...scheda, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 16 }}>
           <label>Cerca intenzione o richiedente<input style={campo} value={ricerca} onChange={(e) => setRicerca(e.target.value)} /></label>
           <label>Messe dal<input type="date" style={campo} value={dal} onChange={(e) => setDal(e.target.value)} /></label>
