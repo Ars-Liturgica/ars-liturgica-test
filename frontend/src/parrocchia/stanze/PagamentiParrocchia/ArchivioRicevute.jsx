@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { supabase } from "../../../supabaseClient";
-import { stampaDocumento } from "../ArchivioDocumenti/stampaDocumentoEconomico";
+import AnteprimaDocumentoEconomico from "../PagamentiParrocchia/AnteprimaDocumentoEconomico";
 
 const TIPI = {
   ricevuta: "Ricevuta",
@@ -27,6 +27,8 @@ export default function ArchivioRicevute({ parrocchiaId, nomeParrocchia = "", to
   const [tipo, setTipo] = useState("");
   const [attivitaId, setAttivitaId] = useState("");
   const [revisione, setRevisione] = useState(0);
+  const [documentoAnteprima, setDocumentoAnteprima] = useState(null);
+  const [anagrafica, setAnagrafica] = useState(null);
 
   useEffect(() => {
     let attivo = true;
@@ -47,6 +49,29 @@ export default function ArchivioRicevute({ parrocchiaId, nomeParrocchia = "", to
     return () => { attivo = false; };
   }, [parrocchiaId, revisione]);
 
+  useEffect(() => {
+    let attivo = true;
+    setAnagrafica(null);
+    if (!parrocchiaId) return () => { attivo = false; };
+    async function caricaAnagrafica() {
+      const { data, error } = await supabase.from("parrocchie")
+        .select("id, nome, indirizzo, cap, comune, provincia, telefono, email")
+        .eq("id", parrocchiaId).single();
+      if (error) {
+        console.error("Impossibile caricare l'anagrafica della parrocchia:", error);
+        return;
+      }
+      if (attivo) {
+        const indirizzoCompleto = [data.indirizzo,
+          [data.cap, data.comune, data.provincia ? `(${data.provincia})` : ""].filter(Boolean).join(" ")]
+          .filter(Boolean).join(" – ");
+        setAnagrafica({ ...data, indirizzo: indirizzoCompleto });
+      }
+    }
+    caricaAnagrafica();
+    return () => { attivo = false; };
+  }, [parrocchiaId]);
+
   const attivita = useMemo(() => [...new Set(documenti.map((d) => d.attivita_id).filter(Boolean))], [documenti]);
   const filtrati = useMemo(() => {
     const q = ricerca.trim().toLocaleLowerCase("it-IT");
@@ -61,12 +86,17 @@ export default function ArchivioRicevute({ parrocchiaId, nomeParrocchia = "", to
   }, [documenti, ricerca, tipo, attivitaId]);
 
   function apri(doc) {
-    try { stampaDocumento(doc, nomeParrocchia); }
-    catch (e) { setErrore(e.message); }
+    setDocumentoAnteprima(doc);
   }
 
   return (
     <main className="ars-archivio-ricevute">
+      <AnteprimaDocumentoEconomico
+        documento={documentoAnteprima}
+        nomeParrocchia={nomeParrocchia}
+        parrocchia={anagrafica}
+        onChiudi={() => setDocumentoAnteprima(null)}
+      />
       <style>{`
         .ars-archivio-ricevute { color: #263747; padding: 20px; }
         .ars-archivio-ricevute h2 { color: #725521; margin-bottom: 8px; }
