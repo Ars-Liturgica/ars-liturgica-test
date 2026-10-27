@@ -5,7 +5,7 @@ import PagamentiParrocchia from "../PagamentiParrocchia/PagamentiParrocchia";
 
 const voci = [
   { id: "attivita", icona: "fa-calendar-days", titolo: "Attività parrocchiali", descrizione: "Crea GREST, gite, catechismo e incontri. Gestisci iscrizioni, gruppi e partecipanti.", sfondo: "#e0effa" },
-  { id: "progetti", icona: "fa-hand-holding-heart", titolo: "Progetti e raccolte fondi", descrizione: "Consulta progetti per restauri, solidarietà e acquisti. La creazione di nuovi progetti è in preparazione.", sfondo: "#e3efdf" },
+  { id: "progetti", icona: "fa-hand-holding-heart", titolo: "Progetti, raccolte fondi e donazioni", descrizione: "Gestisci progetti, raccolte fondi e donazioni libere della parrocchia.", sfondo: "#e3efdf" },
   { id: "metodi", icona: "fa-wallet", titolo: "Impostazioni pagamenti", descrizione: "Configura PayPal, bonifici, link esterni e consegna diretta. SumUp in attesa di definizione.", sfondo: "#f9ebc9" },
   { id: "quote", icona: "fa-receipt", titolo: "Gestione economica e contabilità", descrizione: "Quote e iscrizioni, pagamenti e incassi, offerte e donazioni, spese e acquisti, rimborsi, crediti e somme da riscuotere, trasferimenti tra progetti, registri contabili, saldi, rendiconti e bilanci generali e per attività. I rimborsi delle attività cancellate si gestiscono nel relativo fascicolo.", sfondo: "#eee2f7" },
 ];
@@ -14,7 +14,7 @@ export default function AttivitaProgetti({ parrocchiaId, nomeParrocchia = "", to
   const [sezione, setSezione] = useState(null);
   const tornaIndice = () => setSezione(null);
   if (sezione === "attivita") return <AttivitaGruppiParroco parrocchiaId={parrocchiaId} tornaDashboard={tornaIndice} />;
-  if (sezione === "progetti" || sezione === "metodi") return <ProgettiDonazioni parrocchiaId={parrocchiaId} tornaDashboard={tornaIndice} sezioneIniziale={sezione} />;
+  if (sezione === "progetti" || sezione === "metodi") return <ProgettiDonazioni parrocchiaId={parrocchiaId} tornaDashboard={tornaIndice} sezioneIniziale={sezione === "progetti" ? "indice" : "metodi"} />;
   if (sezione === "quote") return <PagamentiParrocchia parrocchiaId={parrocchiaId} nomeParrocchia={nomeParrocchia} tornaDashboard={tornaIndice} />;
   return <main style={{ maxWidth: 1000, margin: "0 auto", padding: "24px 16px", color: "#302b28" }}>
     <button type="button" onClick={tornaDashboard} style={pulsante}>← Torna alla dashboard</button>
