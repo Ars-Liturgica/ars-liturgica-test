@@ -147,19 +147,22 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
     <button type="button" style={stilePulsanteSecondario} onClick={() => {
       if (sezioneIniziale !== "indice" || sezione === "indice") tornaDashboard();
       else { setSezione("indice"); setModulo(null); setErroreModulo(""); }
-    }} disabled={salvataggio}>← {sezioneIniziale !== "indice" ? "Torna ad Attività e Progetti" : sezione === "indice" ? "Torna alla dashboard" : "Torna a Progetti e Donazioni"}</button>
+    }} disabled={salvataggio}>← {sezioneIniziale !== "indice" ? "Torna ad Attività e Progetti" : sezione === "indice" ? "Torna alla dashboard" : "Torna a Progetti, raccolte fondi e donazioni"}</button>
     <div className="progetti-donazioni-intestazione">
-      <h2>{sezione === "metodi" ? "Metodi di incasso" : sezione === "progetti" ? "Progetti della parrocchia" : "Progetti e Donazioni"}</h2>
-      <p>{sezione === "indice" ? "Scegli la sezione da gestire." : sezione === "metodi" ? "Configura i metodi con cui la parrocchia riceve offerte e quote delle attività." : "Raccolte e iniziative che la comunità può sostenere."}</p>
+      <h2>{sezione === "metodi" ? "Metodi di incasso" : sezione === "progetti" ? "Progetti" : sezione === "raccolte" ? "Raccolte fondi" : sezione === "donazioni" ? "Donazioni" : "Progetti, raccolte fondi e donazioni"}</h2>
+      <p>{sezione === "indice" ? "Scegli la sezione da gestire." : sezione === "metodi" ? "Configura i metodi con cui la parrocchia riceve offerte e quote delle attività." : sezione === "progetti" ? "Presenta i progetti della parrocchia e i relativi documenti." : sezione === "raccolte" ? "Iniziative e raccolte con una finalità specifica." : "Offerte libere alla parrocchia, senza collegamenti ad attività."}</p>
     </div>
     {errore && <div role="alert" className="messaggio-errore">{errore}</div>}
     {messaggio && <p role="status">{messaggio}</p>}
-    {sezione === "indice" && <nav aria-label="Sezioni Progetti e Donazioni" style={{ marginTop: 24 }}>
-      <button type="button" style={stileCartella} onClick={() => setSezione("metodi")}>
-        <span><span aria-hidden="true">💳 </span><strong>Metodi di incasso</strong><br /><small>Bonifico, PayPal, carta e consegna diretta</small></span><span aria-hidden="true">›</span>
-      </button>
+    {sezione === "indice" && <nav aria-label="Progetti, raccolte fondi e donazioni" style={{ marginTop: 24 }}>
       <button type="button" style={stileCartella} onClick={() => setSezione("progetti")}>
-        <span><span aria-hidden="true">📁 </span><strong>Progetti della parrocchia</strong><br /><small>Raccolte fondi e iniziative della comunità</small></span><span aria-hidden="true">›</span>
+        <span><span aria-hidden="true">📁 </span><strong>Progetti</strong><br /><small>Presentazione di opere, fotografie, disegni e documenti</small></span><span aria-hidden="true">›</span>
+      </button>
+      <button type="button" style={stileCartella} onClick={() => setSezione("raccolte")}>
+        <span><span aria-hidden="true">🤲 </span><strong>Raccolte fondi</strong><br /><small>Iniziative autonome con finalità specifiche</small></span><span aria-hidden="true">›</span>
+      </button>
+      <button type="button" style={stileCartella} onClick={() => setSezione("donazioni")}>
+        <span><span aria-hidden="true">❤️ </span><strong>Donazioni</strong><br /><small>Offerte libere e ringraziamenti alla comunità</small></span><span aria-hidden="true">›</span>
       </button>
     </nav>}
     {caricamento ? <p>Caricamento in corso...</p> : <>
@@ -249,8 +252,7 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
       </section>}
       {sezione === "progetti" && <section className="sezione-progetti-donazioni">
         <div className="intestazione-sezione-donazioni">
-          <h3>Progetti della parrocchia</h3>
-          <p>Raccolte e iniziative che la comunità può sostenere.</p>
+          <p>Progetti e iniziative presentati dalla parrocchia.</p>
           <button type="button" style={stilePulsante} disabled title="La funzione sarà attivata nel prossimo passaggio">Nuovo progetto</button>
         </div>
         {progetti.length === 0 ? <p>Nessun progetto è stato ancora creato.</p> :
@@ -258,6 +260,17 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
             <h4>{progetto.titolo}</h4>
             <p>{progetto.stato} · Raccolto {Number(progetto.raccolto || 0).toLocaleString("it-IT", { style: "currency", currency: progetto.valuta || "EUR" })}</p>
           </article>)}
+      </section>}
+      {sezione === "raccolte" && <section className="sezione-raccolte-fondi" style={stileScheda}>
+        <h3>Raccolte fondi</h3>
+        <p>Qui il parroco potrà creare e gestire raccolte fondi autonome, con un titolo e una finalità scelti liberamente.</p>
+        <p><small>Funzione in preparazione: nessuna raccolta viene creata in questa fase.</small></p>
+      </section>}
+      {sezione === "donazioni" && <section className="sezione-donazioni-libere" style={stileScheda}>
+        <h3>Donazioni libere</h3>
+        <p>Uno spazio dedicato alla gratitudine verso chi sostiene liberamente la comunità.</p>
+        <p>Le donazioni di questa sezione non saranno collegate a progetti, raccolte o attività.</p>
+        <p><small>Funzione in preparazione: nessuna registrazione economica viene modificata in questa fase.</small></p>
       </section>}
     </>}
   </div>;
