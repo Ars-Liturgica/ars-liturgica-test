@@ -52,6 +52,9 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
   const [salvataggio, setSalvataggio] = useState(false);
   const [messaggio, setMessaggio] = useState("");
   const [sezione, setSezione] = useState(sezioneIniziale);
+  const [donazioniLibere, setDonazioniLibere] = useState([]);
+  const [erroreDonazioni, setErroreDonazioni] = useState("");
+  const [caricamentoDonazioni, setCaricamentoDonazioni] = useState(false);
 
   const caricaDati = useCallback(async () => {
     if (!parrocchiaId) {
@@ -81,6 +84,31 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
     setModulo(null); setErroreModulo(""); setMessaggio(""); setSezione(sezioneIniziale);
     caricaDati();
   }, [caricaDati, sezioneIniziale]);
+
+  const caricaDonazioniLibere = useCallback(async () => {
+    if (!parrocchiaId) return;
+    setCaricamentoDonazioni(true);
+    setErroreDonazioni("");
+    const { data, error } = await supabase
+      .from("pagamenti_parrocchia")
+      .select("id, data_offerta, importo, valuta, stato, causale_descrizione")
+      .eq("parrocchia_id", parrocchiaId)
+      .eq("causale_tipo", "donazione_libera")
+      .eq("stato", "completata")
+      .order("data_offerta", { ascending: false })
+      .limit(100);
+    if (error) {
+      setErroreDonazioni("Impossibile leggere le donazioni: " + error.message);
+      setDonazioniLibere([]);
+    } else {
+      setDonazioniLibere(data || []);
+    }
+    setCaricamentoDonazioni(false);
+  }, [parrocchiaId]);
+
+  useEffect(() => {
+    if (sezione === "donazioni") caricaDonazioniLibere();
+  }, [sezione, caricaDonazioniLibere]);
 
   function apriMetodo(metodo) {
     setModulo({ ...nuovoMetodo(metodo.tipo), ...metodo });
@@ -270,7 +298,18 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
         <h3>Donazioni libere</h3>
         <p>Uno spazio dedicato alla gratitudine verso chi sostiene liberamente la comunità.</p>
         <p>Le donazioni di questa sezione non saranno collegate a progetti, raccolte o attività.</p>
-        <p><small>Funzione in preparazione: nessuna registrazione economica viene modificata in questa fase.</small></p>
+        <p>Ogni donazione incassata deve essere registrata una sola volta nel Bilancio generale, con la relativa ricevuta. Il nome del pagante è facoltativo.</p>
+        <h4>Donazioni libere incassate</h4>
+        <button type="button" style={stilePulsanteSecondario} onClick={caricaDonazioniLibere} disabled={caricamentoDonazioni}>Aggiorna elenco</button>
+        {caricamentoDonazioni && <p>Caricamento donazioni...</p>}
+        {erroreDonazioni && <p role="alert" style={{ color: "#9b2531" }}>{erroreDonazioni}</p>}
+        {!caricamentoDonazioni && !erroreDonazioni && donazioniLibere.length === 0 && <p>Nessuna donazione libera incassata da mostrare.</p>}
+        {!caricamentoDonazioni && !erroreDonazioni && donazioniLibere.map((d) => <article key={d.id} style={{ borderTop: "1px solid #e5d9ca", padding: "12px 0" }}>
+          <strong>{Number(d.importo).toLocaleString("it-IT", { style: "currency", currency: d.valuta || "EUR" })}</strong>
+          <span> · {d.data_offerta ? new Date(d.data_offerta).toLocaleDateString("it-IT", { timeZone: "Europe/Rome" }) : "Data non disponibile"}</span>
+          <div>{d.causale_descrizione || "Donazione libera"}</div>
+        </article>)}
+        <p><small>Elenco di consultazione. La registrazione di nuovi incassi e la stampa delle ricevute saranno collegate al flusso economico condiviso, senza creare registrazioni duplicate.</small></p>
       </section>}
     </>}
   </div>;
