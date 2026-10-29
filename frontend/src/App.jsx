@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "./supabaseClient";
 import AccessoRiservato from "./AccessoRiservato";
+import IniziativaPubblica from "./parrocchia/stanze/ProgettiDonazioni/IniziativaPubblica";
 import RegistrazioneParroco from "./parrocchia/RegistrazioneParroco";
 import AreaParrocchiale from "./parrocchia/AreaParrocchiale";
 import AttivazioneParrocchia from "./parrocchia/AttivazioneParrocchia";
@@ -11,6 +12,7 @@ import AdminParrocchie from "./admin/AdminParrocchie";
 import AccessoSuperAdmin from "./admin/AccessoSuperAdmin";
 export default function App() {
   const [adminMode, setAdminMode] = useState(false);
+  const mostraIniziativaPubblica = new URLSearchParams(window.location.search).has("ars_iniziativa");
 const [categorie, setCategorie] = useState([]);
  const [liturgia, setLiturgia] = useState({
   data: "",
@@ -168,6 +170,8 @@ useEffect(() => {
       console.error("Errore caricamento categorie WooCommerce:", error);
     });
 }, []);
+  if (mostraIniziativaPubblica) return <IniziativaPubblica />;
+
   if (ambiente === "parrocchia") {
   return (
     <AreaParrocchiale
@@ -1000,4 +1004,3 @@ const textareaStyle = {
   borderRadius: "10px",
   border: "1px solid #ccc",
 };
-
