@@ -360,7 +360,7 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
             </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <button type="button" style={stilePulsanteSecondario} onClick={() => apriIniziativa(p.tipo_iniziativa || "progetto", p)}>Modifica</button>
-              <button type="button" style={stilePulsante} disabled title="Disponibile dopo il collegamento sicuro delle ricevute">Registra offerta (in preparazione)</button>
+              <button type="button" style={stilePulsante} onClick={() => apriIncasso(p)} disabled={operazione}>Registra offerta</button>
             </div>
           </div>
         </article>)}
@@ -368,7 +368,7 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
       {sezione === "donazioni" && <section style={stileScheda}>
         <h3>Donazioni libere</h3>
         <p>Grazie a chi sostiene la vita della comunità. Le offerte non sono collegate a progetti o attività.</p>
-        <button type="button" style={stilePulsante} disabled title="Disponibile dopo il collegamento sicuro delle ricevute">+ Registra donazione (in preparazione)</button>
+        <button type="button" style={stilePulsante} onClick={() => apriIncasso(null)} disabled={operazione}>+ Registra donazione</button>
         <h4>Ultime donazioni incassate</h4>
         <button type="button" style={stilePulsanteSecondario} onClick={caricaDonazioniLibere} disabled={caricamentoDonazioni}>Aggiorna elenco</button>
         {caricamentoDonazioni && <p>Caricamento...</p>}
