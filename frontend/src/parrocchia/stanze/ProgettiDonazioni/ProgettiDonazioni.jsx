@@ -55,6 +55,65 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
   const [donazioniLibere, setDonazioniLibere] = useState([]);
   const [erroreDonazioni, setErroreDonazioni] = useState("");
   const [caricamentoDonazioni, setCaricamentoDonazioni] = useState(false);
+  const [iniziativa, setIniziativa] = useState(null);
+  const [incasso, setIncasso] = useState(null);
+  const [operazione, setOperazione] = useState(false);
+  const [filtro, setFiltro] = useState("tutti");
+  const [erroreOperazione, setErroreOperazione] = useState("");
+  const euro = (n, valuta = "EUR") => Number(n || 0).toLocaleString("it-IT", { style: "currency", currency: valuta });
+  const dataIt = (s) => s ? new Date(s).toLocaleDateString("it-IT") : "Senza scadenza";
+  const nuovoProgetto = (tipo) => ({ id: null, tipo_iniziativa: tipo, titolo: "", descrizione: "", obiettivo: "", valuta: "EUR", data_inizio: new Date().toISOString().slice(0, 10), data_fine: "", stato: "bozza", immagine_url: "", mostra_contatore: false });
+  const nuovoIncasso = (progetto = null) => ({ progetto, causale_descrizione: progetto ? `Offerta per ${progetto.titolo}` : "Donazione libera alla parrocchia", importo: "", metodo: "consegna_diretta", data: new Date().toISOString().slice(0, 10), riferimento_esterno: "", note_private: "", pagante_nominativo: "" });
+  function apriIncasso(progetto = null) { setIncasso(nuovoIncasso(progetto)); setErroreOperazione(""); setMessaggio(""); }
+  function apriIniziativa(tipo, progetto = null) { setIniziativa(progetto ? { ...progetto, tipo_iniziativa: progetto.tipo_iniziativa || "progetto" } : nuovoProgetto(tipo)); setErroreOperazione(""); setMessaggio(""); }
+  async function salvaIniziativa(e) {
+    e.preventDefault(); if (operazione || !iniziativa) return;
+    setOperazione(true); setErroreOperazione("");
+    try {
+      const args = {
+        p_parrocchia_id: parrocchiaId, p_id: iniziativa.id || null,
+        p_titolo: iniziativa.titolo.trim(), p_descrizione: iniziativa.descrizione.trim() || null,
+        p_obiettivo: iniziativa.obiettivo === "" || iniziativa.obiettivo == null ? null : Number(iniziativa.obiettivo),
+        p_valuta: iniziativa.valuta, p_data_inizio: iniziativa.data_inizio,
+        p_data_fine: iniziativa.data_fine || null, p_stato: iniziativa.stato,
+        p_immagine_url: iniziativa.immagine_url.trim() || null,
+        p_tipo_iniziativa: iniziativa.tipo_iniziativa,
+        p_mostra_contatore: Boolean(iniziativa.mostra_contatore),
+      };
+      const { error } = await supabase.rpc("ars_salva_iniziativa_completa", args);
+      if (error) throw error;
+      setIniziativa(null); setMessaggio("Iniziativa salvata correttamente."); await caricaDati();
+    } catch (e) { setErroreOperazione(e.message || "Errore durante il salvataggio."); }
+    finally { setOperazione(false); }
+  }
+  async function registraIncasso(e) {
+    e.preventDefault(); if (operazione || !incasso) return;
+    setOperazione(true); setErroreOperazione("");
+    try {
+      const importo = Number(incasso.importo);
+      if (!Number.isFinite(importo) || importo <= 0 || Math.round(importo * 100) !== importo * 100) throw new Error("Inserisci un importo positivo con massimo due decimali.");
+      if (["paypal", "link_pagamento"].includes(incasso.metodo) && !incasso.riferimento_esterno.trim()) throw new Error("Per un incasso online già ricevuto serve il riferimento dell'operazione.");
+      const { error } = await supabase.rpc("ars_registra_incasso_iniziativa_v2", {
+        p_parrocchia_id: parrocchiaId,
+        p_progetto_donazione_id: incasso.progetto?.id || null,
+        p_causale_descrizione: incasso.causale_descrizione.trim(),
+        p_importo: importo, p_metodo: incasso.metodo,
+        p_data_incasso: new Date(`${incasso.data}T12:00:00`).toISOString(),
+        p_riferimento_esterno: incasso.riferimento_esterno.trim() || null,
+        p_note_private: incasso.note_private.trim() || null,
+        p_pagante_nominativo: incasso.pagante_nominativo.trim() || null,
+        p_incasso_id: crypto.randomUUID(),
+      });
+      if (error) throw error;
+      setIncasso(null); setMessaggio("Incasso registrato. La ricevuta viene emessa dal sistema economico condiviso.");
+      await caricaDati(); await caricaDonazioniLibere();
+    } catch (e) { setErroreOperazione(e.message || "Errore durante la registrazione."); }
+    finally { setOperazione(false); }
+  }
+  const campoIniziativa = (nome, etichetta, tipo = "text") => <label style={{ display: "block", margin: "12px 0" }}>{etichetta}<input style={stileCampo} type={tipo} step={tipo === "number" ? "0.01" : undefined} value={iniziativa[nome] ?? ""} onChange={e => setIniziativa(v => ({ ...v, [nome]: e.target.value }))} /></label>;
+  const campoIncasso = (nome, etichetta, tipo = "text") => <label style={{ display: "block", margin: "12px 0" }}>{etichetta}<input style={stileCampo} type={tipo} step={tipo === "number" ? "0.01" : undefined} value={incasso[nome] ?? ""} onChange={e => setIncasso(v => ({ ...v, [nome]: e.target.value }))} /></label>;
+  const elencoFiltrato = (tipo) => progetti.filter(p => (p.tipo_iniziativa || "progetto") === tipo && (filtro === "tutti" || p.stato === filtro));
+
 
   const caricaDati = useCallback(async () => {
     if (!parrocchiaId) {
@@ -183,13 +242,13 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
     {errore && <div role="alert" className="messaggio-errore">{errore}</div>}
     {messaggio && <p role="status">{messaggio}</p>}
     {sezione === "indice" && <nav aria-label="Progetti, raccolte fondi e donazioni" style={{ marginTop: 24 }}>
-      <button type="button" style={stileCartella} onClick={() => setSezione("progetti")}>
+      <button type="button" style={stileCartella} onClick={() => { setSezione("progetti"); setIncasso(null); setIniziativa(null); setFiltro("tutti"); }}>
         <span><span aria-hidden="true">📁 </span><strong>Progetti</strong><br /><small>Presentazione di opere, fotografie, disegni e documenti</small></span><span aria-hidden="true">›</span>
       </button>
-      <button type="button" style={stileCartella} onClick={() => setSezione("raccolte")}>
+      <button type="button" style={stileCartella} onClick={() => { setSezione("raccolte"); setIncasso(null); setIniziativa(null); setFiltro("tutti"); }}>
         <span><span aria-hidden="true">🤲 </span><strong>Raccolte fondi</strong><br /><small>Iniziative autonome con finalità specifiche</small></span><span aria-hidden="true">›</span>
       </button>
-      <button type="button" style={stileCartella} onClick={() => setSezione("donazioni")}>
+      <button type="button" style={stileCartella} onClick={() => { setSezione("donazioni"); setIncasso(null); setIniziativa(null); }}>
         <span><span aria-hidden="true">❤️ </span><strong>Donazioni</strong><br /><small>Offerte libere e ringraziamenti alla comunità</small></span><span aria-hidden="true">›</span>
       </button>
     </nav>}
@@ -278,39 +337,77 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
           <p>Per maggiori informazioni e una valutazione tecnica, contatta l'assistenza di Ars Liturgica.</p>
         </article>
       </section>}
-      {sezione === "progetti" && <section className="sezione-progetti-donazioni">
-        <div className="intestazione-sezione-donazioni">
-          <p>Progetti e iniziative presentati dalla parrocchia.</p>
-          <button type="button" style={stilePulsante} disabled title="La funzione sarà attivata nel prossimo passaggio">Nuovo progetto</button>
+      {(["progetti", "raccolte"].includes(sezione)) && <section>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+          <p>{sezione === "progetti" ? "Opere e iniziative della parrocchia." : "Raccolte temporanee o continuative per una finalità specifica."}</p>
+          <button type="button" style={stilePulsante} onClick={() => apriIniziativa(sezione === "progetti" ? "progetto" : "raccolta")}>+ {sezione === "progetti" ? "Nuovo progetto" : "Nuova raccolta"}</button>
         </div>
-        {progetti.length === 0 ? <p>Nessun progetto è stato ancora creato.</p> :
-          progetti.map((progetto) => <article key={progetto.id}>
-            <h4>{progetto.titolo}</h4>
-            <p>{progetto.stato} · Raccolto {Number(progetto.raccolto || 0).toLocaleString("it-IT", { style: "currency", currency: progetto.valuta || "EUR" })}</p>
-          </article>)}
-      </section>}
-      {sezione === "raccolte" && <section className="sezione-raccolte-fondi" style={stileScheda}>
-        <h3>Raccolte fondi</h3>
-        <p>Qui il parroco potrà creare e gestire raccolte fondi autonome, con un titolo e una finalità scelti liberamente.</p>
-        <p><small>Funzione in preparazione: nessuna raccolta viene creata in questa fase.</small></p>
-      </section>}
-      {sezione === "donazioni" && <section className="sezione-donazioni-libere" style={stileScheda}>
-        <h3>Donazioni libere</h3>
-        <p>Uno spazio dedicato alla gratitudine verso chi sostiene liberamente la comunità.</p>
-        <p>Le donazioni di questa sezione non saranno collegate a progetti, raccolte o attività.</p>
-        <p>Ogni donazione incassata deve essere registrata una sola volta nel Bilancio generale, con la relativa ricevuta. Il nome del pagante è facoltativo.</p>
-        <h4>Donazioni libere incassate</h4>
-        <button type="button" style={stilePulsanteSecondario} onClick={caricaDonazioniLibere} disabled={caricamentoDonazioni}>Aggiorna elenco</button>
-        {caricamentoDonazioni && <p>Caricamento donazioni...</p>}
-        {erroreDonazioni && <p role="alert" style={{ color: "#9b2531" }}>{erroreDonazioni}</p>}
-        {!caricamentoDonazioni && !erroreDonazioni && donazioniLibere.length === 0 && <p>Nessuna donazione libera incassata da mostrare.</p>}
-        {!caricamentoDonazioni && !erroreDonazioni && donazioniLibere.map((d) => <article key={d.id} style={{ borderTop: "1px solid #e5d9ca", padding: "12px 0" }}>
-          <strong>{Number(d.importo).toLocaleString("it-IT", { style: "currency", currency: d.valuta || "EUR" })}</strong>
-          <span> · {d.data_offerta ? new Date(d.data_offerta).toLocaleDateString("it-IT", { timeZone: "Europe/Rome" }) : "Data non disponibile"}</span>
-          <div>{d.causale_descrizione || "Donazione libera"}</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, margin: "14px 0" }}>
+          {[['tutti','Tutti'],['bozza','Bozze'],['pubblicato','Pubblicati'],['chiuso','Chiusi'],['annullato','Annullati']].map(([v,l]) => <button key={v} type="button" style={filtro === v ? stilePulsante : stilePulsanteSecondario} onClick={() => setFiltro(v)}>{l}</button>)}
+        </div>
+        {elencoFiltrato(sezione === "progetti" ? "progetto" : "raccolta").length === 0 && <p>Nessuna iniziativa in questa categoria.</p>}
+        {elencoFiltrato(sezione === "progetti" ? "progetto" : "raccolta").map(p => <article key={p.id} style={{ ...stileScheda, background: "#fffdf9" }}>
+          <div style={{ display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
+            {p.immagine_url && <img src={p.immagine_url} alt="" style={{ width: 120, height: 95, objectFit: "cover", borderRadius: 8 }} />}
+            <div style={{ flex: "1 1 250px" }}>
+              <strong style={{ fontSize: 19, color: "#24394a" }}>{p.titolo}</strong>
+              <p style={{ margin: "5px 0" }}>{p.descrizione}</p>
+              <p><strong>Stato:</strong> {p.stato} · <strong>Offerte:</strong> {p.numero_offerte || 0}</p>
+              <p><strong>Raccolto:</strong> {euro(p.raccolto, p.valuta)} {p.obiettivo ? `su ${euro(p.obiettivo, p.valuta)}` : ""}</p>
+              {p.obiettivo > 0 && <p><strong>Residuo:</strong> {euro(p.residuo, p.valuta)} · <strong>Avanzamento:</strong> {Number(p.percentuale || 0).toLocaleString("it-IT")}%</p>}
+              {p.obiettivo > 0 && <progress value={Math.min(100, Number(p.raccolto || 0) / Number(p.obiettivo) * 100)} max="100" style={{ width: "100%", accentColor: "#b78b42" }} />}
+              <small>{dataIt(p.data_inizio)} — {dataIt(p.data_fine)} · Contatore pubblico: {p.mostra_contatore ? "sì" : "no"}</small>
+            </div>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+              <button type="button" style={stilePulsanteSecondario} onClick={() => apriIniziativa(p.tipo_iniziativa || "progetto", p)}>Modifica</button>
+              <button type="button" style={stilePulsante} disabled title="Disponibile dopo il collegamento sicuro delle ricevute">Registra offerta (in preparazione)</button>
+            </div>
+          </div>
         </article>)}
-        <p><small>Elenco di consultazione. La registrazione di nuovi incassi e la stampa delle ricevute saranno collegate al flusso economico condiviso, senza creare registrazioni duplicate.</small></p>
       </section>}
+      {sezione === "donazioni" && <section style={stileScheda}>
+        <h3>Donazioni libere</h3>
+        <p>Grazie a chi sostiene la vita della comunità. Le offerte non sono collegate a progetti o attività.</p>
+        <button type="button" style={stilePulsante} disabled title="Disponibile dopo il collegamento sicuro delle ricevute">+ Registra donazione (in preparazione)</button>
+        <h4>Ultime donazioni incassate</h4>
+        <button type="button" style={stilePulsanteSecondario} onClick={caricaDonazioniLibere} disabled={caricamentoDonazioni}>Aggiorna elenco</button>
+        {caricamentoDonazioni && <p>Caricamento...</p>}
+        {erroreDonazioni && <p role="alert">{erroreDonazioni}</p>}
+        {!caricamentoDonazioni && !erroreDonazioni && donazioniLibere.length === 0 && <p>Nessuna donazione registrata.</p>}
+        {donazioniLibere.map(d => <article key={d.id} style={{ borderTop: "1px solid #e5d9ca", padding: "12px 0" }}>
+          <strong>{euro(d.importo, d.valuta)}</strong> · {dataIt(d.data_offerta)}<div>{d.causale_descrizione || "Donazione libera"}</div>
+        </article>)}
+      </section>}
+      {iniziativa && <form onSubmit={salvaIniziativa} style={{ ...stileScheda, background: "#fffaf1" }}>
+        <h3>{iniziativa.id ? "Modifica" : "Nuova"} {iniziativa.tipo_iniziativa === "raccolta" ? "raccolta fondi" : "progetto"}</h3>
+        {erroreOperazione && <p role="alert" style={{ color: "#a32232" }}>{erroreOperazione}</p>}
+        {campoIniziativa("titolo", "Titolo", "text")}
+        <label>Descrizione<textarea style={stileCampo} rows={4} value={iniziativa.descrizione || ""} onChange={e => setIniziativa(v => ({ ...v, descrizione: e.target.value }))} /></label>
+        {campoIniziativa("obiettivo", "Obiettivo economico in euro (facoltativo)", "number")}
+        {campoIniziativa("data_inizio", "Data di inizio", "date")}
+        {campoIniziativa("data_fine", "Data di fine (vuota = continuativa)", "date")}
+        {campoIniziativa("immagine_url", "Indirizzo HTTPS dell'immagine (facoltativo)", "url")}
+        <label style={{ display: "block", margin: "12px 0" }}>Stato<select style={stileCampo} value={iniziativa.stato} onChange={e => setIniziativa(v => ({ ...v, stato: e.target.value }))}>
+          {[['bozza','Bozza'],['pubblicato','Pubblicato'],['chiuso','Chiuso'],['annullato','Annullato']].map(([v,l]) => <option key={v} value={v}>{l}</option>)}
+        </select></label>
+        <label><input type="checkbox" checked={Boolean(iniziativa.mostra_contatore)} onChange={e => setIniziativa(v => ({ ...v, mostra_contatore: e.target.checked }))} /> Mostra il contatore delle offerte ai fedeli</label>
+        <div style={{ display: "flex", gap: 10, marginTop: 20 }}><button type="submit" style={stilePulsante} disabled={operazione}>{operazione ? "Salvataggio..." : "Salva iniziativa"}</button><button type="button" style={stilePulsanteSecondario} onClick={() => setIniziativa(null)}>Annulla</button></div>
+      </form>}
+      {incasso && <form onSubmit={registraIncasso} style={{ ...stileScheda, background: "#fffaf1" }}>
+        <h3>Registra {incasso.progetto ? `offerta per ${incasso.progetto.titolo}` : "donazione libera"}</h3>
+        <p>Registra solo denaro effettivamente ricevuto. La ricevuta è generata automaticamente.</p>
+        {erroreOperazione && <p role="alert" style={{ color: "#a32232" }}>{erroreOperazione}</p>}
+        {campoIncasso("pagante_nominativo", "Pagante (facoltativo: lascia vuoto se non comunicato)")}
+        {campoIncasso("causale_descrizione", "Causale")}
+        {campoIncasso("importo", "Importo in euro", "number")}
+        {campoIncasso("data", "Data dell'incasso", "date")}
+        <label>Metodo<select style={stileCampo} value={incasso.metodo} onChange={e => setIncasso(v => ({ ...v, metodo: e.target.value }))}>
+          <option value="consegna_diretta">Pagamento in parrocchia</option><option value="bonifico">Bonifico</option><option value="paypal">PayPal</option><option value="link_pagamento">Stripe</option>
+        </select></label>
+        {campoIncasso("riferimento_esterno", "Riferimento operazione (obbligatorio per PayPal/Stripe)")}
+        {campoIncasso("note_private", "Note interne (facoltative)")}
+        <div style={{ display: "flex", gap: 10, marginTop: 20 }}><button type="submit" style={stilePulsante} disabled={operazione}>{operazione ? "Registrazione..." : "Conferma incasso"}</button><button type="button" style={stilePulsanteSecondario} onClick={() => setIncasso(null)}>Annulla</button></div>
+      </form>}
     </>}
   </div>;
 }
