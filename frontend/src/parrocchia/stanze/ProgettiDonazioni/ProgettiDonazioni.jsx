@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from "react";
+import { QRCodeSVG } from "qrcode.react";
 import { supabase } from "../../../supabaseClient";
 
 const TIPI = {
@@ -60,12 +61,64 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
   const [operazione, setOperazione] = useState(false);
   const [filtro, setFiltro] = useState("tutti");
   const [erroreOperazione, setErroreOperazione] = useState("");
+  const [allegati, setAllegati] = useState({});
+  const [fileInAttesa, setFileInAttesa] = useState([]);
+  const [caricamentoFile, setCaricamentoFile] = useState(false);
+  const [stampa, setStampa] = useState(null);
+  const urlPubblica = (p) => `${window.location.origin}/?ars_iniziativa=${encodeURIComponent(p.id)}&ars_parrocchia=${encodeURIComponent(parrocchiaId)}`;
+  async function leggiAllegati(id) {
+    if (!id) return;
+    const { data, error } = await supabase.from("ars_allegati_iniziative")
+      .select("id, nome_file, percorso, tipo_mime, principale")
+      .eq("parrocchia_id", parrocchiaId).eq("iniziativa_id", id).order("creato_at");
+    if (error) throw error;
+    setAllegati(v => ({ ...v, [id]: data || [] }));
+  }
+  async function caricaAllegati(id) {
+    if (!fileInAttesa.length) return;
+    setCaricamentoFile(true);
+    try {
+      for (const file of fileInAttesa) {
+        if (!(file.type === "application/pdf" || ["image/jpeg", "image/png", "image/webp"].includes(file.type))) throw new Error("Sono ammessi soltanto immagini e PDF.");
+        if (file.size > 10 * 1024 * 1024) throw new Error("Dimensione massima per file: 10 MB.");
+        const percorso = `${parrocchiaId}/${id}/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
+        const { error: uploadError } = await supabase.storage.from("ars-progetti").upload(percorso, file, { contentType: file.type, upsert: false });
+        if (uploadError) throw uploadError;
+        const { error: dbError } = await supabase.from("ars_allegati_iniziative").insert({
+          parrocchia_id: parrocchiaId, iniziativa_id: id, nome_file: file.name,
+          percorso, tipo_mime: file.type, principale: file.type.startsWith("image/") && !(allegati[id] || []).some(a => a.principale)
+        });
+        if (dbError) {
+          await supabase.storage.from("ars-progetti").remove([percorso]);
+          throw dbError;
+        }
+      }
+      setFileInAttesa([]);
+      await leggiAllegati(id);
+    } finally { setCaricamentoFile(false); }
+  }
+  async function eliminaAllegato(a, id) {
+    if (!window.confirm(`Eliminare ${a.nome_file}?`)) return;
+    setErroreOperazione("");
+    const { error } = await supabase.from("ars_allegati_iniziative").delete().eq("id", a.id).eq("parrocchia_id", parrocchiaId);
+    if (error) { setErroreOperazione(error.message); return; }
+    const { error: storageError } = await supabase.storage.from("ars-progetti").remove([a.percorso]);
+    if (storageError) setErroreOperazione("Allegato scollegato, ma eliminazione fisica non riuscita: " + storageError.message);
+    await leggiAllegati(id);
+  }
+  const urlAllegato = a => supabase.storage.from("ars-progetti").getPublicUrl(a.percorso).data.publicUrl;
+  function apriStampa(p) { setStampa(p); if (!allegati[p.id]) leggiAllegati(p.id).catch(e => setErroreOperazione(e.message)); }
+
   const euro = (n, valuta = "EUR") => Number(n || 0).toLocaleString("it-IT", { style: "currency", currency: valuta });
   const dataIt = (s) => s ? new Date(s).toLocaleDateString("it-IT") : "Senza scadenza";
   const nuovoProgetto = (tipo) => ({ id: null, tipo_iniziativa: tipo, titolo: "", descrizione: "", obiettivo: "", valuta: "EUR", data_inizio: new Date().toISOString().slice(0, 10), data_fine: "", stato: "bozza", immagine_url: "", mostra_contatore: false });
   const nuovoIncasso = (progetto = null) => ({ progetto, causale_descrizione: progetto ? `Offerta per ${progetto.titolo}` : "Donazione libera alla parrocchia", importo: "", metodo: "consegna_diretta", data: new Date().toISOString().slice(0, 10), riferimento_esterno: "", note_private: "", pagante_nominativo: "" });
   function apriIncasso(progetto = null) { setIncasso(nuovoIncasso(progetto)); setErroreOperazione(""); setMessaggio(""); }
-  function apriIniziativa(tipo, progetto = null) { setIniziativa(progetto ? { ...progetto, tipo_iniziativa: progetto.tipo_iniziativa || "progetto" } : nuovoProgetto(tipo)); setErroreOperazione(""); setMessaggio(""); }
+  function apriIniziativa(tipo, progetto = null) {
+    setIniziativa(progetto ? { ...progetto, tipo_iniziativa: progetto.tipo_iniziativa || "progetto" } : nuovoProgetto(tipo));
+    setFileInAttesa([]); setErroreOperazione(""); setMessaggio("");
+    if (progetto?.id) leggiAllegati(progetto.id).catch(e => setErroreOperazione(e.message));
+  }
   async function salvaIniziativa(e) {
     e.preventDefault(); if (operazione || !iniziativa) return;
     setOperazione(true); setErroreOperazione("");
@@ -76,12 +129,21 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
         p_obiettivo: iniziativa.obiettivo === "" || iniziativa.obiettivo == null ? null : Number(iniziativa.obiettivo),
         p_valuta: iniziativa.valuta, p_data_inizio: iniziativa.data_inizio,
         p_data_fine: iniziativa.data_fine || null, p_stato: iniziativa.stato,
-        p_immagine_url: iniziativa.immagine_url.trim() || null,
+        p_immagine_url: (iniziativa.immagine_url || "").trim() || null,
         p_tipo_iniziativa: iniziativa.tipo_iniziativa,
         p_mostra_contatore: Boolean(iniziativa.mostra_contatore),
       };
-      const { error } = await supabase.rpc("ars_salva_iniziativa_completa", args);
+      const { data, error } = await supabase.rpc("ars_salva_iniziativa_completa", args);
       if (error) throw error;
+      const risposta = typeof data === "string" && data.startsWith("{") ? JSON.parse(data) : data;
+      const id = (typeof risposta === "string" && /^[0-9a-f-]{36}$/i.test(risposta) ? risposta : null)
+        || risposta?.id || risposta?.progetto_id || risposta?.progetto?.id
+        || risposta?.iniziativa?.id || iniziativa.id;
+      if (fileInAttesa.length && !id) throw new Error("Iniziativa salvata, ma il server non ha restituito l'ID necessario per allegare i file. Riaprila dall'elenco.");
+      if (id) {
+        setIniziativa(v => v ? ({ ...v, id }) : v);
+        await caricaAllegati(id);
+      }
       setIniziativa(null); setMessaggio("Iniziativa salvata correttamente."); await caricaDati();
     } catch (e) { setErroreOperazione(e.message || "Errore durante il salvataggio."); }
     finally { setOperazione(false); }
@@ -360,6 +422,7 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
             </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <button type="button" style={stilePulsanteSecondario} onClick={() => apriIniziativa(p.tipo_iniziativa || "progetto", p)}>Modifica</button>
+               <button type="button" style={stilePulsanteSecondario} onClick={() => apriStampa(p)} disabled={p.stato !== "pubblicato"} title={p.stato !== "pubblicato" ? "Pubblica prima l’iniziativa" : "Stampa il volantino"}>Stampa volantino / QR</button>
               <button type="button" style={stilePulsante} onClick={() => apriIncasso(p)} disabled={operazione}>Registra offerta</button>
             </div>
           </div>
@@ -386,13 +449,48 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
         {campoIniziativa("obiettivo", "Obiettivo economico in euro (facoltativo)", "number")}
         {campoIniziativa("data_inizio", "Data di inizio", "date")}
         {campoIniziativa("data_fine", "Data di fine (vuota = continuativa)", "date")}
-        {campoIniziativa("immagine_url", "Indirizzo HTTPS dell'immagine (facoltativo)", "url")}
+        <label style={{ display: "block", margin: "12px 0" }}>Aggiungi fotografie o PDF (massimo 10 MB ciascuno)
+          <input style={stileCampo} type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple
+            onChange={e => setFileInAttesa(Array.from(e.target.files || []))} />
+        </label>
+        {fileInAttesa.map((f, i) => <p key={i}>Da caricare: {f.name}</p>)}
+        {iniziativa.id && (allegati[iniziativa.id] || []).map(a => <div key={a.id} style={{ display: "flex", gap: 12, alignItems: "center", margin: "8px 0" }}>
+          {a.tipo_mime.startsWith("image/") && <img src={urlAllegato(a)} alt={a.nome_file} style={{ width: 80, height: 65, objectFit: "cover" }} />}
+          <a href={urlAllegato(a)} target="_blank" rel="noreferrer">{a.nome_file}</a>
+          <button type="button" style={stilePulsanteSecondario} onClick={() => eliminaAllegato(a, iniziativa.id)}>Elimina</button>
+        </div>)}
         <label style={{ display: "block", margin: "12px 0" }}>Stato<select style={stileCampo} value={iniziativa.stato} onChange={e => setIniziativa(v => ({ ...v, stato: e.target.value }))}>
           {[['bozza','Bozza'],['pubblicato','Pubblicato'],['chiuso','Chiuso'],['annullato','Annullato']].map(([v,l]) => <option key={v} value={v}>{l}</option>)}
         </select></label>
         <label><input type="checkbox" checked={Boolean(iniziativa.mostra_contatore)} onChange={e => setIniziativa(v => ({ ...v, mostra_contatore: e.target.checked }))} /> Mostra il contatore delle offerte ai fedeli</label>
-        <div style={{ display: "flex", gap: 10, marginTop: 20 }}><button type="submit" style={stilePulsante} disabled={operazione}>{operazione ? "Salvataggio..." : "Salva iniziativa"}</button><button type="button" style={stilePulsanteSecondario} onClick={() => setIniziativa(null)}>Annulla</button></div>
+        <div style={{ display: "flex", gap: 10, marginTop: 20 }}><button type="submit" style={stilePulsante} disabled={operazione}>{operazione || caricamentoFile ? "Salvataggio..." : "Salva iniziativa"}</button><button type="button" style={stilePulsanteSecondario} onClick={() => setIniziativa(null)}>Annulla</button></div>
       </form>}
+      {stampa && <section style={{ ...stileScheda, background: "#fff" }}>
+        <div id="ars-volantino-stampa" style={{ maxWidth: 760, margin: "auto", padding: 30, fontFamily: "Georgia, serif", color: "#24394a" }}>
+          <p style={{ textAlign: "center", letterSpacing: 2 }}>ARS LITURGICA · {stampa.tipo_iniziativa === "raccolta" ? "RACCOLTA FONDI" : "PROGETTO"}</p>
+          <h1 style={{ textAlign: "center", fontSize: 32 }}>{stampa.titolo}</h1>
+          {(allegati[stampa.id] || []).filter(a => a.tipo_mime.startsWith("image/")).slice(0, 1).map(a =>
+            <img key={a.id} src={urlAllegato(a)} alt="" style={{ width: "100%", maxHeight: 340, objectFit: "contain" }} />)}
+          <p style={{ fontSize: 19, whiteSpace: "pre-wrap" }}>{stampa.descrizione}</p>
+          {stampa.obiettivo && <p><strong>Obiettivo: {euro(stampa.obiettivo, stampa.valuta)}</strong></p>}
+          {stampa.mostra_contatore && <p>Raccolto: {euro(stampa.raccolto, stampa.valuta)}</p>}
+          <div style={{ textAlign: "center", marginTop: 30 }}><QRCodeSVG value={urlPubblica(stampa)} size={150} /><p>Inquadra il codice per consultare l'iniziativa</p></div>
+        </div>
+        <button type="button" style={stilePulsante} onClick={() => {
+          const el = document.getElementById("ars-volantino-stampa");
+          const win = window.open("", "_blank");
+          if (!win || !el) { setErroreOperazione("Consenti le finestre popup per stampare."); return; }
+          win.document.write(`<html><head><title>Volantino</title><style>body{font-family:Georgia,serif;margin:0;padding:20mm;color:#24394a}img{max-width:100%}@page{size:A4;margin:12mm}</style></head><body>${el.innerHTML}</body></html>`);
+          win.document.close();
+          win.addEventListener("load", () => {
+            const images = Array.from(win.document.images);
+            Promise.all(images.map(img => img.complete ? Promise.resolve() : new Promise(resolve => { img.onload = resolve; img.onerror = resolve; })))
+              .then(() => { win.focus(); win.print(); });
+          }, { once: true });
+        }}>Stampa / Salva PDF</button>
+        <button type="button" style={stilePulsanteSecondario} onClick={() => setStampa(null)}>Chiudi</button>
+        
+      </section>}
       {incasso && <form onSubmit={registraIncasso} style={{ ...stileScheda, background: "#fffaf1" }}>
         <h3>Registra {incasso.progetto ? `offerta per ${incasso.progetto.titolo}` : "donazione libera"}</h3>
         <p>Registra solo denaro effettivamente ricevuto. La ricevuta è generata automaticamente.</p>
