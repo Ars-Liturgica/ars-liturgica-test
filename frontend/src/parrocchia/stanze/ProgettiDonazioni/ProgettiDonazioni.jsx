@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { supabase } from "../../../supabaseClient";
 
@@ -65,6 +65,11 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
   const [fileInAttesa, setFileInAttesa] = useState([]);
   const [caricamentoFile, setCaricamentoFile] = useState(false);
   const [stampa, setStampa] = useState(null);
+  // Anteprime locali: nessun caricamento su Storage prima di "Salva iniziativa".
+  const anteprimeFile = useMemo(() => fileInAttesa.map(file => ({
+    file, url: URL.createObjectURL(file)
+  })), [fileInAttesa]);
+  useEffect(() => () => anteprimeFile.forEach(a => URL.revokeObjectURL(a.url)), [anteprimeFile]);
   const urlPubblica = (p) => `${window.location.origin}/?ars_iniziativa=${encodeURIComponent(p.id)}&ars_parrocchia=${encodeURIComponent(parrocchiaId)}`;
   async function leggiAllegati(id) {
     if (!id) return;
@@ -107,7 +112,10 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
     await leggiAllegati(id);
   }
   const urlAllegato = a => supabase.storage.from("ars-progetti").getPublicUrl(a.percorso).data.publicUrl;
-  function apriStampa(p) { setStampa(p); if (!allegati[p.id]) leggiAllegati(p.id).catch(e => setErroreOperazione(e.message)); }
+  function apriStampa(p, daModulo = false) {
+    setStampa({ ...p, _anteprimaLocale: daModulo });
+    if (p.id && !allegati[p.id]) leggiAllegati(p.id).catch(e => setErroreOperazione(e.message));
+  }
 
   const euro = (n, valuta = "EUR") => Number(n || 0).toLocaleString("it-IT", { style: "currency", currency: valuta });
   const dataIt = (s) => s ? new Date(s).toLocaleDateString("it-IT") : "Senza scadenza";
@@ -422,7 +430,7 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
             </div>
             <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
               <button type="button" style={stilePulsanteSecondario} onClick={() => apriIniziativa(p.tipo_iniziativa || "progetto", p)}>Modifica</button>
-               <button type="button" style={stilePulsanteSecondario} onClick={() => apriStampa(p)} disabled={p.stato !== "pubblicato"} title={p.stato !== "pubblicato" ? "Pubblica prima l’iniziativa" : "Stampa il volantino"}>Stampa volantino / QR</button>
+               <button type="button" style={stilePulsanteSecondario} onClick={() => apriStampa(p)} title="Anteprima e stampa del volantino, anche in bozza">Stampa volantino / QR</button>
               <button type="button" style={stilePulsante} onClick={() => apriIncasso(p)} disabled={operazione}>Registra offerta</button>
             </div>
           </div>
@@ -453,34 +461,54 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
           <input style={stileCampo} type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple
             onChange={e => setFileInAttesa(Array.from(e.target.files || []))} />
         </label>
-        {fileInAttesa.map((f, i) => <p key={i}>Da caricare: {f.name}</p>)}
-        {iniziativa.id && (allegati[iniziativa.id] || []).map(a => <div key={a.id} style={{ display: "flex", gap: 12, alignItems: "center", margin: "8px 0" }}>
-          {a.tipo_mime.startsWith("image/") && <img src={urlAllegato(a)} alt={a.nome_file} style={{ width: 80, height: 65, objectFit: "cover" }} />}
-          <a href={urlAllegato(a)} target="_blank" rel="noreferrer">{a.nome_file}</a>
-          <button type="button" style={stilePulsanteSecondario} onClick={() => eliminaAllegato(a, iniziativa.id)}>Elimina</button>
-        </div>)}
+        <div style={{ background: "#fff", border: "1px solid #ddc89d", borderRadius: 12, padding: 18, margin: "14px 0", minHeight: 135 }}>
+          <h4 style={{ marginTop: 0 }}>Fotografie e documenti del progetto</h4>
+          {anteprimeFile.length === 0 && (!iniziativa.id || !(allegati[iniziativa.id] || []).length) &&
+            <p style={{ color: "#6a6a6a" }}>Qui compariranno le fotografie e i PDF selezionati.</p>}
+          <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+            {anteprimeFile.map(({ file, url }, i) => <div key={`${file.name}-${i}`} style={{ border: "1px solid #eee", borderRadius: 8, padding: 9, width: 160, overflowWrap: "anywhere" }}>
+              {file.type.startsWith("image/") ? <img src={url} alt={file.name} style={{ width: "100%", height: 105, objectFit: "contain" }} /> : <div style={{ fontSize: 35 }}>📄</div>}
+              <small>{file.name}</small><div style={{ fontSize: 12, color: "#98691f" }}>Da salvare</div>
+            </div>)}
+            {iniziativa.id && (allegati[iniziativa.id] || []).map(a => <div key={a.id} style={{ border: "1px solid #eee", borderRadius: 8, padding: 9, width: 160, overflowWrap: "anywhere" }}>
+              {a.tipo_mime.startsWith("image/") ? <img src={urlAllegato(a)} alt={a.nome_file} style={{ width: "100%", height: 105, objectFit: "contain" }} /> : <div style={{ fontSize: 35 }}>📄</div>}
+              <a href={urlAllegato(a)} target="_blank" rel="noreferrer" style={{ fontSize: 13 }}>{a.nome_file}</a>
+              <button type="button" style={{ ...stilePulsanteSecondario, display: "block", marginTop: 8, padding: "6px 9px" }} onClick={() => eliminaAllegato(a, iniziativa.id)}>Elimina</button>
+            </div>)}
+          </div>
+        </div>
         <label style={{ display: "block", margin: "12px 0" }}>Stato<select style={stileCampo} value={iniziativa.stato} onChange={e => setIniziativa(v => ({ ...v, stato: e.target.value }))}>
           {[['bozza','Bozza'],['pubblicato','Pubblicato'],['chiuso','Chiuso'],['annullato','Annullato']].map(([v,l]) => <option key={v} value={v}>{l}</option>)}
         </select></label>
         <label><input type="checkbox" checked={Boolean(iniziativa.mostra_contatore)} onChange={e => setIniziativa(v => ({ ...v, mostra_contatore: e.target.checked }))} /> Mostra il contatore delle offerte ai fedeli</label>
-        <div style={{ display: "flex", gap: 10, marginTop: 20 }}><button type="submit" style={stilePulsante} disabled={operazione}>{operazione || caricamentoFile ? "Salvataggio..." : "Salva iniziativa"}</button><button type="button" style={stilePulsanteSecondario} onClick={() => setIniziativa(null)}>Annulla</button></div>
+        <div style={{ display: "flex", gap: 10, marginTop: 20, flexWrap: "wrap" }}>
+          <button type="button" style={stilePulsanteSecondario} onClick={() => apriStampa(iniziativa, true)}>Anteprima volantino</button>
+          <button type="submit" style={stilePulsante} disabled={operazione}>{operazione || caricamentoFile ? "Salvataggio..." : "Salva iniziativa"}</button>
+          <button type="button" style={stilePulsanteSecondario} onClick={() => { setIniziativa(null); setStampa(null); }}>Annulla</button>
+        </div>
       </form>}
       {stampa && <section style={{ ...stileScheda, background: "#fff" }}>
         <div id="ars-volantino-stampa" style={{ maxWidth: 760, margin: "auto", padding: 30, fontFamily: "Georgia, serif", color: "#24394a" }}>
           <p style={{ textAlign: "center", letterSpacing: 2 }}>ARS LITURGICA · {stampa.tipo_iniziativa === "raccolta" ? "RACCOLTA FONDI" : "PROGETTO"}</p>
-          <h1 style={{ textAlign: "center", fontSize: 32 }}>{stampa.titolo}</h1>
-          {(allegati[stampa.id] || []).filter(a => a.tipo_mime.startsWith("image/")).slice(0, 1).map(a =>
-            <img key={a.id} src={urlAllegato(a)} alt="" style={{ width: "100%", maxHeight: 340, objectFit: "contain" }} />)}
+          {stampa.stato !== "pubblicato" && <div style={{ textAlign: "center", color: "#9c6831", fontWeight: 700, fontSize: 21, letterSpacing: 3 }}>BOZZA — NON PUBBLICATO</div>}
+          <h1 style={{ textAlign: "center", fontSize: 32 }}>{stampa.titolo || "Titolo del progetto"}</h1>
+          {stampa._anteprimaLocale && anteprimeFile.some(a => a.file.type.startsWith("image/"))
+            ? anteprimeFile.filter(a => a.file.type.startsWith("image/")).slice(0, 1).map(a =>
+              <img key={a.url} src={a.url} alt="Fotografia selezionata" style={{ width: "100%", maxHeight: 340, objectFit: "contain" }} />)
+            : (allegati[stampa.id] || []).filter(a => a.tipo_mime.startsWith("image/")).slice(0, 1).map(a =>
+              <img key={a.id} src={urlAllegato(a)} alt="" style={{ width: "100%", maxHeight: 340, objectFit: "contain" }} />)}
           <p style={{ fontSize: 19, whiteSpace: "pre-wrap" }}>{stampa.descrizione}</p>
           {stampa.obiettivo && <p><strong>Obiettivo: {euro(stampa.obiettivo, stampa.valuta)}</strong></p>}
           {stampa.mostra_contatore && <p>Raccolto: {euro(stampa.raccolto, stampa.valuta)}</p>}
-          <div style={{ textAlign: "center", marginTop: 30 }}><QRCodeSVG value={urlPubblica(stampa)} size={150} /><p>Inquadra il codice per consultare l'iniziativa</p></div>
+          {stampa.stato === "pubblicato" && stampa.id
+            ? <div style={{ textAlign: "center", marginTop: 30 }}><QRCodeSVG value={urlPubblica(stampa)} size={150} /><p>Inquadra il codice per consultare l'iniziativa</p></div>
+            : <p style={{ textAlign: "center", fontStyle: "italic", color: "#765c37" }}>Il QR code sarà disponibile quando l'iniziativa sarà salvata e pubblicata.</p>}
         </div>
         <button type="button" style={stilePulsante} onClick={() => {
           const el = document.getElementById("ars-volantino-stampa");
           const win = window.open("", "_blank");
           if (!win || !el) { setErroreOperazione("Consenti le finestre popup per stampare."); return; }
-          win.document.write(`<html><head><title>Volantino</title><style>body{font-family:Georgia,serif;margin:0;padding:20mm;color:#24394a}img{max-width:100%}@page{size:A4;margin:12mm}</style></head><body>${el.innerHTML}</body></html>`);
+          win.document.write(`<html><head><title>Volantino</title><style>body{font-family:Georgia,serif;margin:0;padding:12mm;color:#24394a}img{max-width:100%}@page{size:A4;margin:12mm}</style></head><body>${el.innerHTML}</body></html>`);
           win.document.close();
           win.addEventListener("load", () => {
             const images = Array.from(win.document.images);
