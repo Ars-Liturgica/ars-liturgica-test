@@ -66,11 +66,24 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
   const selettoreAllegati = useRef(null);
   const [caricamentoFile, setCaricamentoFile] = useState(false);
   const [stampa, setStampa] = useState(null);
+  const [nomeParrocchia, setNomeParrocchia] = useState("");
   // Anteprime locali: nessun caricamento su Storage prima di "Salva iniziativa".
   const anteprimeFile = useMemo(() => fileInAttesa.map(file => ({
     file, url: URL.createObjectURL(file)
   })), [fileInAttesa]);
   useEffect(() => () => anteprimeFile.forEach(a => URL.revokeObjectURL(a.url)), [anteprimeFile]);
+  useEffect(() => {
+    let attivo = true;
+    setNomeParrocchia("");
+    if (!parrocchiaId) return () => { attivo = false; };
+    supabase.from("parrocchie").select("nome").eq("id", parrocchiaId).single()
+      .then(({ data, error }) => {
+        if (!attivo) return;
+        if (error) { console.error("Nome parrocchia non disponibile:", error); return; }
+        setNomeParrocchia(data?.nome || "");
+      });
+    return () => { attivo = false; };
+  }, [parrocchiaId]);
   const urlPubblica = (p) => `${window.location.origin}/?ars_iniziativa=${encodeURIComponent(p.id)}&ars_parrocchia=${encodeURIComponent(parrocchiaId)}`;
   async function leggiAllegati(id) {
     if (!id) return;
@@ -510,8 +523,12 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
       </form>}
       {stampa && <section style={{ ...stileScheda, background: "#fff" }}>
         <div id="ars-volantino-stampa" style={{ maxWidth: 760, margin: "auto", padding: 30, fontFamily: "Georgia, serif", color: "#24394a", boxSizing: "border-box", width: "100%", overflowWrap: "anywhere" }}>
-          <p style={{ textAlign: "center", letterSpacing: 2 }}>ARS LITURGICA · {stampa.tipo_iniziativa === "raccolta" ? "RACCOLTA FONDI" : "PROGETTO"}</p>
-          <h1 style={{ textAlign: "center", fontSize: 32 }}>{stampa.titolo || "Titolo del progetto"}</h1>
+          <div style={{ textAlign: "center", overflowWrap: "anywhere" }}>
+            <div style={{ fontWeight: 700, fontSize: 23, lineHeight: 1.3 }}>{nomeParrocchia ? `PARROCCHIA ${nomeParrocchia}` : "Nome della parrocchia non disponibile"}</div>
+            <div style={{ marginTop: 12, letterSpacing: 2, fontSize: 16 }}>{stampa.tipo_iniziativa === "raccolta" ? "RACCOLTA FONDI" : "PROGETTO"}</div>
+            <h1 style={{ fontSize: 32, margin: "18px 0 8px", overflowWrap: "anywhere" }}>{stampa.titolo || "Titolo del progetto"}</h1>
+            <div style={{ fontSize: 14, color: "#765c37" }}>{new Date().toLocaleDateString("it-IT", { day: "2-digit", month: "long", year: "numeric" })}</div>
+          </div>
           <p style={{ fontSize: 18, lineHeight: 1.5, whiteSpace: "pre-wrap", overflowWrap: "anywhere", wordBreak: "break-word", maxWidth: "100%" }}>{stampa.descrizione}</p>
           {(() => {
             const locali = stampa._anteprimaLocale ? anteprimeFile.map(({ file, url }) => ({
