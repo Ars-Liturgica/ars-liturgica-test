@@ -515,6 +515,28 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
           <p style={{ fontSize: 19, whiteSpace: "pre-wrap" }}>{stampa.descrizione}</p>
           {stampa.obiettivo && <p><strong>Obiettivo: {euro(stampa.obiettivo, stampa.valuta)}</strong></p>}
           {stampa.mostra_contatore && <p>Raccolto: {euro(stampa.raccolto, stampa.valuta)}</p>}
+          {(() => {
+            const locali = stampa._anteprimaLocale ? anteprimeFile.map(({ file, url }) => ({
+              id: url, nome: file.name, url, immagine: file.type.startsWith("image/"), locale: true
+            })) : [];
+            const salvati = (allegati[stampa.id] || []).map(a => ({
+              id: a.id, nome: a.nome_file, url: urlAllegato(a), immagine: (a.tipo_mime || "").startsWith("image/"), locale: false
+            }));
+            const documenti = [...salvati, ...locali];
+            if (!documenti.length) return null;
+            return <section style={{ border: "1px solid #ddc89d", borderRadius: 12, padding: 18, marginTop: 26, breakInside: "auto" }}>
+              <h2 style={{ fontSize: 23, margin: "0 0 14px", color: "#24394a" }}>Allegati</h2>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 14, alignItems: "flex-start" }}>
+                {documenti.map(d => <div key={d.id} style={{ width: "calc(50% - 7px)", boxSizing: "border-box", border: "1px solid #eee5d8", borderRadius: 8, padding: 10, breakInside: "avoid", pageBreakInside: "avoid", overflowWrap: "anywhere" }}>
+                  {d.immagine
+                    ? <img src={d.url} alt={d.nome} style={{ display: "block", width: "100%", maxHeight: 190, objectFit: "contain", marginBottom: 7 }} />
+                    : <div style={{ fontSize: 32, lineHeight: 1.3 }} aria-hidden="true">📄</div>}
+                  <a href={d.url} target="_blank" rel="noopener noreferrer" style={{ color: "#24394a", fontSize: 14 }}>{d.nome}</a>
+                  {d.locale && <div style={{ color: "#98691f", fontSize: 11 }}>Da salvare — collegamento provvisorio</div>}
+                </div>)}
+              </div>
+            </section>;
+          })()}
           {stampa.stato === "pubblicato" && stampa.id
             ? <div style={{ textAlign: "center", marginTop: 30 }}><QRCodeSVG value={urlPubblica(stampa)} size={150} /><p>Inquadra il codice per consultare l'iniziativa</p></div>
             : <p style={{ textAlign: "center", fontStyle: "italic", color: "#765c37" }}>Il QR code sarà disponibile quando l'iniziativa sarà salvata e pubblicata.</p>}
@@ -523,7 +545,7 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
           const el = document.getElementById("ars-volantino-stampa");
           const win = window.open("", "_blank");
           if (!win || !el) { setErroreOperazione("Consenti le finestre popup per stampare."); return; }
-          win.document.write(`<html><head><title>Volantino</title><style>body{font-family:Georgia,serif;margin:0;padding:12mm;color:#24394a}img{max-width:100%}@page{size:A4;margin:12mm}</style></head><body>${el.innerHTML}</body></html>`);
+          win.document.write(`<html><head><title>Volantino</title><style>body{font-family:Georgia,serif;margin:0;padding:12mm;color:#24394a}img{max-width:100%}section{break-inside:auto}section>div>div{break-inside:avoid;page-break-inside:avoid}@page{size:A4;margin:12mm}</style></head><body>${el.innerHTML}</body></html>`);
           win.document.close();
           win.addEventListener("load", () => {
             const images = Array.from(win.document.images);
