@@ -102,14 +102,14 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
         if (file.size > 10 * 1024 * 1024) throw new Error("Dimensione massima per file: 10 MB.");
         const percorso = `${parrocchiaId}/${id}/${crypto.randomUUID()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
         const { error: uploadError } = await supabase.storage.from("ars-progetti").upload(percorso, file, { contentType: file.type, upsert: false });
-        if (uploadError) throw uploadError;
+        if (uploadError) throw new Error(`Caricamento di "${file.name}" non riuscito: ${uploadError.message}`);
         const { error: dbError } = await supabase.from("ars_allegati_iniziative").insert({
           parrocchia_id: parrocchiaId, iniziativa_id: id, nome_file: file.name,
           percorso, tipo_mime: file.type, principale: file.type.startsWith("image/") && !(allegati[id] || []).some(a => a.principale)
         });
         if (dbError) {
           await supabase.storage.from("ars-progetti").remove([percorso]);
-          throw dbError;
+          throw new Error(`File "${file.name}" caricato ma non registrato: ${dbError.message}`);
         }
       }
       setFileInAttesa([]);
@@ -160,16 +160,31 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
       const { data, error } = await supabase.rpc("ars_salva_iniziativa_completa", args);
       if (error) throw error;
       const risposta = typeof data === "string" && data.startsWith("{") ? JSON.parse(data) : data;
-      const id = (typeof risposta === "string" && /^[0-9a-f-]{36}$/i.test(risposta) ? risposta : null)
+      let id = (typeof risposta === "string" && /^[0-9a-f-]{36}$/i.test(risposta) ? risposta : null)
         || risposta?.id || risposta?.progetto_id || risposta?.progetto?.id
         || risposta?.iniziativa?.id || iniziativa.id;
-      if (fileInAttesa.length && !id) throw new Error("Iniziativa salvata, ma il server non ha restituito l'ID necessario per allegare i file. Riaprila dall'elenco.");
+      // Alcune versioni della RPC restituiscono un risultato senza ID.
+      // Recupero solo se esiste una corrispondenza UNIVOCA: mai collegare file al progetto sbagliato.
+      if (!id && fileInAttesa.length) {
+        const { data: corrispondenze, error: ricercaErrore } = await supabase
+          .from("progetti_donazioni")
+          .select("id")
+          .eq("parrocchia_id", parrocchiaId)
+          .eq("titolo", iniziativa.titolo.trim())
+          .limit(2);
+        if (!ricercaErrore && corrispondenze?.length === 1) id = corrispondenze[0].id;
+      }
+      if (fileInAttesa.length && !id) throw new Error("Progetto salvato, ma impossibile identificare con certezza il record per gli allegati. Nessun file caricato: riapri il progetto e riprova. Se persiste, controlliamo la risposta della funzione ars_salva_iniziativa_completa.");
       if (id) {
         setIniziativa(v => v ? ({ ...v, id }) : v);
         await caricaAllegati(id);
       }
       setIniziativa(null); setMessaggio(pubblica ? "Iniziativa pubblicata correttamente." : "Iniziativa salvata correttamente."); await caricaDati();
-    } catch (e) { setErroreOperazione(e.message || "Errore durante il salvataggio."); }
+    } catch (e) {
+      console.error("Salvataggio iniziativa/allegati:", e);
+      setErroreOperazione("Salvataggio non completato: " + (e.message || "Errore sconosciuto") + ". Gli allegati ancora visibili come 'Da salvare' non sono stati confermati.");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
     finally { setOperazione(false); }
   }
   async function registraIncasso(e) {
