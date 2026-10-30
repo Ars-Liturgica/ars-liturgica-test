@@ -41,7 +41,7 @@ const stilePulsanteSecondario = { ...stilePulsante, background: "#fffaf1", color
 const stileCartella = { ...stilePulsanteSecondario, display: "flex", width: "100%", alignItems: "center", justifyContent: "space-between", textAlign: "left", padding: "22px", marginBottom: "14px", gap: "12px" };
 
 const stileCampo = { display: "block", width: "100%", boxSizing: "border-box", padding: "10px", marginTop: "5px" };
-const stileScheda = { border: "1px solid #ddc89d", borderRadius: "12px", padding: "20px", margin: "16px 0" };
+const stileScheda = { border: "1px solid #ddc89d", borderRadius: "12px", padding: "20px", margin: "16px 0", minWidth: 0, maxWidth: "100%", boxSizing: "border-box", overflowWrap: "anywhere" };
 
 export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezioneIniziale = "indice" }) {
   const [metodiIncasso, setMetodiIncasso] = useState([]);
@@ -331,7 +331,7 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
     </label>;
   }
 
-  return <div className="progetti-donazioni">
+  return <div className="progetti-donazioni" style={{ minWidth: 0, maxWidth: "100%", overflowWrap: "anywhere" }}>
     <button type="button" style={stilePulsanteSecondario} onClick={() => {
       if (sezioneIniziale !== "indice" || sezione === "indice") tornaDashboard();
       else { setSezione("indice"); setModulo(null); setErroreModulo(""); }
@@ -450,9 +450,9 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
         {elencoFiltrato(sezione === "progetti" ? "progetto" : "raccolta").map(p => <article key={p.id} style={{ ...stileScheda, background: "#fffdf9" }}>
           <div style={{ display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
             {p.immagine_url && <img src={p.immagine_url} alt="" style={{ width: 120, height: 95, objectFit: "cover", borderRadius: 8 }} />}
-            <div style={{ flex: "1 1 250px" }}>
-              <strong style={{ fontSize: 19, color: "#24394a" }}>{p.titolo}</strong>
-              <p style={{ margin: "5px 0" }}>{p.descrizione}</p>
+            <div style={{ flex: "1 1 250px", minWidth: 0, maxWidth: "100%", overflowWrap: "anywhere", wordBreak: "break-word" }}>
+              <strong style={{ fontSize: 19, color: "#24394a", overflowWrap: "anywhere", wordBreak: "break-word" }}>{p.titolo}</strong>
+              <p style={{ margin: "5px 0", whiteSpace: "pre-wrap", overflowWrap: "anywhere", wordBreak: "break-word", maxWidth: "100%" }}>{p.descrizione}</p>
               <p><strong>Stato:</strong> {p.stato} · <strong>Offerte:</strong> {p.numero_offerte || 0}</p>
               <p><strong>Raccolto:</strong> {euro(p.raccolto, p.valuta)} {p.obiettivo ? `su ${euro(p.obiettivo, p.valuta)}` : ""}</p>
               {p.obiettivo > 0 && <p><strong>Residuo:</strong> {euro(p.residuo, p.valuta)} · <strong>Avanzamento:</strong> {Number(p.percentuale || 0).toLocaleString("it-IT")}%</p>}
