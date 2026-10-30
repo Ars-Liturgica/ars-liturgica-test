@@ -509,10 +509,10 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
         </div>
       </form>}
       {stampa && <section style={{ ...stileScheda, background: "#fff" }}>
-        <div id="ars-volantino-stampa" style={{ maxWidth: 760, margin: "auto", padding: 30, fontFamily: "Georgia, serif", color: "#24394a" }}>
+        <div id="ars-volantino-stampa" style={{ maxWidth: 760, margin: "auto", padding: 30, fontFamily: "Georgia, serif", color: "#24394a", boxSizing: "border-box", width: "100%", overflowWrap: "anywhere" }}>
           <p style={{ textAlign: "center", letterSpacing: 2 }}>ARS LITURGICA · {stampa.tipo_iniziativa === "raccolta" ? "RACCOLTA FONDI" : "PROGETTO"}</p>
           <h1 style={{ textAlign: "center", fontSize: 32 }}>{stampa.titolo || "Titolo del progetto"}</h1>
-          <p style={{ fontSize: 19, whiteSpace: "pre-wrap" }}>{stampa.descrizione}</p>
+          <p style={{ fontSize: 18, lineHeight: 1.5, whiteSpace: "pre-wrap", overflowWrap: "anywhere", wordBreak: "break-word", maxWidth: "100%" }}>{stampa.descrizione}</p>
           {(() => {
             const locali = stampa._anteprimaLocale ? anteprimeFile.map(({ file, url }) => ({
               id: url, nome: file.name, url, immagine: file.type.startsWith("image/"), locale: true
@@ -535,8 +535,22 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
               </div>
             </section>;
           })()}
-          {stampa.obiettivo && <p><strong>Obiettivo: {euro(stampa.obiettivo, stampa.valuta)}</strong></p>}
-          {stampa.mostra_contatore && <p>Raccolto: {euro(stampa.raccolto, stampa.valuta)}</p>}
+          {stampa.mostra_contatore && (() => {
+            const obiettivo = Number(stampa.obiettivo || 0);
+            const raccolto = Number(stampa.raccolto || 0);
+            const percentuale = obiettivo > 0 ? Math.max(0, Math.min(100, (raccolto / obiettivo) * 100)) : 0;
+            return <div style={{ maxWidth: 490, margin: "20px auto", padding: "14px 18px", border: "1px solid #ddc89d", borderRadius: 12, background: "#fffaf1", breakInside: "avoid", pageBreakInside: "avoid", boxSizing: "border-box" }}>
+              <div style={{ textAlign: "center", fontWeight: 700, fontSize: 17, marginBottom: 10 }}>Sosteniamo insieme questo progetto</div>
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                {obiettivo > 0 && <div><div style={{ fontSize: 12, color: "#765c37" }}>OBIETTIVO</div><strong style={{ fontSize: 19 }}>{euro(obiettivo, stampa.valuta)}</strong></div>}
+                <div><div style={{ fontSize: 12, color: "#765c37" }}>GIÀ RACCOLTI</div><strong style={{ fontSize: 19 }}>{euro(raccolto, stampa.valuta)}</strong></div>
+              </div>
+              {obiettivo > 0 && <>
+                <div style={{ height: 10, borderRadius: 10, background: "#e8dfd0", overflow: "hidden", marginTop: 12 }}><div style={{ height: "100%", width: `${percentuale}%`, background: "#b78b42", borderRadius: 10 }} /></div>
+                <div style={{ fontSize: 13, textAlign: "center", marginTop: 7 }}>{percentuale.toLocaleString("it-IT", { maximumFractionDigits: 1 })}% raggiunto · {raccolto >= obiettivo ? "Obiettivo raggiunto" : `Mancano ${euro(obiettivo - raccolto, stampa.valuta)}`}</div>
+              </>}
+            </div>;
+          })()}
           {stampa.stato === "pubblicato" && stampa.id
             ? <div style={{ textAlign: "center", marginTop: 30 }}><QRCodeSVG value={urlPubblica(stampa)} size={150} /><p>Inquadra il codice per consultare l'iniziativa</p></div>
             : <p style={{ textAlign: "center", fontStyle: "italic", color: "#765c37" }}>Il QR code sarà disponibile quando l'iniziativa sarà salvata e pubblicata.</p>}
@@ -545,7 +559,7 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
           const el = document.getElementById("ars-volantino-stampa");
           const win = window.open("", "_blank");
           if (!win || !el) { setErroreOperazione("Consenti le finestre popup per stampare."); return; }
-          win.document.write(`<html><head><title>Volantino</title><style>body{font-family:Georgia,serif;margin:0;padding:12mm;color:#24394a}img{max-width:100%}section{break-inside:auto}section>div>div{break-inside:avoid;page-break-inside:avoid}@page{size:A4;margin:12mm}</style></head><body>${el.innerHTML}</body></html>`);
+          win.document.write(`<html><head><title>Volantino</title><style>body{font-family:Georgia,serif;margin:0;padding:12mm;color:#24394a;overflow-wrap:anywhere}#ars-volantino-stampa{max-width:100%;box-sizing:border-box}p,h1,h2,a{overflow-wrap:anywhere;word-break:break-word}img{max-width:100%}section{break-inside:auto}section>div>div{break-inside:avoid;page-break-inside:avoid}@page{size:A4;margin:12mm}</style></head><body>${el.innerHTML}</body></html>`);
           win.document.close();
           win.addEventListener("load", () => {
             const images = Array.from(win.document.images);
