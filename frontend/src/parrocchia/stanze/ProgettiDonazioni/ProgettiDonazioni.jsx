@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { supabase } from "../../../supabaseClient";
 
@@ -63,6 +63,7 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
   const [erroreOperazione, setErroreOperazione] = useState("");
   const [allegati, setAllegati] = useState({});
   const [fileInAttesa, setFileInAttesa] = useState([]);
+  const selettoreAllegati = useRef(null);
   const [caricamentoFile, setCaricamentoFile] = useState(false);
   const [stampa, setStampa] = useState(null);
   // Anteprime locali: nessun caricamento su Storage prima di "Salva iniziativa".
@@ -457,18 +458,32 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
         {campoIniziativa("obiettivo", "Obiettivo economico in euro (facoltativo)", "number")}
         {campoIniziativa("data_inizio", "Data di inizio", "date")}
         {campoIniziativa("data_fine", "Data di fine (vuota = continuativa)", "date")}
-        <label style={{ display: "block", margin: "12px 0" }}>Aggiungi fotografie o PDF (massimo 10 MB ciascuno)
-          <input style={stileCampo} type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple
-            onChange={e => setFileInAttesa(Array.from(e.target.files || []))} />
-        </label>
         <div style={{ background: "#fff", border: "1px solid #ddc89d", borderRadius: 12, padding: 18, margin: "14px 0", minHeight: 135 }}>
           <h4 style={{ marginTop: 0 }}>Fotografie e documenti del progetto</h4>
+          <p style={{ fontSize: 13, color: "#52616c" }}>Fotografie JPG, PNG, WEBP e PDF (massimo 10 MB ciascuno).</p>
+          <input ref={selettoreAllegati} type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple
+            style={{ display: "none" }} aria-label="Seleziona fotografie o documenti"
+            onChange={e => {
+              const nuovi = Array.from(e.target.files || []);
+              e.target.value = "";
+              const nonValidi = nuovi.filter(f => !(f.type === "application/pdf" || ["image/jpeg", "image/png", "image/webp"].includes(f.type)) || f.size > 10 * 1024 * 1024);
+              if (nonValidi.length) setErroreOperazione("Alcuni file non sono stati aggiunti: sono ammessi JPG, PNG, WEBP e PDF fino a 10 MB ciascuno.");
+              else setErroreOperazione("");
+              const validi = nuovi.filter(f => (f.type === "application/pdf" || ["image/jpeg", "image/png", "image/webp"].includes(f.type)) && f.size <= 10 * 1024 * 1024);
+              setFileInAttesa(prev => [...prev, ...validi.filter(f => !prev.some(p => p.name === f.name && p.size === f.size && p.lastModified === f.lastModified))]);
+            }} />
+          <button type="button" style={stilePulsanteSecondario} onClick={() => selettoreAllegati.current?.click()} disabled={operazione}>
+            + Aggiungi fotografie o documenti
+          </button>
           {anteprimeFile.length === 0 && (!iniziativa.id || !(allegati[iniziativa.id] || []).length) &&
             <p style={{ color: "#6a6a6a" }}>Qui compariranno le fotografie e i PDF selezionati.</p>}
           <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
             {anteprimeFile.map(({ file, url }, i) => <div key={`${file.name}-${i}`} style={{ border: "1px solid #eee", borderRadius: 8, padding: 9, width: 160, overflowWrap: "anywhere" }}>
               {file.type.startsWith("image/") ? <img src={url} alt={file.name} style={{ width: "100%", height: 105, objectFit: "contain" }} /> : <div style={{ fontSize: 35 }}>📄</div>}
-              <small>{file.name}</small><div style={{ fontSize: 12, color: "#98691f" }}>Da salvare</div>
+              <a href={url} target="_blank" rel="noopener noreferrer" style={{ display: "block", fontSize: 13, overflowWrap: "anywhere" }}>{file.name} · Apri</a>
+              <div style={{ fontSize: 12, color: "#98691f" }}>Da salvare</div>
+              <button type="button" style={{ ...stilePulsanteSecondario, display: "block", marginTop: 8, padding: "6px 9px" }}
+                onClick={() => setFileInAttesa(prev => prev.filter((_, indice) => indice !== i))} disabled={operazione}>Rimuovi</button>
             </div>)}
             {iniziativa.id && (allegati[iniziativa.id] || []).map(a => <div key={a.id} style={{ border: "1px solid #eee", borderRadius: 8, padding: 9, width: 160, overflowWrap: "anywhere" }}>
               {a.tipo_mime.startsWith("image/") ? <img src={urlAllegato(a)} alt={a.nome_file} style={{ width: "100%", height: 105, objectFit: "contain" }} /> : <div style={{ fontSize: 35 }}>📄</div>}
