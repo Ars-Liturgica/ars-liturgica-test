@@ -128,8 +128,10 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
     setFileInAttesa([]); setErroreOperazione(""); setMessaggio("");
     if (progetto?.id) leggiAllegati(progetto.id).catch(e => setErroreOperazione(e.message));
   }
-  async function salvaIniziativa(e) {
-    e.preventDefault(); if (operazione || !iniziativa) return;
+  async function salvaIniziativa(e, pubblica = false) {
+    e?.preventDefault?.(); if (operazione || !iniziativa) return;
+    if (pubblica && !window.confirm(`Pubblicare ${iniziativa.tipo_iniziativa === "raccolta" ? "la raccolta" : "il progetto"} e renderlo visibile ai fedeli?`)) return;
+    const statoDaSalvare = pubblica ? "pubblicato" : iniziativa.stato;
     setOperazione(true); setErroreOperazione("");
     try {
       const args = {
@@ -137,7 +139,7 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
         p_titolo: iniziativa.titolo.trim(), p_descrizione: iniziativa.descrizione.trim() || null,
         p_obiettivo: iniziativa.obiettivo === "" || iniziativa.obiettivo == null ? null : Number(iniziativa.obiettivo),
         p_valuta: iniziativa.valuta, p_data_inizio: iniziativa.data_inizio,
-        p_data_fine: iniziativa.data_fine || null, p_stato: iniziativa.stato,
+        p_data_fine: iniziativa.data_fine || null, p_stato: statoDaSalvare,
         p_immagine_url: (iniziativa.immagine_url || "").trim() || null,
         p_tipo_iniziativa: iniziativa.tipo_iniziativa,
         p_mostra_contatore: Boolean(iniziativa.mostra_contatore),
@@ -153,7 +155,7 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
         setIniziativa(v => v ? ({ ...v, id }) : v);
         await caricaAllegati(id);
       }
-      setIniziativa(null); setMessaggio("Iniziativa salvata correttamente."); await caricaDati();
+      setIniziativa(null); setMessaggio(pubblica ? "Iniziativa pubblicata correttamente." : "Iniziativa salvata correttamente."); await caricaDati();
     } catch (e) { setErroreOperazione(e.message || "Errore durante il salvataggio."); }
     finally { setOperazione(false); }
   }
@@ -492,29 +494,25 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
             </div>)}
           </div>
         </div>
-        <label style={{ display: "block", margin: "12px 0" }}>Stato<select style={stileCampo} value={iniziativa.stato} onChange={e => setIniziativa(v => ({ ...v, stato: e.target.value }))}>
-          {[['bozza','Bozza'],['pubblicato','Pubblicato'],['chiuso','Chiuso'],['annullato','Annullato']].map(([v,l]) => <option key={v} value={v}>{l}</option>)}
-        </select></label>
+        <p><strong>Stato attuale:</strong> {iniziativa.stato === "pubblicato" ? "Pubblicato" : iniziativa.stato === "chiuso" ? "Chiuso" : iniziativa.stato === "annullato" ? "Annullato" : "Bozza"}</p>
+        {iniziativa.id && <label style={{ display: "block", margin: "12px 0" }}>Gestione stato (facoltativa)
+          <select style={stileCampo} value={iniziativa.stato} onChange={e => setIniziativa(v => ({ ...v, stato: e.target.value }))}>
+            {[["bozza","Bozza"],["pubblicato","Pubblicato"],["chiuso","Chiuso"],["annullato","Annullato"]].map(([v,l]) => <option key={v} value={v}>{l}</option>)}
+          </select>
+        </label>}
         <label><input type="checkbox" checked={Boolean(iniziativa.mostra_contatore)} onChange={e => setIniziativa(v => ({ ...v, mostra_contatore: e.target.checked }))} /> Mostra il contatore delle offerte ai fedeli</label>
         <div style={{ display: "flex", gap: 10, marginTop: 20, flexWrap: "wrap" }}>
           <button type="button" style={stilePulsanteSecondario} onClick={() => apriStampa(iniziativa, true)}>Anteprima volantino</button>
-          <button type="submit" style={stilePulsante} disabled={operazione}>{operazione || caricamentoFile ? "Salvataggio..." : "Salva iniziativa"}</button>
+          <button type="submit" style={stilePulsanteSecondario} disabled={operazione || caricamentoFile}>{operazione || caricamentoFile ? "Salvataggio..." : iniziativa.stato === "pubblicato" ? "Salva modifiche" : "Salva bozza"}</button>
+          {iniziativa.stato !== "pubblicato" && <button type="button" style={stilePulsante} disabled={operazione || caricamentoFile} onClick={e => salvaIniziativa(e, true)}>{iniziativa.tipo_iniziativa === "raccolta" ? "Pubblica raccolta" : "Pubblica progetto"}</button>}
           <button type="button" style={stilePulsanteSecondario} onClick={() => { setIniziativa(null); setStampa(null); }}>Annulla</button>
         </div>
       </form>}
       {stampa && <section style={{ ...stileScheda, background: "#fff" }}>
         <div id="ars-volantino-stampa" style={{ maxWidth: 760, margin: "auto", padding: 30, fontFamily: "Georgia, serif", color: "#24394a" }}>
           <p style={{ textAlign: "center", letterSpacing: 2 }}>ARS LITURGICA · {stampa.tipo_iniziativa === "raccolta" ? "RACCOLTA FONDI" : "PROGETTO"}</p>
-          {stampa.stato !== "pubblicato" && <div style={{ textAlign: "center", color: "#9c6831", fontWeight: 700, fontSize: 21, letterSpacing: 3 }}>BOZZA — NON PUBBLICATO</div>}
           <h1 style={{ textAlign: "center", fontSize: 32 }}>{stampa.titolo || "Titolo del progetto"}</h1>
-          {stampa._anteprimaLocale && anteprimeFile.some(a => a.file.type.startsWith("image/"))
-            ? anteprimeFile.filter(a => a.file.type.startsWith("image/")).slice(0, 1).map(a =>
-              <img key={a.url} src={a.url} alt="Fotografia selezionata" style={{ width: "100%", maxHeight: 340, objectFit: "contain" }} />)
-            : (allegati[stampa.id] || []).filter(a => a.tipo_mime.startsWith("image/")).slice(0, 1).map(a =>
-              <img key={a.id} src={urlAllegato(a)} alt="" style={{ width: "100%", maxHeight: 340, objectFit: "contain" }} />)}
           <p style={{ fontSize: 19, whiteSpace: "pre-wrap" }}>{stampa.descrizione}</p>
-          {stampa.obiettivo && <p><strong>Obiettivo: {euro(stampa.obiettivo, stampa.valuta)}</strong></p>}
-          {stampa.mostra_contatore && <p>Raccolto: {euro(stampa.raccolto, stampa.valuta)}</p>}
           {(() => {
             const locali = stampa._anteprimaLocale ? anteprimeFile.map(({ file, url }) => ({
               id: url, nome: file.name, url, immagine: file.type.startsWith("image/"), locale: true
@@ -526,17 +524,19 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
             if (!documenti.length) return null;
             return <section style={{ border: "1px solid #ddc89d", borderRadius: 12, padding: 18, marginTop: 26, breakInside: "auto" }}>
               <h2 style={{ fontSize: 23, margin: "0 0 14px", color: "#24394a" }}>Allegati</h2>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 14, alignItems: "flex-start" }}>
-                {documenti.map(d => <div key={d.id} style={{ width: "calc(50% - 7px)", boxSizing: "border-box", border: "1px solid #eee5d8", borderRadius: 8, padding: 10, breakInside: "avoid", pageBreakInside: "avoid", overflowWrap: "anywhere" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 9, alignItems: "start" }}>
+                {documenti.map(d => <div key={d.id} style={{ minWidth: 0, boxSizing: "border-box", border: "1px solid #eee5d8", borderRadius: 8, padding: 7, breakInside: "avoid", pageBreakInside: "avoid", overflowWrap: "anywhere" }}>
                   {d.immagine
-                    ? <img src={d.url} alt={d.nome} style={{ display: "block", width: "100%", maxHeight: 190, objectFit: "contain", marginBottom: 7 }} />
-                    : <div style={{ fontSize: 32, lineHeight: 1.3 }} aria-hidden="true">📄</div>}
-                  <a href={d.url} target="_blank" rel="noopener noreferrer" style={{ color: "#24394a", fontSize: 14 }}>{d.nome}</a>
+                    ? <img src={d.url} alt={d.nome} style={{ display: "block", width: "100%", height: 86, objectFit: "contain", marginBottom: 5 }} />
+                    : <div style={{ height: 86, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32 }} aria-hidden="true">📄</div>}
+                  <a href={d.url} target="_blank" rel="noopener noreferrer" style={{ color: "#24394a", fontSize: 12 }}>{d.nome}</a>
                   {d.locale && <div style={{ color: "#98691f", fontSize: 11 }}>Da salvare — collegamento provvisorio</div>}
                 </div>)}
               </div>
             </section>;
           })()}
+          {stampa.obiettivo && <p><strong>Obiettivo: {euro(stampa.obiettivo, stampa.valuta)}</strong></p>}
+          {stampa.mostra_contatore && <p>Raccolto: {euro(stampa.raccolto, stampa.valuta)}</p>}
           {stampa.stato === "pubblicato" && stampa.id
             ? <div style={{ textAlign: "center", marginTop: 30 }}><QRCodeSVG value={urlPubblica(stampa)} size={150} /><p>Inquadra il codice per consultare l'iniziativa</p></div>
             : <p style={{ textAlign: "center", fontStyle: "italic", color: "#765c37" }}>Il QR code sarà disponibile quando l'iniziativa sarà salvata e pubblicata.</p>}
