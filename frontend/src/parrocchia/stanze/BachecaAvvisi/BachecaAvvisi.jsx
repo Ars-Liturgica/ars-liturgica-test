@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import "./BachecaAvvisi.css";
 import NuovoAvviso from "./NuovoAvviso";
+import { supabase } from "../../supabaseClient";
 import { leggiDocumentiInArchivio } from "../../motoreDocumentale/MotoreDocumentale";
 
 function formattaData(data) {
@@ -40,6 +41,10 @@ export default function BachecaAvvisi({
     useState(false);
 
   const [avvisi, setAvvisi] = useState([]);
+  const [progettiPubblici, setProgettiPubblici] = useState([]);
+  const [progettoAperto, setProgettoAperto] = useState(null);
+  const [allegatiProgetto, setAllegatiProgetto] = useState([]);
+  const [erroreAllegati, setErroreAllegati] = useState("");
   const [avvisoAperto, setAvvisoAperto] =
     useState(null);
   const [caricamento, setCaricamento] =
@@ -52,6 +57,7 @@ export default function BachecaAvvisi({
     async function caricaAvvisi() {
       if (!parrocchia?.id) {
         setAvvisi([]);
+        setProgettiPubblici([]);
         setCaricamento(false);
         return;
       }
@@ -60,15 +66,25 @@ export default function BachecaAvvisi({
       setErrore("");
 
       try {
-        const documenti =
-          await leggiDocumentiInArchivio({
+        const [documenti, rispostaProgetti] = await Promise.all([
+          leggiDocumentiInArchivio({
             parrocchiaId: parrocchia.id,
             tipo: "avviso",
             stato: "in_essere",
             destinazione: "Bacheca Avvisi",
             pubblicatiFinoA:
               new Date().toISOString(),
-          });
+          }),
+          supabase.rpc("ars_elenco_progetti_donazioni_pubblici", {
+            p_parrocchia_id: parrocchia.id,
+          }),
+        ]);
+        if (rispostaProgetti.error) throw rispostaProgetti.error;
+        const datiProgetti = typeof rispostaProgetti.data === "string"
+          ? JSON.parse(rispostaProgetti.data)
+          : rispostaProgetti.data;
+        const progettiVisibili = (Array.isArray(datiProgetti) ? datiProgetti : [])
+          .filter(p => p.tipo_iniziativa === "progetto");
 
         const oggi = new Date()
           .toISOString()
@@ -93,6 +109,7 @@ export default function BachecaAvvisi({
 
         if (componenteAttivo) {
           setAvvisi(documentiVisibili);
+          setProgettiPubblici(progettiVisibili);
         }
       } catch (error) {
         console.error(
@@ -106,6 +123,7 @@ export default function BachecaAvvisi({
               "Non è stato possibile caricare gli avvisi."
           );
           setAvvisi([]);
+          setProgettiPubblici([]);
         }
       } finally {
         if (componenteAttivo) {
@@ -122,6 +140,22 @@ export default function BachecaAvvisi({
       componenteAttivo = false;
     };
   }, [parrocchia?.id, mostraNuovoAvviso]);
+
+  async function apriProgetto(progetto) {
+    setProgettoAperto(progetto);
+    setAllegatiProgetto([]);
+    setErroreAllegati("");
+    const { data, error } = await supabase.from("ars_allegati_iniziative")
+      .select("id, nome_file, percorso, tipo_mime")
+      .eq("parrocchia_id", parrocchia.id)
+      .eq("iniziativa_id", progetto.id)
+      .order("creato_at");
+    if (error) {
+      setErroreAllegati("Impossibile caricare gli allegati: " + error.message);
+      return;
+    }
+    setAllegatiProgetto(data || []);
+  }
 
   if (mostraNuovoAvviso) {
     return (
@@ -219,7 +253,7 @@ export default function BachecaAvvisi({
 
           {!caricamento &&
             !errore &&
-            avvisi.length === 0 && (
+            avvisi.length === 0 && progettiPubblici.length === 0 && (
               <div className="bacheca-stato">
                 <div className="bacheca-stato-icona">
                   📌
@@ -304,7 +338,67 @@ export default function BachecaAvvisi({
               </div>
             )}
         </section>
+        {!caricamento && !errore && progettiPubblici.length > 0 && (
+          <section className="bacheca-sezione-avvisi" aria-label="Progetti della parrocchia">
+            <div className="bacheca-titolo-sezione"><p>Comunità</p><h2>Progetti pubblicati</h2></div>
+            <div className="elenco-avvisi">
+              {progettiPubblici.map(progetto => (
+                <article key={progetto.id} className="scheda-avviso priorita-normale"
+                  role="button" tabIndex={0} aria-label={`Apri il progetto ${progetto.titolo}`}
+                  onClick={() => apriProgetto(progetto)}
+                  onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); apriProgetto(progetto); } }}>
+                  <div className="scheda-avviso-corpo" style={{ minWidth: 0, overflowWrap: "anywhere" }}>
+                    <p className="categoria-avviso-bacheca">Progetto della parrocchia</p>
+                    <h3 style={{ overflowWrap: "anywhere" }}>{progetto.titolo}</h3>
+                    <p style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere", wordBreak: "break-word" }}>
+                      {(progetto.descrizione || "").slice(0, 240)}{(progetto.descrizione || "").length > 240 ? "…" : ""}
+                    </p>
+                    <div className="scheda-avviso-fondo"><span>Progetto pubblicato</span><strong>Scopri il progetto →</strong></div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
       </div>
+
+      {progettoAperto && (
+        <div className="sfondo-dettaglio-avviso" onClick={() => setProgettoAperto(null)}>
+          <section className="dettaglio-avviso" role="dialog" aria-modal="true"
+            aria-labelledby="titolo-progetto-aperto" onClick={e => e.stopPropagation()}
+            style={{ maxHeight: "85vh", overflowY: "auto", overflowWrap: "anywhere" }}>
+            <button type="button" className="btn-chiudi-avviso" aria-label="Chiudi progetto"
+              onClick={() => setProgettoAperto(null)}>×</button>
+            <p className="categoria-avviso-bacheca">Progetto della parrocchia</p>
+            <h2 id="titolo-progetto-aperto" style={{ overflowWrap: "anywhere" }}>{progettoAperto.titolo}</h2>
+            <p style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere", wordBreak: "break-word" }}>
+              {progettoAperto.descrizione}
+            </p>
+            {progettoAperto.mostra_contatore && (
+              <div style={{ padding: 14, border: "1px solid #ddc89d", borderRadius: 10, margin: "16px 0" }}>
+                <strong>Offerte raccolte: {Number(progettoAperto.raccolto || 0).toLocaleString("it-IT", { style: "currency", currency: progettoAperto.valuta || "EUR" })}</strong>
+                {Number(progettoAperto.obiettivo || 0) > 0 && <p>
+                  Obiettivo: {Number(progettoAperto.obiettivo).toLocaleString("it-IT", { style: "currency", currency: progettoAperto.valuta || "EUR" })}
+                  <progress value={Math.min(100, Number(progettoAperto.percentuale || 0))} max="100" style={{ display: "block", width: "100%" }} />
+                </p>}
+              </div>
+            )}
+            {erroreAllegati && <p role="alert">{erroreAllegati}</p>}
+            {allegatiProgetto.length > 0 && <div>
+              <h3>Fotografie e documenti</h3>
+              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+                {allegatiProgetto.map(a => {
+                  const url = supabase.storage.from("ars-progetti").getPublicUrl(a.percorso).data.publicUrl;
+                  return <div key={a.id} style={{ width: 160, maxWidth: "100%", overflowWrap: "anywhere" }}>
+                    {(a.tipo_mime || "").startsWith("image/") && <img src={url} alt={a.nome_file} style={{ width: "100%", maxHeight: 130, objectFit: "contain" }} />}
+                    <a href={url} target="_blank" rel="noopener noreferrer">{a.nome_file} · Apri</a>
+                  </div>;
+                })}
+              </div>
+            </div>}
+          </section>
+        </div>
+      )}
 
       {avvisoAperto && (
         <div
