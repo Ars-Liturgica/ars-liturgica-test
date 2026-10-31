@@ -7,6 +7,7 @@ import NotificheFedele from "./stanze/Notifiche/NotificheFedele";
 import IntenzioniMesseFedele from "./stanze/Celebrazioni/IntenzioniMesseFedele";
 import PartecipazioneComunita from "./stanze/Collaboratori/PartecipazioneComunita";
 import AttivitaGruppiFedele from "./stanze/AttivitaGruppi/AttivitaGruppiFedele";
+import ProgettiDonazioniFedele from "./stanze/ProgettiDonazioni/ProgettiDonazioniFedele";
 
 export default function DashboardFedele() {
   const [stanzaAperta, setStanzaAperta] = useState(null);
@@ -113,6 +114,15 @@ export default function DashboardFedele() {
   if (stanzaAperta === "attivita-gruppi") {
     return (
       <AttivitaGruppiFedele
+        parrocchiaId={parrocchia.id}
+        tornaDashboard={() => setStanzaAperta(null)}
+      />
+    );
+  }
+
+  if (stanzaAperta === "progetti-donazioni") {
+    return (
+      <ProgettiDonazioniFedele
         parrocchiaId={parrocchia.id}
         tornaDashboard={() => setStanzaAperta(null)}
       />
@@ -417,11 +427,7 @@ export default function DashboardFedele() {
           <button
             type="button"
             onClick={() => setStanzaAperta("partecipazione-comunita")}
-            style={{
-              ...stileCard,
-              background: "#fffaf0",
-              border: "1px solid #d6b56d",
-            }}
+            style={stileCard}
           >
             <div style={{ fontSize: "34px", marginBottom: "16px" }}>
               🤝
@@ -449,6 +455,19 @@ export default function DashboardFedele() {
             >
               La comunità cresce con il contributo di ciascuno. Scopri come
               offrire il tuo tempo, le tue capacità e la tua presenza.
+            </p>
+          </button>
+          <button
+            type="button"
+            onClick={() => setStanzaAperta("progetti-donazioni")}
+            style={stileCard}
+          >
+            <div style={{ fontSize: "34px", marginBottom: "16px" }}>🤲</div>
+            <h2 style={{ margin: "0 0 10px", fontSize: "22px", fontWeight: "500", color: "#49392c" }}>
+              Progetti, raccolte fondi e donazioni
+            </h2>
+            <p style={{ margin: 0, fontFamily: "Arial, sans-serif", fontSize: "15px", lineHeight: "1.6", color: "#75695e" }}>
+              Scopri e sostieni le iniziative della tua parrocchia.
             </p>
           </button>
           <button
