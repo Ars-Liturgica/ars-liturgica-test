@@ -143,7 +143,6 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
   }
   async function salvaIniziativa(e, pubblica = false) {
     e?.preventDefault?.(); if (operazione || !iniziativa) return;
-    if (pubblica && !window.confirm(`Pubblicare ${iniziativa.tipo_iniziativa === "raccolta" ? "la raccolta" : "il progetto"} e renderlo visibile ai fedeli?`)) return;
     const statoDaSalvare = pubblica ? "pubblicato" : iniziativa.stato;
     setOperazione(true); setErroreOperazione("");
     try {
