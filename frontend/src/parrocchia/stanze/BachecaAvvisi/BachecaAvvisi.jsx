@@ -384,18 +384,51 @@ export default function BachecaAvvisi({
               </div>
             )}
             {erroreAllegati && <p role="alert">{erroreAllegati}</p>}
-            {allegatiProgetto.length > 0 && <div>
-              <h3>Fotografie e documenti</h3>
-              <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-                {allegatiProgetto.map(a => {
-                  const url = supabase.storage.from("ars-progetti").getPublicUrl(a.percorso).data.publicUrl;
-                  return <div key={a.id} style={{ width: 160, maxWidth: "100%", overflowWrap: "anywhere" }}>
-                    {(a.tipo_mime || "").startsWith("image/") && <img src={url} alt={a.nome_file} style={{ width: "100%", maxHeight: 130, objectFit: "contain" }} />}
-                    <a href={url} target="_blank" rel="noopener noreferrer">{a.nome_file} · Apri</a>
-                  </div>;
-                })}
-              </div>
-            </div>}
+            {allegatiProgetto.length > 0 && (() => {
+              const fotografie = allegatiProgetto.filter(a =>
+                (a.tipo_mime || "").startsWith("image/") ||
+                /\.(jpg|jpeg|png|webp|gif|avif)$/i.test(a.nome_file || "")
+              );
+              const documenti = allegatiProgetto.filter(a => !fotografie.includes(a));
+              const urlAllegato = a => supabase.storage.from("ars-progetti")
+                .getPublicUrl(a.percorso).data.publicUrl;
+              return (
+                <div className="progetto-allegati">
+                  <h3>Fotografie e documenti</h3>
+                  {fotografie.length > 0 && (
+                    <div className="progetto-gruppo-allegati">
+                      <h4>Fotografie</h4>
+                      <div className="progetto-griglia-foto">
+                        {fotografie.map((a, i) => (
+                          <a key={a.id} className="progetto-foto" href={urlAllegato(a)}
+                            target="_blank" rel="noopener noreferrer"
+                            aria-label={`Apri fotografia ${i + 1}: ${a.nome_file || "fotografia"}`}>
+                            <img src={urlAllegato(a)} alt={a.nome_file || `Fotografia ${i + 1}`} loading="lazy" />
+                            <span>Apri fotografia {i + 1} ↗</span>
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {documenti.length > 0 && (
+                    <div className="progetto-gruppo-allegati">
+                      <h4>Documenti</h4>
+                      <div className="progetto-elenco-documenti">
+                        {documenti.map(a => (
+                          <a key={a.id} className="progetto-documento" href={urlAllegato(a)}
+                            target="_blank" rel="noopener noreferrer"
+                            title={a.nome_file || "Apri documento"}>
+                            <span className="progetto-documento-icona" aria-hidden="true">PDF</span>
+                            <span className="progetto-documento-nome">{a.nome_file || "Documento"}</span>
+                            <span className="progetto-documento-apri">Apri ↗</span>
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </section>
         </div>
       )}
