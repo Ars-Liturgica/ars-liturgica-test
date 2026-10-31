@@ -5,6 +5,27 @@ const euro = (n) => new Intl.NumberFormat("it-IT", { style: "currency", currency
 const card = { background: "#fffdf9", border: "1px solid #e5d9ca", borderRadius: 16, padding: 24, boxShadow: "0 4px 16px rgba(60,42,27,.05)" };
 const button = { border: "1px solid #cbb59c", borderRadius: 10, background: "#fffdf9", padding: "11px 16px", color: "#62452e", cursor: "pointer", fontSize: 16 };
 
+function ContatoreOfferte({ iniziativa }) {
+  if (!iniziativa?.mostra_contatore) return null;
+  // Il backend attuale espone "raccolto", ma non un totale separato delle promesse.
+  // Non inventiamo importi: finché il nuovo campo non esiste, mostriamo "Da collegare".
+  const incassato = Number(iniziativa.raccolto) || 0;
+  const dichiaratoRaw = iniziativa.offerte_dichiarate ?? iniziativa.totale_dichiarato;
+  const dichiarato = dichiaratoRaw == null ? null : Number(dichiaratoRaw);
+  const obiettivo = Number(iniziativa.obiettivo) || 0;
+  const percentuale = obiettivo > 0 ? Math.max(0, Math.min(100, incassato / obiettivo * 100)) : 0;
+  const cifra = { fontSize: "clamp(1.3rem, 3vw, 2rem)", color: "#f2d28d", fontWeight: 700, overflowWrap: "anywhere" };
+  return <section aria-label="Contatore delle offerte" style={{ background: "#101d35", color: "#fff", padding: 22, borderRadius: 16, margin: "18px 0" }}>
+    <div style={{ color: "#e7c57c", textAlign: "center", fontSize: 14, letterSpacing: 1, marginBottom: 16 }}>INSIEME PER IL NOSTRO PROGETTO</div>
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 12 }}>
+      <div style={{ background: "#233653", padding: 16, borderRadius: 12, textAlign: "center" }}><div>Offerte dichiarate</div><div style={cifra}>{dichiarato != null && Number.isFinite(dichiarato) ? euro(dichiarato) : "Da collegare"}</div></div>
+      <div style={{ background: "#233653", padding: 16, borderRadius: 12, textAlign: "center" }}><div>Somme incassate</div><div style={cifra}>{euro(incassato)}</div></div>
+    </div>
+    {obiettivo > 0 && <><div style={{ display: "flex", justifyContent: "space-between", gap: 12, marginTop: 20, color: "#e7c57c" }}><span>Avanzamento effettivo</span><strong>{percentuale.toLocaleString("it-IT", { maximumFractionDigits: 1 })}%</strong></div><div role="progressbar" aria-valuenow={percentuale} aria-valuemin={0} aria-valuemax={100} aria-label="Avanzamento incassi" style={{ background: "#33445e", borderRadius: 12, height: 14, marginTop: 8, overflow: "hidden" }}><div style={{ width: `${percentuale}%`, height: "100%", background: "#d6ac57" }} /></div><div style={{ marginTop: 8, fontSize: 13, color: "#c5d3ea" }}>Obiettivo: {euro(obiettivo)}</div></>}
+    <p style={{ textAlign: "center", color: "#f2d28d", marginBottom: 0 }}>Anche il tuo contributo può fare la differenza</p>
+  </section>;
+}
+
 export default function ProgettiDonazioniFedele({ parrocchiaId, tornaDashboard }) {
   const [sezione, setSezione] = useState("progetto");
   const [progetti, setProgetti] = useState([]);
@@ -50,17 +71,14 @@ export default function ProgettiDonazioniFedele({ parrocchiaId, tornaDashboard }
             <p style={{ color: "#79512d", letterSpacing: 1, fontSize: 13 }}>INIZIATIVA DELLA PARROCCHIA</p>
             <h2 style={{ fontSize: "clamp(1.4rem, 3vw, 2rem)", margin: "12px 0" }}>{p.titolo}</h2>
             <p style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere", lineHeight: 1.6 }}>{p.descrizione}</p>
-            {p.mostra_contatore && <p>Offerte raccolte: <strong>{euro(p.raccolto)}</strong> · Obiettivo: {euro(p.obiettivo)}</p>}
+            <ContatoreOfferte iniziativa={p} />
             <button type="button" style={button} onClick={() => setAttivo(p)}>Scopri il progetto</button>
-          </article>)}
+          </article>) }
         </div>)}
         {attivo && <article style={card}>
           <h2 style={{ fontSize: "clamp(1.5rem, 3vw, 2.2rem)", overflowWrap: "anywhere" }}>{attivo.titolo}</h2>
           <p style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere", lineHeight: 1.7 }}>{attivo.descrizione}</p>
-          {attivo.mostra_contatore && <div style={{ padding: 18, border: "1px solid #e5d9ca", borderRadius: 12 }}>
-            <strong>Offerte raccolte: {euro(attivo.raccolto)}</strong><p>Obiettivo: {euro(attivo.obiettivo)}</p>
-            <progress value={Math.max(0, Math.min(100, Number(attivo.percentuale) || 0))} max="100" style={{ width: "100%" }} />
-          </div>}
+          <ContatoreOfferte iniziativa={attivo} />
           <p style={{ marginTop: 22, color: "#79512d" }}>Per consultare fotografie e documenti, apri questo progetto dalla Bacheca Avvisi. La funzione di pagamento sarà collegata dopo la verifica del sistema condiviso.</p>
         </article>}
       </div>
