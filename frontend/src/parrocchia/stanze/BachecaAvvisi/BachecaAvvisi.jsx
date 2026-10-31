@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import "./BachecaAvvisi.css";
 import NuovoAvviso from "./NuovoAvviso";
-import { supabase } from "../../supabaseClient";
+import { supabase } from "../../../supabaseClient";
 import { leggiDocumentiInArchivio } from "../../motoreDocumentale/MotoreDocumentale";
 
 function formattaData(data) {
