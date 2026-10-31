@@ -745,3 +745,88 @@
   .bacheca-avvisi .scheda-avviso { padding: 20px; }
   .bacheca-avvisi .scheda-avviso h3 { font-size: 1.35rem; }
 }
+/* Dettaglio dei progetti: sobrietà, leggibilità, allegati ordinati */
+.bacheca-avvisi #titolo-progetto-aperto {
+  font-size: clamp(1.55rem, 3vw, 2.05rem);
+  line-height: 1.3;
+  margin-bottom: 22px;
+  overflow-wrap: break-word;
+  word-break: normal;
+}
+.bacheca-avvisi .progetto-allegati { margin-top: 28px; }
+.bacheca-avvisi .progetto-allegati > h3 {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 1.35rem;
+  color: #46382c;
+  margin: 0 0 20px;
+}
+.bacheca-avvisi .progetto-gruppo-allegati + .progetto-gruppo-allegati { margin-top: 26px; }
+.bacheca-avvisi .progetto-gruppo-allegati h4 {
+  color: #79512d;
+  font-size: .95rem;
+  font-weight: 700;
+  margin: 0 0 12px;
+}
+.bacheca-avvisi .progetto-griglia-foto {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 160px), 1fr));
+  gap: 14px;
+}
+.bacheca-avvisi .progetto-foto {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+  text-decoration: none;
+  color: #79512d;
+  font-size: .88rem;
+}
+.bacheca-avvisi .progetto-foto img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: contain;
+  box-sizing: border-box;
+  padding: 8px;
+  border: 1px solid #e5d9ca;
+  border-radius: 10px;
+  background: #fffdf9;
+}
+.bacheca-avvisi .progetto-foto span { text-align: center; }
+.bacheca-avvisi .progetto-foto:hover span,
+.bacheca-avvisi .progetto-documento:hover .progetto-documento-apri { text-decoration: underline; }
+.bacheca-avvisi .progetto-elenco-documenti { display: grid; gap: 9px; }
+.bacheca-avvisi .progetto-documento {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  min-width: 0;
+  padding: 13px 15px;
+  border: 1px solid #e5d9ca;
+  border-radius: 10px;
+  background: #fffdf9;
+  color: #46382c;
+  text-decoration: none;
+}
+.bacheca-avvisi .progetto-documento-icona {
+  flex-shrink: 0;
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .03em;
+  color: #79512d;
+  border: 1px solid #c9ae8d;
+  border-radius: 5px;
+  padding: 6px;
+}
+.bacheca-avvisi .progetto-documento-nome {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bacheca-avvisi .progetto-documento-apri { flex-shrink: 0; color: #79512d; font-weight: 700; }
+@media (max-width: 700px) {
+  .bacheca-avvisi .progetto-griglia-foto { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .bacheca-avvisi .progetto-documento { padding: 11px; gap: 9px; }
+}
