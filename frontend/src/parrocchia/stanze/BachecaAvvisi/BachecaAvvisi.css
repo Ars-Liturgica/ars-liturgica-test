@@ -642,3 +642,106 @@
     padding: 44px 22px 20px;
   }
 }
+
+/* =========================================================
+   SCHEDE BACHECA E PROGETTI — ELEGANZA E SEMPLICITÀ
+   ========================================================= */
+.bacheca-avvisi .bacheca-sezione-avvisi,
+.bacheca-avvisi .bacheca-contenitore {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.bacheca-avvisi .elenco-avvisi {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
+  justify-content: stretch;
+  align-items: stretch;
+  gap: 20px;
+  min-height: 0;
+}
+
+.bacheca-avvisi .scheda-avviso {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: none;
+  min-width: 0;
+  box-sizing: border-box;
+  padding: 24px 28px;
+  border: 1px solid #e5d9ca;
+  border-radius: 14px;
+  background: #fffdf9;
+  box-shadow: 0 3px 12px rgba(60, 42, 27, .06);
+  color: #38291f;
+  cursor: pointer;
+  overflow: hidden;
+  overflow-wrap: break-word;
+  transition: box-shadow .18s ease, transform .18s ease;
+}
+
+.bacheca-avvisi .scheda-avviso:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 7px 18px rgba(60, 42, 27, .11);
+}
+
+.bacheca-avvisi .scheda-avviso:focus-visible {
+  outline: 3px solid #b78b42;
+  outline-offset: 3px;
+}
+
+.bacheca-avvisi .scheda-avviso-corpo {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+}
+
+.bacheca-avvisi .scheda-avviso h3 {
+  margin: 7px 0 14px;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.3rem, 2vw, 1.65rem);
+  font-weight: 600;
+  line-height: 1.3;
+  color: #38291f;
+  overflow-wrap: break-word;
+  word-break: normal;
+  hyphens: auto;
+}
+
+.bacheca-avvisi .scheda-avviso-corpo > p:not(.categoria-avviso-bacheca) {
+  margin: 0 0 18px;
+  color: #55483d;
+  font-size: 1rem;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.bacheca-avvisi .scheda-avviso-data {
+  color: #78695b;
+  font-size: .88rem;
+  margin-bottom: 10px;
+}
+
+.bacheca-avvisi .scheda-avviso-fondo {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 15px;
+  border-top: 1px solid #eee5d8;
+  font-size: .9rem;
+  color: #78695b;
+}
+
+.bacheca-avvisi .scheda-avviso-fondo strong { color: #79512d; }
+
+@media (max-width: 700px) {
+  .bacheca-avvisi .elenco-avvisi { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .bacheca-avvisi .scheda-avviso { padding: 20px; }
+  .bacheca-avvisi .scheda-avviso h3 { font-size: 1.35rem; }
+}
