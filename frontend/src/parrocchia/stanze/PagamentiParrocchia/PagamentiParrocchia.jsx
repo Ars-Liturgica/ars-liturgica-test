@@ -362,7 +362,46 @@ function QuoteAttivita({ parrocchiaId, tornaDashboard, nomeParrocchia, attivitaI
 }
 
 const STILI_QUOTE = `
-  .quote-attivita{color:#173955}.quote-attivita .qa-tabella table,.quote-attivita .qa-tabella th,.quote-attivita .qa-tabella td,.quote-attivita .qa-tabella td strong,.quote-attivita .qa-tabella td small{color:#173955!important}.qa-filtri{display:flex;flex-wrap:wrap;gap:14px;align-items:end;margin:20px 0}.quote-attivita label{display:flex;flex-direction:column;gap:6px}.quote-attivita input,.quote-attivita select,.quote-attivita textarea{padding:10px;border:1px solid #d6c8b4;border-radius:8px;font:inherit;background:#fff;max-width:100%;box-sizing:border-box}.quote-attivita button{padding:10px 14px;border:1px solid #c99536;border-radius:8px;background:#fffaf0;color:#173955;font:inherit;cursor:pointer}.quote-attivita button:disabled{opacity:.55;cursor:default}.quote-attivita .qa-check{flex-direction:row;align-items:center;padding-bottom:10px}.qa-totali{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin:20px 0}.qa-totali article{background:#fffdf9;border:1px solid #e5d9ca;border-radius:12px;padding:18px}.qa-totali span,.qa-totali strong{display:block}.qa-totali strong{font-size:24px;margin-top:8px}.qa-tabella{overflow:auto}.qa-tabella table{width:100%;border-collapse:collapse}.qa-tabella th,.qa-tabella td{text-align:left;vertical-align:top;padding:12px 10px;border-bottom:1px solid #e5d9ca}.qa-tabella th{background:#f6f0e5}.qa-tabella small{display:block;margin-top:5px}.qa-famiglia{background:#faf5eb;font-weight:600}.qa-pannello{background:#fffdf9;border:1px solid #c99536;border-radius:14px;padding:22px;margin-top:24px}.qa-pannello fieldset{border:0;margin:0;padding:0}.qa-pannello textarea{width:100%}@media print{.azioni-non-stampabili{display:none!important}}
+  .quote-attivita{color:#173955}.quote-attivita .qa-tabella table,.quote-attivita .qa-tabella th,.quote-attivita .qa-tabella td,.quote-attivita .qa-tabella td strong,.quote-attivita .qa-tabella td small{color:#173955!important}.qa-filtri{display:flex;flex-wrap:wrap;gap:14px;align-items:end;margin:20px 0}.quote-attivita label{display:flex;flex-direction:column;gap:6px}.quote-attivita input,.quote-attivita select,.quote-attivita textarea{padding:10px;border:1px solid #d6c8b4;border-radius:8px;font:inherit;background:#fff;max-width:100%;box-sizing:border-box}.quote-attivita button{padding:10px 14px;border:1px solid #c99536;border-radius:8px;background:#fffaf0;color:#173955;font:inherit;cursor:pointer}.quote-attivita button:disabled{opacity:.55;cursor:default}.quote-attivita .qa-check{flex-direction:row;align-items:center;padding-bottom:10px}.qa-totali{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin:20px 0}.qa-totali article{background:#fffdf9;border:1px solid #e5d9ca;border-radius:12px;padding:18px}.qa-totali span,.qa-totali strong{display:block}.qa-totali strong{font-size:24px;margin-top:8px}.qa-tabella{overflow:auto}.qa-tabella table{width:100%;border-collapse:collapse}.qa-tabella th,.qa-tabella td{text-align:left;vertical-align:top;padding:12px 10px;border-bottom:1px solid #e5d9ca}.qa-tabella th{background:#f6f0e5}.qa-tabella small{display:block;margin-top:5px}.qa-famiglia{background:#faf5eb;font-weight:600}.qa-pannello{background:#fffdf9;border:1px solid #c99536;border-radius:14px;padding:22px;margin-top:24px}.qa-pannello fieldset{border:0;margin:0;padding:0}.qa-pannello textarea{width:100%}
+/* Versamenti: schede leggibili senza scorrimento orizzontale su schermi stretti. */
+.ars-pagina-economica,.ars-bilancio{min-width:0;max-width:100%;box-sizing:border-box}
+.ars-versamenti-responsive{max-width:100%;min-width:0}
+.ars-versamenti-responsive td{overflow-wrap:anywhere}
+.ars-versamenti-responsive button{white-space:nowrap}
+@media(max-width:1250px){
+  .ars-versamenti-responsive{overflow:visible}
+  .ars-versamenti-responsive table,.ars-versamenti-responsive tbody{display:block;width:100%}
+  .ars-versamenti-responsive thead{display:none}
+  .ars-versamenti-responsive tbody tr{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 18px;margin:0 0 16px;padding:12px 16px;border:1px solid #dfd2bd;border-radius:12px;background:#fffdf9;box-shadow:0 2px 7px #1739550d}
+  .ars-versamenti-responsive tbody tr:nth-child(even){background:#fffaf0}
+  .ars-versamenti-responsive tbody td{display:flex;flex-direction:column;align-items:flex-start;gap:5px;min-width:0;padding:9px 0;border-bottom:1px solid #eee7db;overflow-wrap:anywhere}
+  .ars-versamenti-responsive tbody td::before{font-size:12px;font-weight:700;color:#687685;letter-spacing:.02em}
+  .ars-versamenti-causale tbody td:nth-child(1)::before,.ars-versamenti-attivita tbody td:nth-child(1)::before{content:"Data"}
+  .ars-versamenti-causale tbody td:nth-child(2)::before{content:"Causale"}
+  .ars-versamenti-causale tbody td:nth-child(3)::before{content:"Pagante"}
+  .ars-versamenti-causale tbody td:nth-child(4)::before{content:"Partecipante"}
+  .ars-versamenti-causale tbody td:nth-child(5)::before{content:"Descrizione"}
+  .ars-versamenti-causale tbody td:nth-child(6)::before{content:"Metodo"}
+  .ars-versamenti-causale tbody td:nth-child(7)::before{content:"Stato"}
+  .ars-versamenti-causale tbody td:nth-child(8)::before{content:"Importo"}
+  .ars-versamenti-causale tbody td:nth-child(9)::before{content:"Ricevuta"}
+  .ars-versamenti-causale tbody td:nth-child(10)::before{content:"Storno"}
+  .ars-versamenti-attivita tbody td:nth-child(2)::before{content:"Pagante"}
+  .ars-versamenti-attivita tbody td:nth-child(3)::before{content:"Partecipante"}
+  .ars-versamenti-attivita tbody td:nth-child(4)::before{content:"Causale"}
+  .ars-versamenti-attivita tbody td:nth-child(5)::before{content:"Attività"}
+  .ars-versamenti-attivita tbody td:nth-child(6)::before{content:"Metodo"}
+  .ars-versamenti-attivita tbody td:nth-child(7)::before{content:"Stato"}
+  .ars-versamenti-attivita tbody td:nth-child(8)::before{content:"Importo"}
+  .ars-versamenti-attivita tbody td:nth-child(9)::before{content:"Storno"}
+  .ars-versamenti-responsive tbody td:last-child{border-bottom:0}
+}
+@media(max-width:650px){
+  .ars-versamenti-responsive tbody tr{grid-template-columns:minmax(0,1fr)}
+  .ars-versamenti-responsive tbody td{padding:8px 0}
+}
+
+@media print{.azioni-non-stampabili{display:none!important}}
 `;
 
 const FILTRI_INIZIALI = {
@@ -453,7 +492,7 @@ function righeBilancio(movimenti, spese) {
       key: `storno:${p.id}`, data: p.data_storno_mancato_incasso || p.data,
       giorno: new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Rome" }).format(new Date(p.data_storno_mancato_incasso || p.data)),
       iniziativa: nomeIniziativa(p), tipo: "Storno mancato incasso",
-      causale: `Storno del pagamento ${p.id} · ${p.causale || "—"}`,
+      causale: `Storno mancato incasso — ${p.causale || "Pagamento registrato"}`,
       entrata: null, uscita: p.importo, valuta: p.valuta, metodo: "—",
     })),
     ...spese.map(s => ({ key: `spesa:${s.id}`, giorno: s.data.slice(0,10), data: s.data,
@@ -764,7 +803,7 @@ function RegistroMovimenti({ parrocchiaId, tornaDashboard, nomeParrocchia, attiv
       <h3>Spese · dettagli amministrativi</h3>
       {!spese.length ? <p>Nessuna spesa registrata per la selezione.</p> : <div className="ars-economia-tabella"><table><thead><tr><th>Data</th><th>Attività</th><th>Descrizione</th><th>Importo</th><th>Note private</th></tr></thead><tbody>{spese.map(s => <tr key={s.id}><td>{dataBreve(s.data)}</td><td>{s.titolo_attivita}</td><td>{s.descrizione}</td><td>{formattaImporto(s.importo,s.valuta)}</td><td>{s.note_private || "—"}</td></tr>)}</tbody></table></div>}
       <h3>Versamenti · stato delle registrazioni</h3>
-      {!movimenti.length ? <p>Nessun pagamento registrato per la selezione.</p> : <div className="ars-economia-tabella"><table><thead><tr><th>Data</th><th>Pagante</th><th>Partecipante</th><th>Causale</th><th>Attività</th><th>Metodo</th><th>Stato</th><th>Importo</th><th>Azioni</th></tr></thead><tbody>{movimenti.map(p => <tr key={p.id}><td>{formattaData(p.data)}</td><td>{p.pagante || "—"}</td><td>{p.partecipante || "—"}</td><td>{p.causale || "—"}</td><td>{p.attivita?.titolo || "—"}</td><td>{metodoIncasso(p)}</td><td>{etichettaStato(p.stato)}</td><td>{formattaImporto(p.importo,p.valuta)}</td><td>{["completata", "in_attesa"].includes(p.stato) && !p.stornato_mancato_incasso ? <button type="button" disabled={salvataggio} onClick={() => stornaPagamento(p)}>Storna</button> : p.stornato_mancato_incasso ? "Stornato" : "—"}</td></tr>)}</tbody></table></div>}
+      {!movimenti.length ? <p>Nessun pagamento registrato per la selezione.</p> : <div className="ars-economia-tabella ars-versamenti-responsive ars-versamenti-attivita"><table><thead><tr><th>Data</th><th>Pagante</th><th>Partecipante</th><th>Causale</th><th>Attività</th><th>Metodo</th><th>Stato</th><th>Importo</th><th>Azioni</th></tr></thead><tbody>{movimenti.map(p => <tr key={p.id}><td>{formattaData(p.data)}</td><td>{p.pagante || "—"}</td><td>{p.partecipante || "—"}</td><td>{p.causale || "—"}</td><td>{p.attivita?.titolo || "—"}</td><td>{metodoIncasso(p)}</td><td>{etichettaStato(p.stato)}</td><td>{formattaImporto(p.importo,p.valuta)}</td><td>{["completata", "in_attesa"].includes(p.stato) && !p.stornato_mancato_incasso ? <button type="button" disabled={salvataggio} onClick={() => stornaPagamento(p)}>Storna</button> : p.stornato_mancato_incasso ? "Stornato" : "—"}</td></tr>)}</tbody></table></div>}
       </>}
     </>}
   </main>;
@@ -795,6 +834,23 @@ const STILI_ECONOMIA = `
 .ars-economia-tabella th{background:#173955!important;color:#fff!important}
 .ars-economia-tabella th,.ars-economia-tabella td{padding:12px 10px;text-align:left;vertical-align:top;border-bottom:1px solid #e5d9ca}
 .ars-economia-tabella tbody tr:nth-child(even){background:#faf5eb}
+/* Pulsanti del registro versamenti: compatti, leggibili e in colonne separate. */
+.ars-bilancio .ars-versamenti-causale tbody td:nth-child(9) button,
+.ars-bilancio .ars-versamenti-causale tbody td:nth-child(10) button,
+.ars-bilancio .ars-versamenti-attivita tbody td:nth-child(9) button{
+  padding:5px 8px;
+  min-height:30px;
+  min-width:0;
+  width:auto;
+  font-size:inherit;
+  line-height:1.2;
+  white-space:nowrap;
+}
+.ars-bilancio .ars-versamenti-causale th:nth-child(9),
+.ars-bilancio .ars-versamenti-causale td:nth-child(9),
+.ars-bilancio .ars-versamenti-causale th:nth-child(10),
+.ars-bilancio .ars-versamenti-causale td:nth-child(10){padding-left:5px;padding-right:5px;}
+
 .ars-spesa-pannello{padding:22px;border:1px solid #c99536;border-radius:14px;background:#fffdf9;margin:24px 0}
 .ars-conferma-incasso{flex-direction:row!important;align-items:center;gap:10px!important}.ars-conferma-incasso input{width:auto!important}
 .ars-spesa-pannello fieldset{border:0;padding:0;margin:0;min-width:0}
@@ -1039,7 +1095,7 @@ function EconomiaPerCausale({ parrocchiaId, tornaDashboard, nomeParrocchia, moda
         <div className="ars-economia-azioni"><label>Stato<select value={filtri.stato} onChange={e=>setFiltri({...filtri,stato:e.target.value})}><option value="">Tutti gli stati</option>{["completata","in_attesa","fallita","annullata","rimborsata"].map(id=><option key={id} value={id}>{etichettaStato(id)}</option>)}</select></label><label>Cerca<input value={filtri.ricerca} onChange={e=>setFiltri({...filtri,ricerca:e.target.value})} placeholder="Pagante, partecipante o descrizione"/></label></div>
         <p>{versamentiVisibili.length} versamenti nella selezione.</p>
         {[...new Set(versamentiVisibili.map(p=>p.valuta||"EUR"))].map(valuta=><p key={valuta}><strong>Pagamenti registrati: {formattaImporto(versamentiVisibili.filter(p=>p.valuta===valuta&&["completata","in_attesa"].includes(p.stato)).reduce((t,p)=>t+Math.round(numero(p.importo)*100),0)/100,valuta)}</strong></p>)}
-        {!versamentiVisibili.length?<p>Nessun versamento per i filtri scelti.</p>:<div className="ars-economia-tabella"><table><thead><tr><th>Data</th><th>Causale</th><th>Pagante</th><th>Partecipante</th><th>Descrizione</th><th>Metodo</th><th>Stato</th><th>Importo</th><th>Ricevuta</th><th>Azioni</th></tr></thead><tbody>{versamentiVisibili.map(p=><tr key={p.id}><td>{formattaData(p.data)}</td><td>{causaleMovimento(p)}</td><td>{p.pagante||"—"}</td><td>{p.partecipante||"—"}</td><td>{p.causale||"—"}</td><td>{metodoIncasso(p)}</td><td>{etichettaStato(p.stato)}</td><td>{formattaImporto(p.importo,p.valuta)}</td><td>{p.stato === "completata" ? <button type="button" disabled={!!stampaInCorso} onClick={() => ristampaRicevuta(p)}>{stampaInCorso === p.id ? "Apertura…" : "Stampa"}</button> : "—"}</td><td>{["completata", "in_attesa"].includes(p.stato) && !p.stornato_mancato_incasso ? <button type="button" disabled={salvataggio} onClick={() => stornaPagamento(p)}>Storna</button> : p.stornato_mancato_incasso ? "Stornato" : "—"}</td></tr>)}</tbody></table></div>}
+        {!versamentiVisibili.length?<p>Nessun versamento per i filtri scelti.</p>:<div className="ars-economia-tabella ars-versamenti-responsive ars-versamenti-causale"><table><thead><tr><th>Data</th><th>Causale</th><th>Pagante</th><th>Partecipante</th><th>Descrizione</th><th>Metodo</th><th>Stato</th><th>Importo</th><th>Ricevuta</th><th>Azioni</th></tr></thead><tbody>{versamentiVisibili.map(p=><tr key={p.id}><td>{formattaData(p.data)}</td><td>{causaleMovimento(p)}</td><td>{p.pagante||"—"}</td><td>{p.partecipante||"—"}</td><td>{p.causale||"—"}</td><td>{metodoIncasso(p)}</td><td>{etichettaStato(p.stato)}</td><td>{formattaImporto(p.importo,p.valuta)}</td><td>{p.stato === "completata" ? <button type="button" disabled={!!stampaInCorso} onClick={() => ristampaRicevuta(p)}>{stampaInCorso === p.id ? "Apertura…" : "Stampa"}</button> : "—"}</td><td>{["completata", "in_attesa"].includes(p.stato) && !p.stornato_mancato_incasso ? <button type="button" disabled={salvataggio} onClick={() => stornaPagamento(p)}>Storna</button> : p.stornato_mancato_incasso ? "Stornato" : "—"}</td></tr>)}</tbody></table></div>}
       </>}
     </>}
   </main>;
