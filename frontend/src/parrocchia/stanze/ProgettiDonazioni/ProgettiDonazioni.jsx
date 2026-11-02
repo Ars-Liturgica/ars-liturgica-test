@@ -57,6 +57,7 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
   const [erroreDonazioni, setErroreDonazioni] = useState("");
   const [caricamentoDonazioni, setCaricamentoDonazioni] = useState(false);
   const [iniziativa, setIniziativa] = useState(null);
+  const [propostaDaEliminare, setPropostaDaEliminare] = useState(null);
   const [incasso, setIncasso] = useState(null);
   const [operazione, setOperazione] = useState(false);
   const [filtro, setFiltro] = useState("tutti");
@@ -142,17 +143,18 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
     if (progetto?.id) leggiAllegati(progetto.id).catch(e => setErroreOperazione(e.message));
   }
   async function eliminaProposta() {
-    if (operazione || !iniziativa?.id || iniziativa.tipo_iniziativa !== "donazione") return;
-    if (!window.confirm(`Eliminare definitivamente la proposta «${iniziativa.titolo}»?`)) return;
+    if (operazione || !propostaDaEliminare?.id || propostaDaEliminare.tipo_iniziativa !== "donazione") return;
+    const proposta = propostaDaEliminare;
     setOperazione(true);
     setErroreOperazione("");
     try {
       const { error } = await supabase.rpc("ars_elimina_proposta_donazione", {
         p_parrocchia_id: parrocchiaId,
-        p_proposta_id: iniziativa.id,
+        p_proposta_id: proposta.id,
       });
       if (error) throw error;
-      setIniziativa(null);
+      setPropostaDaEliminare(null);
+      setIniziativa(v => v?.id === proposta.id ? null : v);
       setMessaggio("Proposta eliminata correttamente.");
       await caricaDati();
     } catch (e) {
@@ -483,10 +485,25 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
               <p style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{p.descrizione}</p>
               <small>Stato: {p.stato === "pubblicato" ? "Pubblicata" : p.stato === "bozza" ? "Bozza" : p.stato}</small>
             </div>
-            <button type="button" style={stilePulsanteSecondario} onClick={() => apriIniziativa("donazione", p)}>Modifica</button>
+            <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "flex-start" }}>
+              <button type="button" style={stilePulsanteSecondario} onClick={() => apriIniziativa("donazione", p)}>Modifica</button>
+              <button type="button" style={{ ...stilePulsanteSecondario, color: "#9b2833", borderColor: "#d9a6aa" }}
+                disabled={operazione} onClick={() => { setErroreOperazione(""); setPropostaDaEliminare(p); }}>Elimina proposta</button>
+            </div>
           </div>
         </article>)}
       </section>}
+      {sezione === "donazioni" && propostaDaEliminare && <div role="presentation" style={{ position: "fixed", inset: 0, background: "rgba(19, 37, 50, 0.56)", zIndex: 9999, display: "flex", justifyContent: "center", alignItems: "center", padding: 16 }}>
+        <div role="dialog" aria-modal="true" aria-labelledby="ars-conferma-elimina-titolo" style={{ background: "#fffaf1", border: "1px solid #ddc89d", borderRadius: 16, padding: 26, width: "100%", maxWidth: 440, boxShadow: "0 18px 50px rgba(0,0,0,.22)", boxSizing: "border-box" }}>
+          <h3 id="ars-conferma-elimina-titolo" style={{ color: "#24394a", marginTop: 0 }}>Conferma cancellazione</h3>
+          <p style={{ overflowWrap: "anywhere" }}>Confermi la cancellazione della proposta <strong>«{propostaDaEliminare.titolo}»</strong>?</p>
+          {erroreOperazione && <p role="alert" style={{ color: "#9b2833" }}>{erroreOperazione}</p>}
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "flex-end", marginTop: 22 }}>
+            <button type="button" style={stilePulsanteSecondario} disabled={operazione} onClick={() => { setPropostaDaEliminare(null); setErroreOperazione(""); }}>Annulla</button>
+            <button type="button" style={{ ...stilePulsante, background: "#9b2833", borderColor: "#9b2833" }} disabled={operazione} onClick={eliminaProposta}>{operazione ? "Eliminazione..." : "Conferma cancellazione"}</button>
+          </div>
+        </div>
+      </div>}
       {iniziativa && <form onSubmit={salvaIniziativa} style={{ ...stileScheda, background: "#fffaf1" }}>
         <h3>{iniziativa.id ? "Modifica" : "Nuova"} {iniziativa.tipo_iniziativa === "donazione" ? "proposta di donazione" : iniziativa.tipo_iniziativa === "raccolta" ? "raccolta fondi" : "progetto"}</h3>
         {erroreOperazione && <p role="alert" style={{ color: "#a32232" }}>{erroreOperazione}</p>}
@@ -540,9 +557,6 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
           {iniziativa.tipo_iniziativa !== "donazione" && <button type="button" style={stilePulsanteSecondario} onClick={() => apriStampa(iniziativa, true)}>Anteprima volantino</button>}
           <button type="submit" style={stilePulsanteSecondario} disabled={operazione || caricamentoFile}>{operazione || caricamentoFile ? "Salvataggio..." : iniziativa.stato === "pubblicato" ? "Salva modifiche" : "Salva bozza"}</button>
           {iniziativa.stato !== "pubblicato" && <button type="button" style={stilePulsante} disabled={operazione || caricamentoFile} onClick={e => salvaIniziativa(e, true)}>{iniziativa.tipo_iniziativa === "donazione" ? "Pubblica proposta" : iniziativa.tipo_iniziativa === "raccolta" ? "Pubblica raccolta" : "Pubblica progetto"}</button>}
-          {iniziativa.tipo_iniziativa === "donazione" && iniziativa.id && <button type="button"
-            style={{ ...stilePulsanteSecondario, color: "#9b2833", borderColor: "#d9a6aa" }}
-            disabled={operazione || caricamentoFile} onClick={eliminaProposta}>Elimina proposta</button>}
           <button type="button" style={stilePulsanteSecondario} onClick={() => { setIniziativa(null); setStampa(null); }}>Annulla</button>
         </div>
       </form>}
