@@ -149,12 +149,12 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
       const args = {
         p_parrocchia_id: parrocchiaId, p_id: iniziativa.id || null,
         p_titolo: iniziativa.titolo.trim(), p_descrizione: iniziativa.descrizione.trim() || null,
-        p_obiettivo: iniziativa.obiettivo === "" || iniziativa.obiettivo == null ? null : Number(iniziativa.obiettivo),
+        p_obiettivo: iniziativa.tipo_iniziativa === "donazione" || iniziativa.obiettivo === "" || iniziativa.obiettivo == null ? null : Number(iniziativa.obiettivo),
         p_valuta: iniziativa.valuta, p_data_inizio: iniziativa.data_inizio,
         p_data_fine: iniziativa.data_fine || null, p_stato: statoDaSalvare,
         p_immagine_url: (iniziativa.immagine_url || "").trim() || null,
         p_tipo_iniziativa: iniziativa.tipo_iniziativa,
-        p_mostra_contatore: Boolean(iniziativa.mostra_contatore),
+        p_mostra_contatore: iniziativa.tipo_iniziativa === "donazione" ? false : Boolean(iniziativa.mostra_contatore),
       };
       const { data, error } = await supabase.rpc("ars_salva_iniziativa_completa", args);
       if (error) throw error;
@@ -244,31 +244,6 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
     caricaDati();
   }, [caricaDati, sezioneIniziale]);
 
-  const caricaDonazioniLibere = useCallback(async () => {
-    if (!parrocchiaId) return;
-    setCaricamentoDonazioni(true);
-    setErroreDonazioni("");
-    const { data, error } = await supabase
-      .from("pagamenti_parrocchia")
-      .select("id, data_offerta, importo, valuta, stato, causale_descrizione")
-      .eq("parrocchia_id", parrocchiaId)
-      .eq("causale_tipo", "donazione_libera")
-      .eq("stato", "completata")
-      .order("data_offerta", { ascending: false })
-      .limit(100);
-    if (error) {
-      setErroreDonazioni("Impossibile leggere le donazioni: " + error.message);
-      setDonazioniLibere([]);
-    } else {
-      setDonazioniLibere(data || []);
-    }
-    setCaricamentoDonazioni(false);
-  }, [parrocchiaId]);
-
-  useEffect(() => {
-    if (sezione === "donazioni") caricaDonazioniLibere();
-  }, [sezione, caricaDonazioniLibere]);
-
   function apriMetodo(metodo) {
     setModulo({ ...nuovoMetodo(metodo.tipo), ...metodo });
     setErroreModulo(""); setMessaggio("");
@@ -348,7 +323,7 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
       <button type="button" style={stileCartella} onClick={() => { setSezione("raccolte"); setIncasso(null); setIniziativa(null); setFiltro("tutti"); }}>
         <span><span aria-hidden="true">🤲 </span><strong>Raccolte fondi</strong><br /><small>Iniziative autonome con finalità specifiche</small></span><span aria-hidden="true">›</span>
       </button>
-      <button type="button" style={stileCartella} onClick={() => { setSezione("donazioni"); setIncasso(null); setIniziativa(null); }}>
+      <button type="button" style={stileCartella} onClick={() => { setSezione("donazioni"); setIncasso(null); setIniziativa(null); setFiltro("tutti"); }}>
         <span><span aria-hidden="true">❤️ </span><strong>Donazioni</strong><br /><small>Offerte libere e ringraziamenti alla comunità</small></span><span aria-hidden="true">›</span>
       </button>
     </nav>}
@@ -466,28 +441,40 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
           </div>
         </article>)}
       </section>}
-      {sezione === "donazioni" && <section style={stileScheda}>
-        <h3>Donazioni libere</h3>
-        <p>Grazie a chi sostiene la vita della comunità. Le offerte non sono collegate a progetti o attività.</p>
-        <button type="button" style={stilePulsante} onClick={() => apriIncasso(null)} disabled={operazione}>+ Registra donazione</button>
-        <h4>Ultime donazioni incassate</h4>
-        <button type="button" style={stilePulsanteSecondario} onClick={caricaDonazioniLibere} disabled={caricamentoDonazioni}>Aggiorna elenco</button>
-        {caricamentoDonazioni && <p>Caricamento...</p>}
-        {erroreDonazioni && <p role="alert">{erroreDonazioni}</p>}
-        {!caricamentoDonazioni && !erroreDonazioni && donazioniLibere.length === 0 && <p>Nessuna donazione registrata.</p>}
-        {donazioniLibere.map(d => <article key={d.id} style={{ borderTop: "1px solid #e5d9ca", padding: "12px 0" }}>
-          <strong>{euro(d.importo, d.valuta)}</strong> · {dataIt(d.data_offerta)}<div>{d.causale_descrizione || "Donazione libera"}</div>
+      {sezione === "donazioni" && <section>
+        <div style={{ ...stileScheda, background: "#fffaf1" }}>
+          <h3>Proposte di donazione</h3>
+          <p>Invita i fedeli a sostenere liberamente la parrocchia. Ogni proposta pubblicata apparirà nella sezione Donazioni dei fedeli, senza obiettivi economici né contatori.</p>
+          <button type="button" style={stilePulsante} onClick={() => apriIniziativa("donazione")}>+ Nuova proposta di donazione</button>
+          <p style={{ fontSize: 13, color: "#52616c" }}>Le donazioni ricevute e le relative ricevute si consultano nel Bilancio generale.</p>
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, margin: "14px 0" }}>
+          {[["tutti", "Tutte"], ["bozza", "Bozze"], ["pubblicato", "Pubblicate"], ["chiuso", "Chiuse"], ["annullato", "Annullate"]].map(([v, l]) =>
+            <button key={v} type="button" style={filtro === v ? stilePulsante : stilePulsanteSecondario} onClick={() => setFiltro(v)}>{l}</button>
+          )}
+        </div>
+        {elencoFiltrato("donazione").length === 0 && <p>Nessuna proposta di donazione in questa categoria.</p>}
+        {elencoFiltrato("donazione").map(p => <article key={p.id} style={{ ...stileScheda, background: "#fffdf9" }}>
+          <div style={{ display: "flex", gap: 14, alignItems: "flex-start", flexWrap: "wrap" }}>
+            {p.immagine_url && <img src={p.immagine_url} alt="" style={{ width: 110, height: 90, objectFit: "cover", borderRadius: 8 }} />}
+            <div style={{ flex: "1 1 240px", minWidth: 0, overflowWrap: "anywhere" }}>
+              <strong style={{ fontSize: 18, color: "#24394a" }}>{p.titolo}</strong>
+              <p style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{p.descrizione}</p>
+              <small>Stato: {p.stato === "pubblicato" ? "Pubblicata" : p.stato === "bozza" ? "Bozza" : p.stato}</small>
+            </div>
+            <button type="button" style={stilePulsanteSecondario} onClick={() => apriIniziativa("donazione", p)}>Modifica</button>
+          </div>
         </article>)}
       </section>}
       {iniziativa && <form onSubmit={salvaIniziativa} style={{ ...stileScheda, background: "#fffaf1" }}>
-        <h3>{iniziativa.id ? "Modifica" : "Nuova"} {iniziativa.tipo_iniziativa === "raccolta" ? "raccolta fondi" : "progetto"}</h3>
+        <h3>{iniziativa.id ? "Modifica" : "Nuova"} {iniziativa.tipo_iniziativa === "donazione" ? "proposta di donazione" : iniziativa.tipo_iniziativa === "raccolta" ? "raccolta fondi" : "progetto"}</h3>
         {erroreOperazione && <p role="alert" style={{ color: "#a32232" }}>{erroreOperazione}</p>}
         {campoIniziativa("titolo", "Titolo", "text")}
         <label>Descrizione<textarea style={stileCampo} rows={4} value={iniziativa.descrizione || ""} onChange={e => setIniziativa(v => ({ ...v, descrizione: e.target.value }))} /></label>
-        {campoIniziativa("obiettivo", "Obiettivo economico in euro (facoltativo)", "number")}
-        {campoIniziativa("data_inizio", "Data di inizio", "date")}
-        {campoIniziativa("data_fine", "Data di fine (vuota = continuativa)", "date")}
-        <div style={{ background: "#fff", border: "1px solid #ddc89d", borderRadius: 12, padding: 18, margin: "14px 0", minHeight: 135 }}>
+        {iniziativa.tipo_iniziativa !== "donazione" && campoIniziativa("obiettivo", "Obiettivo economico in euro (facoltativo)", "number")}
+        {iniziativa.tipo_iniziativa !== "donazione" && campoIniziativa("data_inizio", "Data di inizio", "date")}
+        {iniziativa.tipo_iniziativa !== "donazione" && campoIniziativa("data_fine", "Data di fine (vuota = continuativa)", "date")}
+        {iniziativa.tipo_iniziativa !== "donazione" && <div style={{ background: "#fff", border: "1px solid #ddc89d", borderRadius: 12, padding: 18, margin: "14px 0", minHeight: 135 }}>
           <h4 style={{ marginTop: 0 }}>Fotografie e documenti del progetto</h4>
           <p style={{ fontSize: 13, color: "#52616c" }}>Fotografie JPG, PNG, WEBP e PDF (massimo 10 MB ciascuno).</p>
           <input ref={selettoreAllegati} type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple
@@ -520,18 +507,18 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
               <button type="button" style={{ ...stilePulsanteSecondario, display: "block", marginTop: 8, padding: "6px 9px" }} onClick={() => eliminaAllegato(a, iniziativa.id)}>Elimina</button>
             </div>)}
           </div>
-        </div>
+        </div>}
         <p><strong>Stato attuale:</strong> {iniziativa.stato === "pubblicato" ? "Pubblicato" : iniziativa.stato === "chiuso" ? "Chiuso" : iniziativa.stato === "annullato" ? "Annullato" : "Bozza"}</p>
         {iniziativa.id && <label style={{ display: "block", margin: "12px 0" }}>Gestione stato (facoltativa)
           <select style={stileCampo} value={iniziativa.stato} onChange={e => setIniziativa(v => ({ ...v, stato: e.target.value }))}>
             {[["bozza","Bozza"],["pubblicato","Pubblicato"],["chiuso","Chiuso"],["annullato","Annullato"]].map(([v,l]) => <option key={v} value={v}>{l}</option>)}
           </select>
         </label>}
-        <label><input type="checkbox" checked={Boolean(iniziativa.mostra_contatore)} onChange={e => setIniziativa(v => ({ ...v, mostra_contatore: e.target.checked }))} /> Mostra il contatore delle offerte ai fedeli</label>
+        {iniziativa.tipo_iniziativa !== "donazione" && <label><input type="checkbox" checked={Boolean(iniziativa.mostra_contatore)} onChange={e => setIniziativa(v => ({ ...v, mostra_contatore: e.target.checked }))} /> Mostra il contatore delle offerte ai fedeli</label>}
         <div style={{ display: "flex", gap: 10, marginTop: 20, flexWrap: "wrap" }}>
-          <button type="button" style={stilePulsanteSecondario} onClick={() => apriStampa(iniziativa, true)}>Anteprima volantino</button>
+          {iniziativa.tipo_iniziativa !== "donazione" && <button type="button" style={stilePulsanteSecondario} onClick={() => apriStampa(iniziativa, true)}>Anteprima volantino</button>}
           <button type="submit" style={stilePulsanteSecondario} disabled={operazione || caricamentoFile}>{operazione || caricamentoFile ? "Salvataggio..." : iniziativa.stato === "pubblicato" ? "Salva modifiche" : "Salva bozza"}</button>
-          {iniziativa.stato !== "pubblicato" && <button type="button" style={stilePulsante} disabled={operazione || caricamentoFile} onClick={e => salvaIniziativa(e, true)}>{iniziativa.tipo_iniziativa === "raccolta" ? "Pubblica raccolta" : "Pubblica progetto"}</button>}
+          {iniziativa.stato !== "pubblicato" && <button type="button" style={stilePulsante} disabled={operazione || caricamentoFile} onClick={e => salvaIniziativa(e, true)}>{iniziativa.tipo_iniziativa === "donazione" ? "Pubblica proposta" : iniziativa.tipo_iniziativa === "raccolta" ? "Pubblica raccolta" : "Pubblica progetto"}</button>}
           <button type="button" style={stilePulsanteSecondario} onClick={() => { setIniziativa(null); setStampa(null); }}>Annulla</button>
         </div>
       </form>}
