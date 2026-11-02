@@ -38,11 +38,12 @@ function IstruzioniMetodo({ metodo }) {
     {tipo === "paypal" && metodo.email_paypal && <p>PayPal: {metodo.email_paypal}</p>}
     {metodo.istruzioni && <p style={{ whiteSpace: "pre-wrap" }}>{metodo.istruzioni}</p>}
     {["paypal", "link_pagamento"].includes(tipo) && (url ? <p><a href={url} target="_blank" rel="noopener noreferrer" style={{ color: "#79512d", fontWeight: 700 }}>Apri il collegamento di pagamento ↗</a></p> : <p>Collegamento non disponibile: contatta la parrocchia per completare il versamento.</p>)}
-    <p style={{ fontSize: 13, color: "#655748" }}>La dichiarazione è registrata in attesa. L'apertura di un collegamento esterno non conferma automaticamente l'incasso.</p>
+    <p style={{ fontSize: 13, color: "#655748" }}>La registrazione dell’offerta non equivale alla conferma del versamento tramite il gestore esterno.</p>
   </div>;
 }
 
 function RiepilogoPagamento({ iniziativa, parrocchiaId, onRegistrata }) {
+  const donazione = iniziativa.tipo_iniziativa === "donazione";
   const [metodi, setMetodi] = useState([]);
   const [caricaMetodi, setCaricaMetodi] = useState(true);
   const [erroreMetodi, setErroreMetodi] = useState("");
@@ -75,10 +76,18 @@ function RiepilogoPagamento({ iniziativa, parrocchiaId, onRegistrata }) {
     if (!/^\d+(\.\d{1,2})?$/.test(testo) || Number(testo) <= 0) { setErrore("Inserisci un importo valido, con massimo due decimali."); return; }
     setInvio(true); setErrore("");
     try {
-      const { data, error } = await supabase.rpc("ars_dichiara_offerta_progetto", {
-        p_parrocchia_id: parrocchiaId, p_progetto_id: iniziativa.id, p_importo: Number(testo),
-        p_metodo: metodoRpc(metodo), p_pagante_nominativo: nominativo.trim() || null
-      });
+      const { data, error } = donazione
+        ? await supabase.rpc("ars_dichiara_donazione_libera", {
+            p_parrocchia_id: parrocchiaId,
+            p_proposta_id: iniziativa.donazioneSpontanea ? null : iniziativa.id,
+            p_importo: Number(testo),
+            p_metodo: metodoRpc(metodo),
+            p_pagante_nominativo: nominativo.trim() || null
+          })
+        : await supabase.rpc("ars_dichiara_offerta_progetto", {
+            p_parrocchia_id: parrocchiaId, p_progetto_id: iniziativa.id, p_importo: Number(testo),
+            p_metodo: metodoRpc(metodo), p_pagante_nominativo: nominativo.trim() || null
+          });
       if (error) throw error;
       if (!data?.successo || !data?.pagamento_id) throw new Error("La dichiarazione non è stata confermata.");
       setRegistrato({ id: data.pagamento_id, importo: Number(testo), metodo });
@@ -87,13 +96,13 @@ function RiepilogoPagamento({ iniziativa, parrocchiaId, onRegistrata }) {
     finally { setInvio(false); }
   }
   return <section style={{ ...card, marginTop: 20, background: "#f9f4e9" }} aria-label="Riepilogo e pagamento">
-    <h3 style={{ marginTop: 0, fontSize: "1.4rem" }}>❤️ Sostieni questo progetto</h3>
+    <h3 style={{ marginTop: 0, fontSize: "1.4rem" }}>{donazione ? "❤️ La tua donazione" : "❤️ Sostieni questo progetto"}</h3>
     <h4 style={{ margin: "0 0 14px", fontWeight: 400 }}>Riepilogo e pagamento</h4>
-    {registrato ? <div role="status"><p><strong>Offerta dichiarata correttamente.</strong></p><p>Importo: <strong>{euro(registrato.importo)}</strong></p><p>Stato: <strong>In attesa</strong></p><p>Riferimento: <code style={{ overflowWrap: "anywhere" }}>{registrato.id}</code></p><IstruzioniMetodo metodo={registrato.metodo} /><p style={{ fontSize: 13 }}>Per un'altra offerta, torna all'elenco e riapri il progetto.</p></div> : <form onSubmit={dichiara}>
+    {registrato ? <div role="status"><p><strong>Offerta dichiarata correttamente.</strong></p><p>Importo: <strong>{euro(registrato.importo)}</strong></p><p>Stato: <strong>{donazione ? "Registrata" : "In attesa"}</strong></p><p>Riferimento: <code style={{ overflowWrap: "anywhere" }}>{registrato.id}</code></p><IstruzioniMetodo metodo={registrato.metodo} /><p style={{ fontSize: 13 }}>Per un'altra offerta, torna all'elenco e riapri la scheda.</p></div> : <form onSubmit={dichiara}>
       <label style={{ display: "block", marginBottom: 12 }}>Importo dell'offerta (€)<input style={field} value={importo} onChange={e => setImporto(e.target.value)} inputMode="decimal" placeholder="Es. 25,00" required /></label>
       <label style={{ display: "block", marginBottom: 12 }}>Pagante (facoltativo)<input style={field} value={nominativo} onChange={e => setNominativo(e.target.value)} placeholder="Lascia vuoto per offerta anonima" /></label>
       {caricaMetodi ? <p>Caricamento metodi di pagamento…</p> : erroreMetodi ? <p role="alert">{erroreMetodi}</p> : metodi.length === 0 ? <p>Nessun metodo di pagamento attivo. Contatta la parrocchia.</p> : <label style={{ display: "block", marginBottom: 12 }}>Metodo di pagamento<select style={field} value={scelto} onChange={e => setScelto(e.target.value)}>{metodi.map(m => <option key={m.id} value={String(m.id)}>{nomeMetodo(m)}</option>)}</select></label>}
-      <p style={{ fontSize: 13, lineHeight: 1.5 }}>Confermando registri una dichiarazione di offerta. Le istruzioni per il versamento appariranno subito dopo. Non viene ancora addebitato alcun importo.</p>
+      <p style={{ fontSize: 13, lineHeight: 1.5 }}>Confermando registri l’offerta. Le istruzioni per il versamento appariranno subito dopo. L’eventuale pagamento esterno si completa separatamente.</p>
       {errore && <p role="alert" style={{ color: "#9d2828" }}>{errore}</p>}
       <button type="submit" disabled={invio || caricaMetodi || !metodo} style={{ ...button, background: "#79512d", color: "#fff", opacity: invio || !metodo ? .6 : 1 }}>{invio ? "Registrazione in corso…" : "Conferma l'offerta e prosegui"}</button>
     </form>}
@@ -115,6 +124,7 @@ export default function ProgettiDonazioniFedele({ parrocchiaId, tornaDashboard }
   }, [parrocchiaId]);
   useEffect(() => { setCaricamento(true); carica(); }, [carica]);
   const visibili = progetti.filter(p => p.tipo_iniziativa === sezione);
+  const donazioneSpontanea = { id: "donazione-spontanea", tipo_iniziativa: "donazione", donazioneSpontanea: true, titolo: "La tua donazione", descrizione: "Un gesto libero per sostenere la vita e le attività della nostra parrocchia. Grazie di cuore per il tuo contributo." };
   return <main style={{ minHeight: "100vh", background: "#f7f3ed", padding: "clamp(14px, 3vw, 28px) 12px", fontFamily: 'Georgia, "Times New Roman", serif', color: "#3e3328", boxSizing: "border-box" }}>
     <div style={{ maxWidth: 1100, margin: "0 auto", minWidth: 0 }}>
       <button type="button" style={button} onClick={attivo ? () => setAttivo(null) : tornaDashboard}>← {attivo ? "Torna alle iniziative" : "Torna alla Dashboard"}</button>
@@ -124,7 +134,24 @@ export default function ProgettiDonazioniFedele({ parrocchiaId, tornaDashboard }
       </nav>}
       {errore && <p role="alert">{errore}</p>}
       {caricamento && <p>Caricamento iniziative…</p>}
-      {!caricamento && !attivo && sezione === "donazione" && <section style={card}><h2>Donazioni</h2><p>Le offerte libere alla parrocchia saranno disponibili in questa sezione.</p></section>}
+       {!caricamento && !attivo && sezione === "donazione" && <section aria-label="Donazioni alla parrocchia">
+         <h2 style={{ fontSize: "clamp(1.35rem, 4vw, 1.9rem)", fontWeight: 500 }}>Donazioni</h2>
+         <p style={{ lineHeight: 1.6 }}>Ogni gesto di generosità è prezioso. Grazie per essere vicino alla nostra comunità.</p>
+         <div style={{ display: "grid", gap: 16, gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 300px), 1fr))" }}>
+           {visibili.map(p => <article key={p.id} style={card}>
+             <p style={{ color: "#79512d", fontSize: 12, letterSpacing: 1 }}>PROPOSTA DELLA PARROCCHIA</p>
+             <h3 style={{ fontSize: "1.4rem", overflowWrap: "anywhere" }}>{p.titolo}</h3>
+             <p style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere", lineHeight: 1.6 }}>{p.descrizione}</p>
+             <button type="button" style={{ ...button, background: "#79512d", color: "#fff" }} onClick={() => setAttivo(p)}>❤️ Sostieni questa proposta</button>
+           </article>)}
+           <article style={{ ...card, border: "1px solid #c9a76c", background: "#fffaf0" }}>
+             <p style={{ color: "#79512d", fontSize: 12, letterSpacing: 1 }}>UN GESTO LIBERO</p>
+             <h3 style={{ fontSize: "1.4rem" }}>La tua donazione</h3>
+             <p style={{ lineHeight: 1.6 }}>{donazioneSpontanea.descrizione}</p>
+             <button type="button" style={{ ...button, background: "#79512d", color: "#fff" }} onClick={() => setAttivo(donazioneSpontanea)}>❤️ Fai una donazione</button>
+           </article>
+         </div>
+       </section>}
       {!caricamento && !attivo && sezione !== "donazione" && (visibili.length === 0 ? <section style={card}><p>Nessuna iniziativa pubblicata in questa sezione.</p></section> : <div style={{ display: "grid", gap: 16 }}>
         {visibili.map(p => <article key={p.id} style={card}>
           <p style={{ color: "#79512d", letterSpacing: 1, fontSize: 12 }}>INIZIATIVA DELLA PARROCCHIA</p>
@@ -137,7 +164,7 @@ export default function ProgettiDonazioniFedele({ parrocchiaId, tornaDashboard }
       {attivo && <article style={card}>
         <h2 style={{ fontSize: "clamp(1.4rem, 4vw, 2.2rem)", overflowWrap: "anywhere" }}>{attivo.titolo}</h2>
         <p style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere", lineHeight: 1.7 }}>{attivo.descrizione}</p>
-        <ContatoreOfferte iniziativa={attivo} />
+        {attivo.tipo_iniziativa !== "donazione" && <ContatoreOfferte iniziativa={attivo} />}
         <RiepilogoPagamento key={attivo.id} iniziativa={attivo} parrocchiaId={parrocchiaId} onRegistrata={carica} />
       </article>}
     </div>
