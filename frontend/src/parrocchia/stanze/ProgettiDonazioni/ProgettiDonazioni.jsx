@@ -141,6 +141,27 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
     setFileInAttesa([]); setErroreOperazione(""); setMessaggio("");
     if (progetto?.id) leggiAllegati(progetto.id).catch(e => setErroreOperazione(e.message));
   }
+  async function eliminaProposta() {
+    if (operazione || !iniziativa?.id || iniziativa.tipo_iniziativa !== "donazione") return;
+    if (!window.confirm(`Eliminare definitivamente la proposta «${iniziativa.titolo}»?`)) return;
+    setOperazione(true);
+    setErroreOperazione("");
+    try {
+      const { error } = await supabase.rpc("ars_elimina_proposta_donazione", {
+        p_parrocchia_id: parrocchiaId,
+        p_proposta_id: iniziativa.id,
+      });
+      if (error) throw error;
+      setIniziativa(null);
+      setMessaggio("Proposta eliminata correttamente.");
+      await caricaDati();
+    } catch (e) {
+      setErroreOperazione(e.message || "Impossibile eliminare la proposta.");
+    } finally {
+      setOperazione(false);
+    }
+  }
+
   async function salvaIniziativa(e, pubblica = false) {
     e?.preventDefault?.(); if (operazione || !iniziativa) return;
     const statoDaSalvare = pubblica ? "pubblicato" : iniziativa.stato;
@@ -519,6 +540,9 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
           {iniziativa.tipo_iniziativa !== "donazione" && <button type="button" style={stilePulsanteSecondario} onClick={() => apriStampa(iniziativa, true)}>Anteprima volantino</button>}
           <button type="submit" style={stilePulsanteSecondario} disabled={operazione || caricamentoFile}>{operazione || caricamentoFile ? "Salvataggio..." : iniziativa.stato === "pubblicato" ? "Salva modifiche" : "Salva bozza"}</button>
           {iniziativa.stato !== "pubblicato" && <button type="button" style={stilePulsante} disabled={operazione || caricamentoFile} onClick={e => salvaIniziativa(e, true)}>{iniziativa.tipo_iniziativa === "donazione" ? "Pubblica proposta" : iniziativa.tipo_iniziativa === "raccolta" ? "Pubblica raccolta" : "Pubblica progetto"}</button>}
+          {iniziativa.tipo_iniziativa === "donazione" && iniziativa.id && <button type="button"
+            style={{ ...stilePulsanteSecondario, color: "#9b2833", borderColor: "#d9a6aa" }}
+            disabled={operazione || caricamentoFile} onClick={eliminaProposta}>Elimina proposta</button>}
           <button type="button" style={stilePulsanteSecondario} onClick={() => { setIniziativa(null); setStampa(null); }}>Annulla</button>
         </div>
       </form>}
