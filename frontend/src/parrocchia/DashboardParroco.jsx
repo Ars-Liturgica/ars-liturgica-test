@@ -14,7 +14,7 @@ import IntenzioniMesseParroco from "./stanze/Celebrazioni/IntenzioniMesseParroco
 import Notifiche from "./stanze/Notifiche/Notifiche";
 import CollaboratoriParrocchia from "./stanze/Collaboratori/CollaboratoriParrocchia";
 import ProgettiDonazioni from "./stanze/ProgettiDonazioni/ProgettiDonazioni";
-import PagamentiParrocchia, { saldiIniziativeDaEconomia } from "./stanze/PagamentiParrocchia/PagamentiParrocchia";
+import PagamentiParrocchia from "./stanze/PagamentiParrocchia/PagamentiParrocchia";
 import AttivitaGruppiParroco from "./stanze/AttivitaGruppi/AttivitaGruppiParroco";
 import AttivitaProgetti from "./stanze/AttivitaProgetti/AttivitaProgetti";
 
@@ -224,9 +224,43 @@ export default function DashboardParroco({
         if (!d || !Array.isArray(d.movimenti) || !Array.isArray(d.spese) ||
             !Array.isArray(d.attivita) || !Array.isArray(d.progetti) ||
             !Array.isArray(regolazioni.data)) throw new Error("Dati economici incompleti");
-        // Usa lo stesso identico calcolo della pagina «Consulta singola iniziativa».
-        const negativi = saldiIniziativeDaEconomia(d, regolazioni.data)
-          .filter(r => r.saldo < -0.000001)
+        const mappa = new Map();
+        const aggiungi = (tipo, id, titolo, valuta, entrata, uscita) => {
+          if (!id) return;
+          const key = `${tipo}:${id}:${valuta || "EUR"}`;
+          if (!mappa.has(key)) mappa.set(key, { key, tipo, id, titolo: titolo || "Iniziativa", valuta: valuta || "EUR", entrate: 0, uscite: 0 });
+          const r = mappa.get(key);
+          r.entrate += entrata;
+          r.uscite += uscita;
+        };
+        const attivita = new Map(d.attivita.map(a => [a.id, a.titolo]));
+        const progetti = new Map(d.progetti.map(a => [a.id, a.titolo]));
+        const gruppo = r => {
+          const idAttivita = r.attivita_id || r.attivita?.id;
+          const idProgetto = r.progetto_donazione_id || r.progetto?.id;
+          if (idAttivita) return ["attivita", idAttivita, attivita.get(idAttivita) || r.titolo_attivita || r.attivita?.titolo];
+          if (idProgetto) return ["progetto", idProgetto, progetti.get(idProgetto) || r.titolo_progetto || r.progetto?.titolo];
+          return null;
+        };
+        const centesimi = n => Math.round((Number(n) || 0) * 100);
+        d.movimenti.forEach(r => {
+          const g = gruppo(r);
+          if (!g) return;
+          const importo = centesimi(r.importo);
+          aggiungi(...g, r.valuta, ["completata", "in_attesa"].includes(r.stato) ? importo : 0,
+            r.stornato_mancato_incasso ? importo : 0);
+        });
+        d.spese.forEach(r => {
+          const g = gruppo(r);
+          if (g) aggiungi(...g, r.valuta, 0, centesimi(r.importo));
+        });
+        regolazioni.data.filter(r => r.tipo === "rimborso").forEach(r => {
+          const g = gruppo(r);
+          if (g) aggiungi(...g, r.valuta, 0, centesimi(r.importo));
+        });
+        const negativi = [...mappa.values()]
+          .filter(r => r.entrate - r.uscite < 0)
+          .map(r => ({ ...r, saldo: (r.entrate - r.uscite) / 100 }))
           .sort((a, b) => a.titolo.localeCompare(b.titolo, "it"));
         if (attivo) setBilanciNegativi(negativi);
       } catch (e) {
@@ -568,20 +602,38 @@ function RiepilogoDashboard({ dati, apri, bilanciNegativi, erroreBilanci, carica
           <div><span>Spese registrate · tutte le causali</span><strong>{denaro(conto.spese_attivita, conto.valuta)}</strong></div>
         </div>)}
       <p className="ars-nota">Il riepilogo considera gli incassi confermati e le spese registrate nel mese.</p>
-      {caricamentoBilanci && <p className="ars-nota" role="status">Controllo saldi delle iniziative…</p>}
       {erroreBilanci && <p className="ars-nota" role="status">{erroreBilanci}</p>}
-      {!erroreBilanci && bilanciNegativi.length > 0 && <div className="ars-avviso-bilanci">
-        <button type="button" className="ars-avviso-bilanci-titolo" aria-expanded={mostraBilanciNegativi} onClick={() => setMostraBilanciNegativi(v => !v)}>
-          <i className="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
-          <span>{bilanciNegativi.length} {bilanciNegativi.length === 1 ? "iniziativa con saldo negativo" : "iniziative con saldo negativo"}</span>
-          <span aria-hidden="true">{mostraBilanciNegativi ? "−" : "+"}</span>
+      <div className="ars-economia-azioni">
+        <button type="button" className="ars-azione-principale" onClick={() => apri("pagamenti")}>Apri la gestione economica</button>
+        <button
+          type="button"
+          className={`ars-saldi-pulsante ${bilanciNegativi.length > 0 ? "ars-saldi-allerta" : "ars-saldi-regolari"}`}
+          aria-expanded={mostraBilanciNegativi}
+          aria-controls="ars-dettaglio-saldi-negativi"
+          onClick={() => setMostraBilanciNegativi(v => !v)}
+        >
+          <span className="ars-saldi-numero">{caricamentoBilanci || erroreBilanci ? "—" : bilanciNegativi.length}</span>
+          <span>saldi negativi</span>
+          <span className="ars-saldi-freccia" aria-hidden="true">{mostraBilanciNegativi ? "⌃" : "⌄"}</span>
         </button>
-        {mostraBilanciNegativi && <div className="ars-avviso-bilanci-elenco">
-          {bilanciNegativi.map(r => <div key={r.key}><span>{r.titolo}<small>{r.tipo === "attivita" ? "Attività" : "Progetto / raccolta fondi"}</small></span><strong>{denaro(r.saldo, r.valuta)}</strong></div>)}
-          <button type="button" className="ars-azione-secondaria" onClick={() => apri("pagamenti")}>Consulta la gestione economica</button>
-        </div>}
+      </div>
+      {mostraBilanciNegativi && <div id="ars-dettaglio-saldi-negativi" className="ars-saldi-dettaglio" role="region" aria-label="Dettaglio saldi negativi">
+        {caricamentoBilanci ? <p>Controllo dei saldi in corso…</p> :
+          erroreBilanci ? <p>Impossibile verificare i saldi in questo momento.</p> :
+          bilanciNegativi.length === 0 ? <p className="ars-saldi-ok">✓ Nessuna iniziativa con saldo negativo.</p> :
+          <>
+            <p className="ars-saldi-intestazione">Iniziative da verificare</p>
+            <div className="ars-saldi-elenco">
+              {bilanciNegativi.map(r => <div className="ars-saldi-riga" key={r.key}>
+                <div className="ars-saldi-descrizione">
+                  <strong>{r.titolo}</strong>
+                  <small>{r.tipo === "attivita" ? "Attività" : "Progetto / raccolta fondi"}</small>
+                </div>
+                <strong className="ars-saldi-importo">{denaro(r.saldo, r.valuta)}</strong>
+              </div>)}
+            </div>
+          </>}
       </div>}
-      <button type="button" className="ars-azione-principale" onClick={() => apri("pagamenti")}>Apri la gestione economica</button>
     </section>
   </div>;
 }
@@ -610,6 +662,24 @@ const STILE_DASHBOARD = `
 .ars-dashboard-sintesi .ars-conti{display:flex;flex-wrap:wrap;gap:24px;padding:12px 0}
 .ars-dashboard-sintesi .ars-conti div{display:flex;flex-direction:column;gap:7px;flex:1;min-width:180px}
 .ars-dashboard-sintesi .ars-conti strong{font-size:1.6rem;color:#244b50}
+.ars-dashboard-sintesi .ars-economia-azioni{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:12px}
+.ars-dashboard-sintesi .ars-saldi-pulsante{display:inline-flex;align-items:center;justify-content:center;gap:9px;border:1px solid #c6d4d2;border-radius:8px;background:#fff;color:#244b50;padding:10px 14px;font:inherit;cursor:pointer;min-height:44px}
+.ars-dashboard-sintesi .ars-saldi-pulsante:hover{background:#f8fbfa}
+.ars-dashboard-sintesi .ars-saldi-numero{font-weight:800;font-size:1.15em;line-height:1;color:#27834f}
+.ars-dashboard-sintesi .ars-saldi-allerta{border-color:#d6a3a3;background:#fffafa}
+.ars-dashboard-sintesi .ars-saldi-allerta .ars-saldi-numero{color:#b43737}
+.ars-dashboard-sintesi .ars-saldi-freccia{color:#647779;margin-left:3px}
+.ars-dashboard-sintesi .ars-saldi-dettaglio{margin-top:14px;padding:16px;border:1px solid #dce4e2;border-radius:12px;background:#fff;max-width:100%;overflow-wrap:anywhere}
+.ars-dashboard-sintesi .ars-saldi-dettaglio p{margin:0}
+.ars-dashboard-sintesi .ars-saldi-ok{color:#28754a;font-weight:600}
+.ars-dashboard-sintesi .ars-saldi-intestazione{font-weight:700;color:#244b50;margin-bottom:12px!important}
+.ars-dashboard-sintesi .ars-saldi-elenco{display:grid;gap:10px}
+.ars-dashboard-sintesi .ars-saldi-riga{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:12px;border:1px solid #eee4e1;border-radius:9px;background:#fffafa}
+.ars-dashboard-sintesi .ars-saldi-descrizione{display:flex;flex-direction:column;gap:5px;min-width:0}
+.ars-dashboard-sintesi .ars-saldi-descrizione strong{overflow-wrap:anywhere}
+.ars-dashboard-sintesi .ars-saldi-descrizione small{font-size:.83rem;color:#687476}
+.ars-dashboard-sintesi .ars-saldi-importo{color:#a52d36;white-space:nowrap;font-size:1.05rem}
+@media(max-width:480px){.ars-dashboard-sintesi .ars-saldi-riga{align-items:flex-start;flex-direction:column;gap:8px}}
 .ars-dashboard-sintesi .ars-titolo-sezioni{color:#244b50}
 .ars-dashboard-sintesi .griglia-gestione{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px}
 .ars-dashboard-sintesi .card-gestione{min-height:0;padding:18px;text-align:left;display:block;height:auto}
