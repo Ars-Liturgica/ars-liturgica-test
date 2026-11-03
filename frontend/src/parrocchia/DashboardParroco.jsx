@@ -14,7 +14,7 @@ import IntenzioniMesseParroco from "./stanze/Celebrazioni/IntenzioniMesseParroco
 import Notifiche from "./stanze/Notifiche/Notifiche";
 import CollaboratoriParrocchia from "./stanze/Collaboratori/CollaboratoriParrocchia";
 import ProgettiDonazioni from "./stanze/ProgettiDonazioni/ProgettiDonazioni";
-import PagamentiParrocchia from "./stanze/PagamentiParrocchia/PagamentiParrocchia";
+import PagamentiParrocchia, { saldiIniziativeDaEconomia } from "./stanze/PagamentiParrocchia/PagamentiParrocchia";
 import AttivitaGruppiParroco from "./stanze/AttivitaGruppi/AttivitaGruppiParroco";
 import AttivitaProgetti from "./stanze/AttivitaProgetti/AttivitaProgetti";
 
@@ -22,6 +22,9 @@ export default function DashboardParroco({
   onCambioVista,
 }) {
   const [riepilogo, setRiepilogo] = useState(null);
+  const [bilanciNegativi, setBilanciNegativi] = useState([]);
+  const [erroreBilanci, setErroreBilanci] = useState("");
+  const [caricamentoBilanci, setCaricamentoBilanci] = useState(false);
   const [erroreRiepilogo, setErroreRiepilogo] = useState("");
   const [caricamentoRiepilogo, setCaricamentoRiepilogo] = useState(true);
   const [aggiornamento, setAggiornamento] = useState(0);
@@ -197,6 +200,43 @@ export default function DashboardParroco({
       document.removeEventListener("visibilitychange", alRientro);
     };
   }, []);
+
+  // Controllo di sola lettura sull'intero storico, non limitato al mese corrente.
+  // Stesse RPC e regole contabili della pagina Gestione economica.
+  useEffect(() => {
+    if (!parrocchia?.id || stanzaAperta) return;
+    let attivo = true;
+    async function caricaBilanci() {
+      setCaricamentoBilanci(true);
+      setErroreBilanci("");
+      try {
+        const [economia, regolazioni] = await Promise.all([
+          supabase.rpc("ars_economia_parrocchia_per_causale", {
+            p_parrocchia_id: parrocchia.id, p_data_da: null, p_data_a: null,
+          }),
+          supabase.rpc("ars_regolazioni_economiche_parroco", {
+            p_parrocchia_id: parrocchia.id, p_data_da: null, p_data_a: null,
+          }),
+        ]);
+        if (economia.error) throw economia.error;
+        if (regolazioni.error) throw regolazioni.error;
+        const d = economia.data;
+        if (!d || !Array.isArray(d.movimenti) || !Array.isArray(d.spese) ||
+            !Array.isArray(d.attivita) || !Array.isArray(d.progetti) ||
+            !Array.isArray(regolazioni.data)) throw new Error("Dati economici incompleti");
+        // Usa lo stesso identico calcolo della pagina «Consulta singola iniziativa».
+        const negativi = saldiIniziativeDaEconomia(d, regolazioni.data)
+          .filter(r => r.saldo < -0.000001)
+          .sort((a, b) => a.titolo.localeCompare(b.titolo, "it"));
+        if (attivo) setBilanciNegativi(negativi);
+      } catch (e) {
+        console.error("Controllo bilanci iniziative:", e);
+        if (attivo) { setBilanciNegativi([]); setErroreBilanci("Controllo dei saldi non disponibile."); }
+      } finally { if (attivo) setCaricamentoBilanci(false); }
+    }
+    caricaBilanci();
+    return () => { attivo = false; };
+  }, [parrocchia?.id, stanzaAperta, aggiornamento]);
 
   const sezioniGestione = [
     {
@@ -447,7 +487,7 @@ export default function DashboardParroco({
       </div>
       {caricamentoRiepilogo && <p role="status">Caricamento del riepilogo…</p>}
       {erroreRiepilogo && <p role="alert" className="ars-riepilogo-errore">{erroreRiepilogo}</p>}
-      {riepilogo && <RiepilogoDashboard dati={riepilogo} apri={setStanzaAperta} />}
+      {riepilogo && <RiepilogoDashboard dati={riepilogo} apri={setStanzaAperta} bilanciNegativi={bilanciNegativi} erroreBilanci={erroreBilanci} caricamentoBilanci={caricamentoBilanci} />}
       <h3 className="ars-titolo-sezioni">Gestione della parrocchia</h3>
       <div className="griglia-gestione">
         {sezioniGestione.map((sezione) => (
@@ -488,7 +528,8 @@ function denaro(importo, valuta) {
   return new Intl.NumberFormat("it-IT", { style: "currency", currency: valuta }).format(Number(importo));
 }
 
-function RiepilogoDashboard({ dati, apri }) {
+function RiepilogoDashboard({ dati, apri, bilanciNegativi, erroreBilanci, caricamentoBilanci }) {
+  const [mostraBilanciNegativi, setMostraBilanciNegativi] = useState(false);
   const mese = new Intl.DateTimeFormat("it-IT", { month: "long", year: "numeric", timeZone: "Europe/Rome" })
     .format(new Date(dati.mese + "T12:00:00Z"));
   const daSeguire = [
@@ -527,6 +568,19 @@ function RiepilogoDashboard({ dati, apri }) {
           <div><span>Spese registrate · tutte le causali</span><strong>{denaro(conto.spese_attivita, conto.valuta)}</strong></div>
         </div>)}
       <p className="ars-nota">Il riepilogo considera gli incassi confermati e le spese registrate nel mese.</p>
+      {caricamentoBilanci && <p className="ars-nota" role="status">Controllo saldi delle iniziative…</p>}
+      {erroreBilanci && <p className="ars-nota" role="status">{erroreBilanci}</p>}
+      {!erroreBilanci && bilanciNegativi.length > 0 && <div className="ars-avviso-bilanci">
+        <button type="button" className="ars-avviso-bilanci-titolo" aria-expanded={mostraBilanciNegativi} onClick={() => setMostraBilanciNegativi(v => !v)}>
+          <i className="fa-solid fa-triangle-exclamation" aria-hidden="true"></i>
+          <span>{bilanciNegativi.length} {bilanciNegativi.length === 1 ? "iniziativa con saldo negativo" : "iniziative con saldo negativo"}</span>
+          <span aria-hidden="true">{mostraBilanciNegativi ? "−" : "+"}</span>
+        </button>
+        {mostraBilanciNegativi && <div className="ars-avviso-bilanci-elenco">
+          {bilanciNegativi.map(r => <div key={r.key}><span>{r.titolo}<small>{r.tipo === "attivita" ? "Attività" : "Progetto / raccolta fondi"}</small></span><strong>{denaro(r.saldo, r.valuta)}</strong></div>)}
+          <button type="button" className="ars-azione-secondaria" onClick={() => apri("pagamenti")}>Consulta la gestione economica</button>
+        </div>}
+      </div>}
       <button type="button" className="ars-azione-principale" onClick={() => apri("pagamenti")}>Apri la gestione economica</button>
     </section>
   </div>;
