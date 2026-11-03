@@ -100,9 +100,12 @@ export default function PagamentiParrocchia({ parrocchiaId, tornaDashboard, nome
     <nav className="ars-scelta-economica azioni-non-stampabili" aria-label="Gestione economica">
       <button type="button" aria-pressed={pagina === "versamenti"} disabled={occupato} onClick={() => setPagina("versamenti")}>Versamenti per causale</button>
       <button type="button" aria-pressed={pagina === "bilancio"} disabled={occupato} onClick={() => setPagina("bilancio")}>Bilancio generale</button>
+      <button type="button" aria-pressed={pagina === "iniziativa"} disabled={occupato} onClick={() => setPagina("iniziativa")}>Consulta singola iniziativa</button>
       <button type="button" aria-pressed={pagina === "verifica"} disabled={occupato} onClick={() => setPagina("verifica")}>Verifica incassi</button>
     </nav>
-    {pagina === "verifica"
+    {pagina === "iniziativa"
+      ? <ConsultaSingolaIniziativa key={`${parrocchiaId}:iniziativa`} parrocchiaId={parrocchiaId} tornaDashboard={tornaDashboard} nomeParrocchia={nomeParrocchia} />
+      : pagina === "verifica"
       ? <VerificaIncassi key={`${parrocchiaId}:verifica`} parrocchiaId={parrocchiaId} tornaDashboard={tornaDashboard} nomeParrocchia={nomeParrocchia} onOccupato={setOccupato} />
       : <EconomiaPerCausale key={`${parrocchiaId}:${pagina}`} parrocchiaId={parrocchiaId} tornaDashboard={tornaDashboard} nomeParrocchia={nomeParrocchia} modalita={pagina} onOccupato={setOccupato} />}
   </div>;
@@ -1023,6 +1026,104 @@ function bilanciPerCausale(dati, movimenti, spese, tipo, collegamento) {
   });
   spese.forEach(s => { gruppo(s.causale_tipo, s.attivita_id || s.progetto_donazione_id, causaleSpesa(s), s.valuta).spese += Math.round(numero(s.importo) * 100); });
   return [...m.values()].sort((a,b) => a.titolo.localeCompare(b.titolo,"it") || a.valuta.localeCompare(b.valuta));
+}
+
+// Consultazione autonoma, di sola lettura: non modifica le registrazioni economiche.
+function ConsultaSingolaIniziativa({ parrocchiaId, tornaDashboard, nomeParrocchia }) {
+  const [dati, setDati] = useState(null);
+  const [errore, setErrore] = useState("");
+  const [caricamento, setCaricamento] = useState(true);
+  const [aggiornamento, setAggiornamento] = useState(0);
+  const [scelta, setScelta] = useState("");
+  const [dal, setDal] = useState("");
+  const [al, setAl] = useState("");
+  useEffect(() => {
+    let attivo = true;
+    async function carica() {
+      setCaricamento(true); setErrore("");
+      try {
+        if (!parrocchiaId) throw new Error("Seleziona una parrocchia.");
+        const [economia, regolazioni] = await Promise.all([
+          supabase.rpc("ars_economia_parrocchia_per_causale", { p_parrocchia_id: parrocchiaId, p_data_da: null, p_data_a: null }),
+          supabase.rpc("ars_regolazioni_economiche_parroco", { p_parrocchia_id: parrocchiaId, p_data_da: null, p_data_a: null }),
+        ]);
+        if (economia.error) throw economia.error;
+        if (regolazioni.error) throw regolazioni.error;
+        if (!["attivita", "progetti", "movimenti", "spese"].every(k => Array.isArray(economia.data?.[k])) || !Array.isArray(regolazioni.data))
+          throw new Error("Dati economici non disponibili.");
+        if (attivo) setDati({ ...economia.data, spese: [...economia.data.spese, ...speseDaRimborsi(regolazioni.data)] });
+      } catch (e) { if (attivo) setErrore(e.message || "Impossibile caricare le iniziative."); }
+      finally { if (attivo) setCaricamento(false); }
+    }
+    carica();
+    return () => { attivo = false; };
+  }, [parrocchiaId, aggiornamento]);
+
+  const opzioni = useMemo(() => {
+    if (!dati) return [];
+    const tutte = [
+      ...dati.attivita.map(a => ({ key: `attivita:${a.id}`, tipo: "attivita", id: a.id, nome: a.titolo, categoria: "Attività" })),
+      ...dati.progetti.map(a => ({ key: `progetto:${a.id}`, tipo: "progetto", id: a.id, nome: a.titolo, categoria: a.tipo === "raccolta" || a.tipo === "raccolta_fondi" || a.tipo_iniziativa === "raccolta" ? "Raccolta fondi" : "Progetto / raccolta" })),
+    ];
+    // Conserva anche iniziative storiche presenti nei movimenti ma non più nell'elenco attivo.
+    dati.movimenti.forEach(p => {
+      const a = p.attivita, pr = p.progetto;
+      const tipo = a?.id ? "attivita" : pr?.id ? "progetto" : null;
+      const id = a?.id || pr?.id;
+      if (tipo && id && !tutte.some(x => x.key === `${tipo}:${id}`)) tutte.push({ key: `${tipo}:${id}`, tipo, id, nome: a?.titolo || pr?.titolo || "Iniziativa archiviata", categoria: tipo === "attivita" ? "Attività" : "Progetto / raccolta" });
+    });
+    return tutte.sort((a,b) => a.categoria.localeCompare(b.categoria,"it") || a.nome.localeCompare(b.nome,"it"));
+  }, [dati]);
+  const selezionata = opzioni.find(o => o.key === scelta);
+  const corrisponde = (tipo, id) => selezionata && selezionata.tipo === tipo && selezionata.id === id;
+  const giorno = (data) => data ? new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Rome" }).format(new Date(data)) : "";
+  const nelPeriodo = data => (!dal || giorno(data) >= dal) && (!al || giorno(data) <= al);
+  const movimenti = (dati?.movimenti || []).filter(p => (corrisponde("attivita",p.attivita?.id) || corrisponde("progetto",p.progetto?.id)) && nelPeriodo(p.data));
+  const spese = (dati?.spese || []).filter(p => (corrisponde("attivita",p.attivita_id) || corrisponde("progetto",p.progetto_donazione_id)) && nelPeriodo(p.data));
+  const righe = righeBilancio(movimenti, spese);
+  const valute = [...new Set([...movimenti.map(p=>p.valuta||"EUR"),...spese.map(p=>p.valuta||"EUR")])];
+  const totali = valute.map(valuta => {
+    const entrate = righe.filter(r => r.valuta === valuta).reduce((t,r) => t + numero(r.entrata),0);
+    const uscite = righe.filter(r => r.valuta === valuta).reduce((t,r) => t + numero(r.uscita),0);
+    return { valuta, entrate, uscite, saldo: entrate - uscite };
+  });
+  function stampa() {
+    if (!selezionata) return;
+    try {
+      const corpo = `<p>${escapeHtml(nomeParrocchia || "Segreteria parrocchiale")}</p><h1>${escapeHtml(selezionata.nome)}</h1><p>${escapeHtml(selezionata.categoria)} · ${escapeHtml(dal || "Inizio")} – ${escapeHtml(al || "Oggi")}</p><table><thead><tr><th>Data</th><th>Causale</th><th>Entrata</th><th>Uscita</th></tr></thead><tbody>${righe.map(r => `<tr><td>${escapeHtml(r.giorno)}</td><td>${escapeHtml(r.causale)}</td><td>${r.entrata == null ? "—" : escapeHtml(formattaImporto(r.entrata,r.valuta))}</td><td>${r.uscita == null ? "—" : escapeHtml(formattaImporto(r.uscita,r.valuta))}</td></tr>`).join("")}</tbody></table>${totali.map(t => `<p><strong>Entrate ${escapeHtml(formattaImporto(t.entrate,t.valuta))} · Uscite ${escapeHtml(formattaImporto(t.uscite,t.valuta))} · Saldo ${escapeHtml(formattaImporto(t.saldo,t.valuta))}</strong></p>`).join("")}`;
+      apriStampa(`Consulta iniziativa - ${selezionata.nome}`, corpo);
+    } catch(e) { setErrore(e.message); }
+  }
+  return <main className="ars-bilancio">
+    <button type="button" onClick={tornaDashboard}>← Torna alla dashboard</button>
+    <h2>Consulta singola iniziativa</h2>
+    <p>Seleziona un'attività, un progetto o una raccolta fondi per consultare entrate, uscite, storni e saldo.</p>
+    <p>Le iniziative nuove compaiono automaticamente nell'elenco quando vengono caricate dalla gestione economica.</p>
+    <div className="ars-economia-azioni azioni-non-stampabili">
+      <label>Iniziativa<select value={scelta} onChange={e => setScelta(e.target.value)} disabled={caricamento}>
+        <option value="">Seleziona una singola iniziativa</option>
+        {opzioni.map(o => <option key={o.key} value={o.key}>{o.categoria} — {o.nome}</option>)}
+      </select></label>
+      <label>Dal<input type="date" value={dal} onChange={e=>setDal(e.target.value)} /></label>
+      <label>Al<input type="date" value={al} onChange={e=>setAl(e.target.value)} /></label>
+      <button type="button" disabled={caricamento} onClick={()=>setAggiornamento(n=>n+1)}>Aggiorna</button>
+      <button type="button" onClick={()=>{setDal("");setAl("");}}>Azzera date</button>
+      <button type="button" disabled={!selezionata || caricamento} onClick={stampa}>Stampa / Salva PDF</button>
+    </div>
+    {caricamento && <p role="status">Caricamento iniziative…</p>}
+    {errore && <p role="alert">{errore}</p>}
+    {!caricamento && !errore && !opzioni.length && <p>Nessuna iniziativa presente nell'elenco economico.</p>}
+    {!caricamento && !errore && selezionata && <>
+      <h3>{selezionata.nome}</h3>
+      {totali.length ? totali.map(t => <section className="qa-totali" key={t.valuta}>
+        {[["Entrate",t.entrate],["Uscite e storni",t.uscite],["Saldo",t.saldo]].map(([nome,valore]) => <article key={nome}><span>{nome}</span><strong>{formattaImporto(valore,t.valuta)}</strong></article>)}
+      </section>) : <p>Nessun movimento nel periodo selezionato.</p>}
+      <h3>Movimenti dell'iniziativa</h3>
+      <div className="ars-economia-tabella"><table><thead><tr><th>Data</th><th>Tipo</th><th>Causale</th><th>Metodo</th><th>Entrata</th><th>Uscita</th></tr></thead><tbody>
+        {righe.map(r => <tr key={r.key}><td>{r.giorno}</td><td>{r.tipo}</td><td>{r.causale}</td><td>{r.metodo}</td><td>{r.entrata == null ? "—" : formattaImporto(r.entrata,r.valuta)}</td><td>{r.uscita == null ? "—" : formattaImporto(r.uscita,r.valuta)}</td></tr>)}
+      </tbody></table></div>
+    </>}
+  </main>;
 }
 
 function EconomiaPerCausale({ parrocchiaId, tornaDashboard, nomeParrocchia, modalita, onOccupato }) {
