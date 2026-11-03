@@ -618,6 +618,32 @@ function righeBilancio(movimenti, spese) {
     })),
   ].sort((a,b) => b.giorno.localeCompare(a.giorno) || a.key.localeCompare(b.key));
 }
+
+// Unica fonte dei saldi: utilizza esattamente le righe contabili della
+// pagina «Consulta singola iniziativa», senza ricalcolare gli storni.
+export function saldiIniziativeDaEconomia(dati, regolazioni) {
+  const spese = [...dati.spese, ...speseDaRimborsi(regolazioni)];
+  const iniziative = [
+    ...dati.attivita.map(a => ({ tipo: "attivita", id: a.id, titolo: a.titolo })),
+    ...dati.progetti.map(a => ({ tipo: "progetto", id: a.id, titolo: a.titolo })),
+  ];
+  return iniziative.flatMap(i => {
+    const movimenti = dati.movimenti.filter(p => i.tipo === "attivita"
+      ? p.attivita?.id === i.id : p.progetto?.id === i.id);
+    const uscite = spese.filter(s => i.tipo === "attivita"
+      ? s.attivita_id === i.id : s.progetto_donazione_id === i.id);
+    const righe = righeBilancio(movimenti, uscite);
+    const valute = [...new Set(righe.map(r => r.valuta || "EUR"))];
+    return valute.map(valuta => {
+      const v = righe.filter(r => (r.valuta || "EUR") === valuta);
+      const entrate = v.reduce((tot, r) => tot + numero(r.entrata), 0);
+      const usciteTot = v.reduce((tot, r) => tot + numero(r.uscita), 0);
+      return { key: `${i.tipo}:${i.id}:${valuta}`, tipo: i.tipo,
+        id: i.id, titolo: i.titolo, valuta, saldo: entrate - usciteTot };
+    });
+  });
+}
+
 function stampaMovimentiBilancio(movimenti, spese) {
   const righe = righeBilancio(movimenti, spese);
   return `<h2>Dettaglio incassi e spese</h2><table><thead><tr><th>Data</th><th>Iniziativa</th><th>Tipo</th><th>Causale</th><th>Entrata</th><th>Uscita</th></tr></thead><tbody>${righe.map(r => `<tr><td>${escapeHtml(new Date(r.giorno+"T12:00:00").toLocaleDateString("it-IT"))}</td><td>${escapeHtml(r.iniziativa)}</td><td>${escapeHtml(r.tipo)}</td><td>${escapeHtml(r.causale)}</td><td>${r.entrata !== null ? escapeHtml(formattaImporto(r.entrata,r.valuta)) : "—"}</td><td>${r.uscita !== null ? escapeHtml(formattaImporto(r.uscita,r.valuta)) : "—"}</td></tr>`).join("")}</tbody></table>`;
