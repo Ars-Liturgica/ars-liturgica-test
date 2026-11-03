@@ -100,9 +100,123 @@ export default function PagamentiParrocchia({ parrocchiaId, tornaDashboard, nome
     <nav className="ars-scelta-economica azioni-non-stampabili" aria-label="Gestione economica">
       <button type="button" aria-pressed={pagina === "versamenti"} disabled={occupato} onClick={() => setPagina("versamenti")}>Versamenti per causale</button>
       <button type="button" aria-pressed={pagina === "bilancio"} disabled={occupato} onClick={() => setPagina("bilancio")}>Bilancio generale</button>
+      <button type="button" aria-pressed={pagina === "verifica"} disabled={occupato} onClick={() => setPagina("verifica")}>Verifica incassi</button>
     </nav>
-    <EconomiaPerCausale key={`${parrocchiaId}:${pagina}`} parrocchiaId={parrocchiaId} tornaDashboard={tornaDashboard} nomeParrocchia={nomeParrocchia} modalita={pagina} onOccupato={setOccupato} />
+    {pagina === "verifica"
+      ? <VerificaIncassi key={`${parrocchiaId}:verifica`} parrocchiaId={parrocchiaId} tornaDashboard={tornaDashboard} nomeParrocchia={nomeParrocchia} onOccupato={setOccupato} />
+      : <EconomiaPerCausale key={`${parrocchiaId}:${pagina}`} parrocchiaId={parrocchiaId} tornaDashboard={tornaDashboard} nomeParrocchia={nomeParrocchia} modalita={pagina} onOccupato={setOccupato} />}
   </div>;
+}
+
+
+// Verifica incassi: sola consultazione e storno; nessuna seconda conferma PayPal/Stripe.
+function tipoMetodoVerifica(p) {
+  const metodo = String(p.metodo || "").toLowerCase();
+  const gestore = String(p.gestore_pagamento || "").toLowerCase();
+  if (metodo === "bonifico") return "bonifico";
+  if (metodo === "paypal" || gestore === "paypal") return "paypal";
+  if (["stripe", "link_pagamento"].includes(metodo) || ["stripe", "link_pagamento"].includes(gestore)) return "stripe";
+  return null; // Esclude consegna_diretta e metodi online non identificabili.
+}
+function LogoMetodoVerifica({ tipo }) {
+  if (tipo === "paypal") return <span className="ars-logo-paypal" aria-label="PayPal"><strong>Pay</strong><strong>Pal</strong></span>;
+  if (tipo === "stripe") return <span className="ars-logo-stripe" aria-label="Stripe">stripe</span>;
+  return <span className="ars-logo-bonifico" aria-label="Bonifico bancario"><span aria-hidden="true">▥</span> Bonifico</span>;
+}
+function VerificaIncassi({ parrocchiaId, tornaDashboard, nomeParrocchia, onOccupato }) {
+  const [movimenti, setMovimenti] = useState([]);
+  const [caricamento, setCaricamento] = useState(true);
+  const [errore, setErrore] = useState("");
+  const [messaggio, setMessaggio] = useState("");
+  const [ricerca, setRicerca] = useState("");
+  const [metodo, setMetodo] = useState("");
+  const [stato, setStato] = useState("");
+  const [dal, setDal] = useState("");
+  const [al, setAl] = useState("");
+  const [revisione, setRevisione] = useState(0);
+  const [occupato, setOccupato] = useState(false);
+  const [stampaInCorso, setStampaInCorso] = useState(null);
+  const [documentoAnteprima, setDocumentoAnteprima] = useState(null);
+  const blocco = useRef(false);
+  useEffect(() => { onOccupato?.(occupato); return () => onOccupato?.(false); }, [occupato, onOccupato]);
+  useEffect(() => {
+    let attivo = true;
+    setCaricamento(true); setErrore("");
+    async function carica() {
+      try {
+        if (!parrocchiaId) throw new Error("Seleziona una parrocchia.");
+        const { data, error } = await supabase.rpc("ars_economia_parrocchia_per_causale", {
+          p_parrocchia_id: parrocchiaId, p_data_da: null, p_data_a: null,
+        });
+        if (error) throw error;
+        if (!Array.isArray(data?.movimenti)) throw new Error("Elenco incassi non disponibile.");
+        if (attivo) setMovimenti(data.movimenti.filter(p => tipoMetodoVerifica(p)));
+      } catch (e) { if (attivo) setErrore(e.message || "Impossibile caricare gli incassi."); }
+      finally { if (attivo) setCaricamento(false); }
+    }
+    carica(); return () => { attivo = false; };
+  }, [parrocchiaId, revisione]);
+  const elenco = useMemo(() => movimenti.filter(p => {
+    const tipo = tipoMetodoVerifica(p);
+    const testo = [p.pagante, p.causale, p.partecipante, causaleMovimento(p), tipo].filter(Boolean).join(" ").toLocaleLowerCase("it-IT");
+    const giorno = p.data ? new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Rome" }).format(new Date(p.data)) : "";
+    const statoEffettivo = p.stornato_mancato_incasso ? "stornato" : p.stato;
+    return (!metodo || tipo === metodo) && (!stato || statoEffettivo === stato) &&
+      (!ricerca.trim() || testo.includes(ricerca.trim().toLocaleLowerCase("it-IT"))) &&
+      (!dal || giorno >= dal) && (!al || giorno <= al);
+  }).sort((a,b) => new Date(b.data || 0) - new Date(a.data || 0)), [movimenti, ricerca, metodo, stato, dal, al]);
+  async function storna(p) {
+    if (blocco.current || p.stornato_mancato_incasso) return;
+    if (!window.confirm(`Confermi il mancato incasso di ${formattaImporto(p.importo,p.valuta)}? Verrà registrato un movimento negativo collegato all'originale. Non è un rimborso.`)) return;
+    blocco.current = true; setOccupato(true); setErrore(""); setMessaggio("");
+    try {
+      const { data, error } = await supabase.rpc("ars_storna_mancato_incasso", { p_pagamento_id: p.id });
+      if (error) throw error;
+      if (data !== true) throw new Error("Incasso già stornato o non disponibile. Aggiorna l'elenco.");
+      setMessaggio("Storno registrato. I bilanci sono aggiornati.");
+      setRevisione(n => n + 1);
+    } catch (e) { setErrore(e.message || "Storno non riuscito."); }
+    finally { blocco.current = false; setOccupato(false); }
+  }
+  async function ricevuta(p) {
+    if (stampaInCorso) return;
+    setStampaInCorso(p.id); setMessaggio("");
+    try {
+      const doc = await recuperaDocumentoEconomico(parrocchiaId, "pagamento", p.id, null);
+      if (!doc || doc.tipo_documento !== "ricevuta") { setMessaggio("Ricevuta non disponibile nell'archivio. Nessun nuovo documento è stato emesso."); return; }
+      setDocumentoAnteprima(doc);
+    } catch(e) { setMessaggio(`Impossibile aprire la ricevuta: ${e.message}`); }
+    finally { setStampaInCorso(null); }
+  }
+  return <main className="ars-bilancio ars-verifica-incassi">
+    <AnteprimaConAnagrafica documento={documentoAnteprima} parrocchiaId={parrocchiaId} nomeParrocchia={nomeParrocchia} onChiudi={() => setDocumentoAnteprima(null)} />
+    <button type="button" onClick={tornaDashboard} disabled={occupato}>← Torna alla dashboard</button>
+    <h2>Verifica incassi</h2>
+    <p>Qui trovi i pagamenti effettuati con PayPal, Stripe e bonifico, con data, causale e importo.</p>
+    <p>PayPal e Stripe sono già confermati dal gestore. Per un bonifico non ricevuto puoi utilizzare «Storna incasso».</p>
+    <div className="ars-economia-azioni azioni-non-stampabili">
+      <label>Cerca<input value={ricerca} onChange={e=>setRicerca(e.target.value)} placeholder="Pagante o causale" /></label>
+      <label>Metodo<select value={metodo} onChange={e=>setMetodo(e.target.value)}><option value="">Tutti</option><option value="paypal">PayPal</option><option value="stripe">Stripe</option><option value="bonifico">Bonifico</option></select></label>
+      <label>Stato<select value={stato} onChange={e=>setStato(e.target.value)}><option value="">Tutti</option><option value="completata">Completato</option><option value="in_attesa">In attesa</option><option value="stornato">Stornato</option><option value="fallita">Fallito</option><option value="annullata">Annullato</option></select></label>
+      <label>Dal<input type="date" value={dal} onChange={e=>setDal(e.target.value)} /></label>
+      <label>Al<input type="date" value={al} onChange={e=>setAl(e.target.value)} /></label>
+      <button type="button" disabled={caricamento || occupato} onClick={()=>setRevisione(n=>n+1)}>Aggiorna</button>
+      <button type="button" onClick={()=>{setRicerca("");setMetodo("");setStato("");setDal("");setAl("");}}>Azzera filtri</button>
+    </div>
+    {messaggio && <p role="status">{messaggio}</p>}{errore && <p role="alert">{errore}</p>}
+    {caricamento ? <p>Caricamento incassi…</p> : <>
+      <p>{elenco.length} incassi nella selezione.</p>
+      {!elenco.length ? <p>Nessun incasso corrisponde ai filtri scelti.</p> : <div className="ars-economia-tabella ars-versamenti-responsive ars-verifica-tabella"><table><thead><tr><th>Data pagamento</th><th>Pagante</th><th>Importo</th><th>Metodo</th><th>Causale</th><th>Stato</th><th>Ricevuta</th><th>Storno</th></tr></thead><tbody>
+        {elenco.map(p => <tr key={p.id}>
+          <td>{formattaData(p.data)}</td><td>{p.pagante || "—"}</td><td><strong>{formattaImporto(p.importo,p.valuta)}</strong></td>
+          <td><LogoMetodoVerifica tipo={tipoMetodoVerifica(p)} /></td><td>{p.causale || causaleMovimento(p)}</td>
+          <td>{p.stornato_mancato_incasso ? "Stornato" : etichettaStato(p.stato)}</td>
+          <td>{["completata", "in_attesa"].includes(p.stato) ? <button type="button" disabled={!!stampaInCorso || occupato} onClick={()=>ricevuta(p)}>{stampaInCorso===p.id ? "Apertura…" : "Stampa"}</button> : "—"}</td>
+          <td>{p.stornato_mancato_incasso ? "Stornato" : ["completata", "in_attesa"].includes(p.stato) ? <button type="button" disabled={occupato} onClick={()=>storna(p)}>Storna incasso</button> : "—"}</td>
+        </tr>)}
+      </tbody></table></div>}
+    </>}
+  </main>;
 }
 
 function QuoteAttivita({ parrocchiaId, tornaDashboard, nomeParrocchia, attivitaIniziale = "", onOccupato }) {
@@ -810,6 +924,24 @@ function RegistroMovimenti({ parrocchiaId, tornaDashboard, nomeParrocchia, attiv
 }
 
 const STILI_ECONOMIA = `
+
+.ars-verifica-incassi .ars-logo-paypal{display:inline-flex;gap:0;font-weight:900;font-style:italic;font-size:17px;letter-spacing:-.7px;white-space:nowrap}
+.ars-logo-paypal strong:first-child{color:#003087}.ars-logo-paypal strong:last-child{color:#009cde}
+.ars-logo-stripe{display:inline-block;color:#635bff;font-weight:850;font-size:19px;letter-spacing:-.9px}
+.ars-logo-bonifico{display:inline-flex;align-items:center;gap:6px;font-weight:650;color:#173955;white-space:nowrap}
+.ars-logo-bonifico span{font-size:23px;color:#b38a37}
+.ars-verifica-incassi .ars-verifica-tabella button{padding:7px 9px;font-size:13px;white-space:nowrap}
+@media(max-width:1250px){
+.ars-verifica-tabella tbody td:nth-child(1)::before{content:"Data pagamento"}
+.ars-verifica-tabella tbody td:nth-child(2)::before{content:"Pagante"}
+.ars-verifica-tabella tbody td:nth-child(3)::before{content:"Importo"}
+.ars-verifica-tabella tbody td:nth-child(4)::before{content:"Metodo"}
+.ars-verifica-tabella tbody td:nth-child(5)::before{content:"Causale"}
+.ars-verifica-tabella tbody td:nth-child(6)::before{content:"Stato"}
+.ars-verifica-tabella tbody td:nth-child(7)::before{content:"Ricevuta"}
+.ars-verifica-tabella tbody td:nth-child(8)::before{content:"Storno"}
+}
+
 .ars-bilancio .qa-totali{display:flex;flex-wrap:wrap;gap:18px;margin:22px 0}
 .ars-bilancio .qa-totali article{flex:1;min-width:150px;padding:20px;border:1px solid #d6c8b4;border-radius:12px;background:#fffaf0}
 .ars-bilancio .qa-totali span,.ars-bilancio .qa-totali strong{display:block;color:#173955}
