@@ -357,7 +357,7 @@ export default function DashboardParroco({
   ];
 
   if (stanzaAperta === "sacramenti") {
-    return <SacramentiParroco tornaDashboard={() => setStanzaAperta(null)} />;
+    return <SacramentiParroco parrocchiaId={parrocchia?.id} nomeParrocchia={parrocchia?.nome || ""} tornaDashboard={() => setStanzaAperta(null)} />;
   }
 
   if (stanzaAperta === "intenzioni") {
