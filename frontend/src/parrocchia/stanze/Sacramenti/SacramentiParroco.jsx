@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { supabase } from "../../../supabaseClient";
 
 const sacramenti = [
   { id: "battesimo", nome: "Battesimo", descrizione: "Richieste e celebrazioni" },
@@ -61,11 +62,45 @@ const impostazioniIniziali = {
   date: { 1: { apertura: "", chiusura: "" }, 2: { apertura: "", chiusura: "" }, 3: { apertura: "", chiusura: "" } },
 };
 
-export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "" }) {
+export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "", parrocchiaId }) {
   const [scelto, setScelto] = useState(null);
   const [sezione, setSezione] = useState(null);
   const [impostazioni, setImpostazioni] = useState(impostazioniIniziali);
   const [messaggio, setMessaggio] = useState("");
+  const [salvato, setSalvato] = useState(false);
+  const [modifica, setModifica] = useState(true);
+  const [anteprima, setAnteprima] = useState(false);
+  const [caricamento, setCaricamento] = useState(false);
+  const [operazione, setOperazione] = useState(false);
+
+  useEffect(() => {
+    let attivo = true;
+    setSalvato(false);
+    setModifica(true);
+    setAnteprima(false);
+    setImpostazioni({ ...impostazioniIniziali, date: { 1: { apertura: "", chiusura: "" }, 2: { apertura: "", chiusura: "" }, 3: { apertura: "", chiusura: "" } } });
+    if (!parrocchiaId) return;
+    async function carica() {
+      setCaricamento(true);
+      const { data, error } = await supabase.from("ars_comunione_impostazioni")
+        .select("anno_pastorale, durata, date_iscrizioni, informazioni")
+        .eq("parrocchia_id", parrocchiaId).maybeSingle();
+      if (!attivo) return;
+      setCaricamento(false);
+      if (error) { setMessaggio("Impossibile caricare le impostazioni: " + error.message); return; }
+      if (data) {
+        setImpostazioni({ anno: data.anno_pastorale, durata: String(data.durata),
+          informazioni: data.informazioni || "",
+          date: { 1: { apertura: "", chiusura: "", ...(data.date_iscrizioni?.[1] || {}) },
+            2: { apertura: "", chiusura: "", ...(data.date_iscrizioni?.[2] || {}) },
+            3: { apertura: "", chiusura: "", ...(data.date_iscrizioni?.[3] || {}) } } });
+        setSalvato(true);
+        setModifica(false);
+      }
+    }
+    carica();
+    return () => { attivo = false; };
+  }, [parrocchiaId]);
   const sacramento = sacramenti.find((s) => s.id === scelto);
   const sezioneAttiva = sezioniComunione.find((s) => s.id === sezione);
 
@@ -99,10 +134,26 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "" 
     return "";
   }
 
-  function verificaImpostazioni(e) {
+  async function salvaImpostazioni(e) {
     e.preventDefault();
+    if (!modifica || operazione) return;
     const errore = controllaImpostazioni();
-    setMessaggio(errore || "Dati verificati. Il salvataggio permanente sarà attivato con il collegamento a Supabase.");
+    if (errore) { setMessaggio(errore); return; }
+    if (!parrocchiaId) { setMessaggio("Parrocchia non disponibile: torna alla dashboard e riprova."); return; }
+    setOperazione(true);
+    const { error } = await supabase.from("ars_comunione_impostazioni").upsert({
+      parrocchia_id: parrocchiaId,
+      anno_pastorale: impostazioni.anno,
+      durata: Number(impostazioni.durata),
+      date_iscrizioni: impostazioni.date,
+      informazioni: impostazioni.informazioni,
+      aggiornato_il: new Date().toISOString(),
+    }, { onConflict: "parrocchia_id" });
+    setOperazione(false);
+    if (error) { setMessaggio("Salvataggio non riuscito: " + error.message); return; }
+    setSalvato(true);
+    setModifica(false);
+    setMessaggio("Impostazioni salvate correttamente.");
   }
 
   function stampaVolantino() {
@@ -112,8 +163,9 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "" 
       setMessaggio("Nome della parrocchia non disponibile. Riprova dalla dashboard.");
       return;
     }
+    setAnteprima(true);
     setMessaggio("");
-    window.print();
+    window.setTimeout(() => window.print(), 50);
   }
 
   function formattaData(valore) {
@@ -165,7 +217,8 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "" 
         <section className="ars-sac-pannello">
           <h3>Impostazioni anno catechistico</h3>
           <p>Definisci l'anno pastorale e le date delle iscrizioni per ciascun anno di catechismo.</p>
-          <form className="ars-sac-form" onSubmit={verificaImpostazioni}>
+          <form className="ars-sac-form" onSubmit={salvaImpostazioni}>
+            <fieldset className="ars-sac-campi" disabled={!modifica || caricamento || operazione}>
             <label>Anno pastorale
               <input type="text" value={impostazioni.anno} placeholder="2026/2027"
                 onChange={(e) => aggiorna("anno", e.target.value)} required />
@@ -196,15 +249,18 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "" 
                 placeholder="Orari, documenti necessari, incontri informativi e altre comunicazioni..."
                 onChange={(e) => aggiorna("informazioni", e.target.value)} />
             </label>
+            </fieldset>
             <div className="ars-sac-form-footer">
               <div className="ars-sac-azioni">
-                <button type="submit" className="ars-sac-conferma">Verifica impostazioni</button>
-                <button type="button" className="ars-sac-stampa" onClick={stampaVolantino}>Anteprima e stampa volantino</button>
+                {modifica ? <button type="submit" className="ars-sac-conferma" disabled={caricamento || operazione}>{operazione ? "Salvataggio..." : salvato ? "Salva modifiche" : "Salva impostazioni"}</button>
+                  : <button type="button" className="ars-sac-conferma" onClick={() => { setModifica(true); setMessaggio(""); }}>Modifica impostazioni</button>}
+                <button type="button" className="ars-sac-stampa" onClick={() => setAnteprima((v) => !v)}>{anteprima ? "Chiudi anteprima" : "Anteprima volantino"}</button>
+                {anteprima && <button type="button" className="ars-sac-stampa" onClick={stampaVolantino}>Stampa volantino</button>}
               </div>
             </div>
           </form>
           {messaggio && <p className="ars-sac-messaggio" role="status">{messaggio}</p>}
-          <div className="ars-sac-volantino" aria-label="Volantino per le famiglie">
+          <div className={`ars-sac-volantino ${anteprima ? "" : "ars-sac-volantino-nascosto"}`} aria-label="Volantino per le famiglie">
             <div className="ars-sac-volantino-interno">
               <div className="ars-sac-volantino-parrocchia">{nomeParrocchia ? `Parrocchia ${nomeParrocchia.replace(/^parrocchia\s+/i, "")}` : "Parrocchia"}</div>
               <div className="ars-sac-volantino-simbolo"><Simbolo tipo="comunione" /></div>
@@ -265,6 +321,8 @@ const STILE = `
 .ars-sac-pannello h3{font:700 1.5rem Georgia,serif;margin:0 0 8px}
 .ars-sac-pannello>p{color:#5f6d70;margin:0 0 22px;line-height:1.5}
 .ars-sac-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.ars-sac-campi{display:contents;border:0;padding:0;margin:0;min-width:0}
+.ars-sac-campi:disabled input,.ars-sac-campi:disabled select,.ars-sac-campi:disabled textarea{background:#f7f6f2;color:#35494b;opacity:1}
 .ars-sac-form label{display:flex;flex-direction:column;gap:7px;font-weight:600;font-size:.95rem}
 .ars-sac-form input,.ars-sac-form select,.ars-sac-form textarea{box-sizing:border-box;width:100%;min-height:44px;border:1px solid #d8c9a8;border-radius:9px;background:white;color:#243c40;padding:10px;font:inherit}
 .ars-sac-form textarea{resize:vertical;line-height:1.5}
@@ -276,6 +334,7 @@ const STILE = `
 .ars-sac-azioni{display:flex;gap:10px;flex-wrap:wrap}
 .ars-sac-stampa{border:1px solid #a67a29;border-radius:9px;background:white;color:#795a24;padding:12px 18px;font-weight:700;cursor:pointer}
 .ars-sac-volantino{margin:28px auto 0;max-width:560px;background:#fff;color:#111;padding:12px;box-shadow:0 2px 12px #00000016}
+.ars-sac-volantino-nascosto{display:none}
 .ars-sac-volantino-interno{border:1px solid #777;padding:26px 30px;text-align:center;font-family:Georgia,serif;background:#fff}
 .ars-sac-volantino-parrocchia{font-size:1.35rem;font-weight:bold;margin:4px 0 12px;overflow-wrap:anywhere}
 .ars-sac-volantino-simbolo{color:#222;display:flex;justify-content:center}
@@ -296,6 +355,7 @@ const STILE = `
   @page{size:A4;margin:12mm}
   body *{visibility:hidden!important}
   .ars-sac-volantino,.ars-sac-volantino *{visibility:visible!important}
+  .ars-sac-volantino-nascosto{display:none!important}
   .ars-sac-volantino{position:absolute;left:0;top:0;width:100%;max-width:none;box-sizing:border-box;margin:0;padding:0;box-shadow:none!important;background:#fff!important;color:#111!important}
   .ars-sac-volantino-interno{min-height:255mm;box-sizing:border-box;border:1px solid #777;padding:18mm 15mm;break-inside:avoid}
   .ars-sac-volantino-anno,.ars-sac-volantino-info{break-inside:avoid}
