@@ -57,8 +57,9 @@ const annoCorrente = new Date().getFullYear();
 const impostazioniIniziali = {
   anno: `${annoCorrente}/${annoCorrente + 1}`,
   durata: "2",
-  apertura: "",
-  chiusura: "",
+  parrocchia: "",
+  informazioni: "",
+  date: { 1: { apertura: "", chiusura: "" }, 2: { apertura: "", chiusura: "" }, 3: { apertura: "", chiusura: "" } },
 };
 
 export default function SacramentiParroco({ tornaDashboard }) {
@@ -80,22 +81,46 @@ export default function SacramentiParroco({ tornaDashboard }) {
     setMessaggio("");
   }
 
+  function aggiornaData(anno, campo, valore) {
+    setImpostazioni((precedenti) => ({
+      ...precedenti,
+      date: { ...precedenti.date, [anno]: { ...precedenti.date[anno], [campo]: valore } },
+    }));
+    setMessaggio("");
+  }
+
+  function controllaImpostazioni() {
+    if (!/^\d{4}\/\d{4}$/.test(impostazioni.anno)) return "Inserisci l'anno pastorale nel formato 2026/2027.";
+    const [inizio, fine] = impostazioni.anno.split("/").map(Number);
+    if (fine !== inizio + 1) return "L'anno pastorale deve comprendere due anni consecutivi.";
+    for (let anno = 1; anno <= Number(impostazioni.durata); anno++) {
+      const { apertura, chiusura } = impostazioni.date[anno];
+      if (apertura && chiusura && chiusura < apertura) return `Per il ${anno}° anno la chiusura precede l'apertura.`;
+    }
+    return "";
+  }
+
   function verificaImpostazioni(e) {
     e.preventDefault();
-    if (!/^\d{4}\/\d{4}$/.test(impostazioni.anno)) {
-      setMessaggio("Inserisci l'anno pastorale nel formato 2026/2027.");
+    const errore = controllaImpostazioni();
+    setMessaggio(errore || "Dati verificati. Il salvataggio permanente sarà attivato con il collegamento a Supabase.");
+  }
+
+  function stampaVolantino() {
+    const errore = controllaImpostazioni();
+    if (errore) { setMessaggio(errore); return; }
+    if (!impostazioni.parrocchia.trim()) {
+      setMessaggio("Inserisci il nome della parrocchia prima di stampare.");
       return;
     }
-    const [inizio, fine] = impostazioni.anno.split("/").map(Number);
-    if (fine !== inizio + 1) {
-      setMessaggio("L'anno pastorale deve comprendere due anni consecutivi.");
-      return;
-    }
-    if (impostazioni.apertura && impostazioni.chiusura && impostazioni.chiusura < impostazioni.apertura) {
-      setMessaggio("La chiusura delle iscrizioni non può precedere l'apertura.");
-      return;
-    }
-    setMessaggio("Impostazioni verificate. Il salvataggio definitivo sarà disponibile dopo il collegamento a Supabase.");
+    setMessaggio("");
+    window.print();
+  }
+
+  function formattaData(valore) {
+    if (!valore) return "Da definire";
+    const [anno, mese, giorno] = valore.split("-");
+    return `${giorno}/${mese}/${anno}`;
   }
 
   return (
@@ -140,7 +165,7 @@ export default function SacramentiParroco({ tornaDashboard }) {
       ) : sezione === "impostazioni" ? (
         <section className="ars-sac-pannello">
           <h3>Impostazioni anno catechistico</h3>
-          <p>Definisci l'anno pastorale, la durata del percorso e il periodo delle iscrizioni.</p>
+          <p>Definisci l'anno pastorale e le date delle iscrizioni per ciascun anno di catechismo.</p>
           <form className="ars-sac-form" onSubmit={verificaImpostazioni}>
             <label>Anno pastorale
               <input type="text" value={impostazioni.anno} placeholder="2026/2027"
@@ -152,18 +177,60 @@ export default function SacramentiParroco({ tornaDashboard }) {
                 <option value="3">3 anni</option>
               </select>
             </label>
-            <label>Apertura iscrizioni
-              <input type="date" value={impostazioni.apertura} onChange={(e) => aggiorna("apertura", e.target.value)} />
+            {[1, 2, 3].map((anno) => (
+              <fieldset className="ars-sac-anno" key={anno} disabled={anno > Number(impostazioni.durata)}>
+                <legend>{anno}° anno {anno > Number(impostazioni.durata) ? "(non previsto)" : ""}</legend>
+                <div className="ars-sac-date">
+                  <label>Apertura iscrizioni
+                    <input type="date" value={impostazioni.date[anno].apertura}
+                      onChange={(e) => aggiornaData(anno, "apertura", e.target.value)} />
+                  </label>
+                  <label>Chiusura iscrizioni
+                    <input type="date" value={impostazioni.date[anno].chiusura}
+                      onChange={(e) => aggiornaData(anno, "chiusura", e.target.value)} />
+                  </label>
+                </div>
+              </fieldset>
+            ))}
+            <label className="ars-sac-intera">Nome della parrocchia (per il volantino)
+              <input type="text" value={impostazioni.parrocchia} placeholder="Inserisci il nome della parrocchia"
+                onChange={(e) => aggiorna("parrocchia", e.target.value)} />
             </label>
-            <label>Chiusura iscrizioni
-              <input type="date" value={impostazioni.chiusura} onChange={(e) => aggiorna("chiusura", e.target.value)} />
+            <label className="ars-sac-intera">Informazioni e istruzioni per le famiglie
+              <textarea rows="6" value={impostazioni.informazioni}
+                placeholder="Orari, documenti necessari, incontri informativi e altre comunicazioni..."
+                onChange={(e) => aggiorna("informazioni", e.target.value)} />
             </label>
             <div className="ars-sac-form-footer">
-              <button type="submit" className="ars-sac-conferma">Verifica impostazioni</button>
-              <small>Anteprima: i dati non sono ancora salvati nel database.</small>
+              <div className="ars-sac-azioni">
+                <button type="submit" className="ars-sac-conferma">Verifica impostazioni</button>
+                <button type="button" className="ars-sac-stampa" onClick={stampaVolantino}>Anteprima e stampa volantino</button>
+              </div>
             </div>
           </form>
           {messaggio && <p className="ars-sac-messaggio" role="status">{messaggio}</p>}
+          <div className="ars-sac-volantino" aria-label="Volantino per le famiglie">
+            <div className="ars-sac-volantino-interno">
+              <div className="ars-sac-volantino-parrocchia">{impostazioni.parrocchia.trim() || "Nome della parrocchia"}</div>
+              <div className="ars-sac-volantino-simbolo"><Simbolo tipo="comunione" /></div>
+              <h1>Prima Comunione</h1>
+              <h2>Anno catechistico {impostazioni.anno}</h2>
+              <div className="ars-sac-volantino-linea" />
+              <h3>Iscrizioni al catechismo</h3>
+              {[1, 2, 3].filter((anno) => anno <= Number(impostazioni.durata)).map((anno) => (
+                <div className="ars-sac-volantino-anno" key={anno}>
+                  <strong>{anno}° anno</strong>
+                  <span>Apertura: {formattaData(impostazioni.date[anno].apertura)}</span>
+                  <span>Chiusura: {formattaData(impostazioni.date[anno].chiusura)}</span>
+                </div>
+              ))}
+              {impostazioni.informazioni.trim() && <div className="ars-sac-volantino-info">
+                <h3>Informazioni per le famiglie</h3>
+                <p>{impostazioni.informazioni}</p>
+              </div>}
+              <div className="ars-sac-volantino-fine">La comunità parrocchiale vi aspetta</div>
+            </div>
+          </div>
         </section>
       ) : (
         <section className="ars-sac-dettaglio">
@@ -204,11 +271,40 @@ const STILE = `
 .ars-sac-pannello>p{color:#5f6d70;margin:0 0 22px;line-height:1.5}
 .ars-sac-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
 .ars-sac-form label{display:flex;flex-direction:column;gap:7px;font-weight:600;font-size:.95rem}
-.ars-sac-form input,.ars-sac-form select{box-sizing:border-box;width:100%;min-height:44px;border:1px solid #d8c9a8;border-radius:9px;background:white;color:#243c40;padding:10px;font:inherit}
+.ars-sac-form input,.ars-sac-form select,.ars-sac-form textarea{box-sizing:border-box;width:100%;min-height:44px;border:1px solid #d8c9a8;border-radius:9px;background:white;color:#243c40;padding:10px;font:inherit}
+.ars-sac-form textarea{resize:vertical;line-height:1.5}
+.ars-sac-intera{grid-column:1/-1}
+.ars-sac-anno{grid-column:1/-1;min-width:0;border:1px solid #e2d2b3;border-radius:11px;padding:14px;margin:0}
+.ars-sac-anno legend{font-weight:700;color:#594c36;padding:0 7px}
+.ars-sac-anno:disabled{opacity:.48}
+.ars-sac-date{display:grid;grid-template-columns:1fr 1fr;gap:15px}
+.ars-sac-azioni{display:flex;gap:10px;flex-wrap:wrap}
+.ars-sac-stampa{border:1px solid #a67a29;border-radius:9px;background:white;color:#795a24;padding:12px 18px;font-weight:700;cursor:pointer}
+.ars-sac-volantino{margin:28px auto 0;max-width:560px;background:#fff;color:#111;padding:12px;box-shadow:0 2px 12px #00000016}
+.ars-sac-volantino-interno{border:1px solid #777;padding:26px 30px;text-align:center;font-family:Georgia,serif;background:#fff}
+.ars-sac-volantino-parrocchia{font-size:1.35rem;font-weight:bold;margin:4px 0 12px;overflow-wrap:anywhere}
+.ars-sac-volantino-simbolo{color:#222;display:flex;justify-content:center}
+.ars-sac-volantino-simbolo svg{width:75px;height:75px}
+.ars-sac-volantino h1{font-size:2rem;margin:7px 0;color:#111}
+.ars-sac-volantino h2{font-size:1.12rem;margin:0 0 16px;color:#222}
+.ars-sac-volantino h3{font-size:1.15rem;margin:14px 0;color:#111}
+.ars-sac-volantino-linea{height:1px;background:#999;margin:12px 0}
+.ars-sac-volantino-anno{display:grid;grid-template-columns:90px 1fr 1fr;gap:6px;text-align:left;border-bottom:1px solid #ddd;padding:10px 0;font:14px Arial,sans-serif}
+.ars-sac-volantino-info{text-align:left;margin-top:20px;overflow-wrap:anywhere}
+.ars-sac-volantino-info p{white-space:pre-wrap;line-height:1.5;font:14px/1.5 Arial,sans-serif;color:#111}
+.ars-sac-volantino-fine{margin-top:25px;font-style:italic;font-size:13px}
 .ars-sac-form-footer{grid-column:1/-1;display:flex;flex-direction:column;align-items:flex-start;gap:10px}
 .ars-sac-conferma{border:0;border-radius:9px;background:#a67a29;color:white;padding:12px 18px;font-weight:700;cursor:pointer}
 .ars-sac-form-footer small{color:#687477}
 .ars-sac-messaggio{margin-top:16px!important;color:#5c4825!important;font-weight:600}
-@media(max-width:650px){.ars-sacramenti-parroco{padding:12px}.ars-sac-griglia{gap:12px}.ars-sac-card{min-height:185px;padding:15px 8px}.ars-sac-card strong{font-size:1.08rem}.ars-sac-descrizione{font-size:.83rem}.ars-sac-header h2{font-size:1.65rem}.ars-sac-simbolo{width:78px;height:78px}.ars-sac-simbolo svg{width:65px;height:65px}.ars-sac-griglia-sezioni{grid-template-columns:repeat(2,minmax(0,1fr))}.ars-sac-card-sezione{min-height:150px}.ars-sac-pannello{padding:18px}.ars-sac-form{grid-template-columns:1fr}}
+@media print{
+  @page{size:A4;margin:12mm}
+  body *{visibility:hidden!important}
+  .ars-sac-volantino,.ars-sac-volantino *{visibility:visible!important}
+  .ars-sac-volantino{position:absolute;left:0;top:0;width:100%;max-width:none;box-sizing:border-box;margin:0;padding:0;box-shadow:none!important;background:#fff!important;color:#111!important}
+  .ars-sac-volantino-interno{min-height:255mm;box-sizing:border-box;border:1px solid #777;padding:18mm 15mm;break-inside:avoid}
+  .ars-sac-volantino-anno,.ars-sac-volantino-info{break-inside:avoid}
+}
+@media(max-width:650px){.ars-sacramenti-parroco{padding:12px}.ars-sac-griglia{gap:12px}.ars-sac-card{min-height:185px;padding:15px 8px}.ars-sac-card strong{font-size:1.08rem}.ars-sac-descrizione{font-size:.83rem}.ars-sac-header h2{font-size:1.65rem}.ars-sac-simbolo{width:78px;height:78px}.ars-sac-simbolo svg{width:65px;height:65px}.ars-sac-griglia-sezioni{grid-template-columns:repeat(2,minmax(0,1fr))}.ars-sac-card-sezione{min-height:150px}.ars-sac-pannello{padding:18px}.ars-sac-form{grid-template-columns:1fr}.ars-sac-date{grid-template-columns:1fr}.ars-sac-volantino-interno{padding:15px}.ars-sac-volantino-anno{grid-template-columns:1fr;gap:4px}}
 @media(max-width:380px){.ars-sac-griglia{grid-template-columns:1fr}.ars-sac-card{min-height:165px}}
 `;
