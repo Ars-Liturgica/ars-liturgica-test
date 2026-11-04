@@ -218,19 +218,19 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
           <h3>Impostazioni anno catechistico</h3>
           <p>Definisci l'anno pastorale e le date delle iscrizioni per ciascun anno di catechismo.</p>
           <form className="ars-sac-form" onSubmit={salvaImpostazioni}>
-            <fieldset className="ars-sac-campi" disabled={!modifica || caricamento || operazione}>
+            <>
             <label>Anno pastorale
               <input type="text" value={impostazioni.anno} placeholder="2026/2027"
-                onChange={(e) => aggiorna("anno", e.target.value)} required />
+                onChange={(e) => aggiorna("anno", e.target.value)} disabled={!modifica || caricamento || operazione} required />
             </label>
             <label>Durata del percorso
-              <select value={impostazioni.durata} onChange={(e) => aggiorna("durata", e.target.value)}>
+              <select value={impostazioni.durata} onChange={(e) => aggiorna("durata", e.target.value)} disabled={!modifica || caricamento || operazione}>
                 <option value="2">2 anni</option>
                 <option value="3">3 anni</option>
               </select>
             </label>
             {[1, 2, 3].map((anno) => (
-              <fieldset className="ars-sac-anno" key={anno} disabled={anno > Number(impostazioni.durata)}>
+              <fieldset className="ars-sac-anno" key={anno} disabled={!modifica || caricamento || operazione || anno > Number(impostazioni.durata)}>
                 <legend>{anno}° anno {anno > Number(impostazioni.durata) ? "(non previsto)" : ""}</legend>
                 <div className="ars-sac-date">
                   <label>Apertura iscrizioni
@@ -247,9 +247,9 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
             <label className="ars-sac-intera">Informazioni e istruzioni per le famiglie
               <textarea rows="6" value={impostazioni.informazioni}
                 placeholder="Orari, documenti necessari, incontri informativi e altre comunicazioni..."
-                onChange={(e) => aggiorna("informazioni", e.target.value)} />
+                onChange={(e) => aggiorna("informazioni", e.target.value)} disabled={!modifica || caricamento || operazione} />
             </label>
-            </fieldset>
+            </>
             <div className="ars-sac-form-footer">
               <div className="ars-sac-azioni">
                 {modifica ? <button type="submit" className="ars-sac-conferma" disabled={caricamento || operazione}>{operazione ? "Salvataggio..." : salvato ? "Salva modifiche" : "Salva impostazioni"}</button>
@@ -321,8 +321,7 @@ const STILE = `
 .ars-sac-pannello h3{font:700 1.5rem Georgia,serif;margin:0 0 8px}
 .ars-sac-pannello>p{color:#5f6d70;margin:0 0 22px;line-height:1.5}
 .ars-sac-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
-.ars-sac-campi{display:contents;border:0;padding:0;margin:0;min-width:0}
-.ars-sac-campi:disabled input,.ars-sac-campi:disabled select,.ars-sac-campi:disabled textarea{background:#f7f6f2;color:#35494b;opacity:1}
+.ars-sac-form input:disabled,.ars-sac-form select:disabled,.ars-sac-form textarea:disabled{background:#f7f6f2;color:#35494b;opacity:1}
 .ars-sac-form label{display:flex;flex-direction:column;gap:7px;font-weight:600;font-size:.95rem}
 .ars-sac-form input,.ars-sac-form select,.ars-sac-form textarea{box-sizing:border-box;width:100%;min-height:44px;border:1px solid #d8c9a8;border-radius:9px;background:white;color:#243c40;padding:10px;font:inherit}
 .ars-sac-form textarea{resize:vertical;line-height:1.5}
