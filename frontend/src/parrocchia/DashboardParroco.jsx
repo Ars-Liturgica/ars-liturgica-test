@@ -17,6 +17,7 @@ import ProgettiDonazioni from "./stanze/ProgettiDonazioni/ProgettiDonazioni";
 import PagamentiParrocchia from "./stanze/PagamentiParrocchia/PagamentiParrocchia";
 import AttivitaGruppiParroco from "./stanze/AttivitaGruppi/AttivitaGruppiParroco";
 import AttivitaProgetti from "./stanze/AttivitaProgetti/AttivitaProgetti";
+import SacramentiParroco from "./stanze/Sacramenti/SacramentiParroco";
 
 export default function DashboardParroco({
   onCambioVista,
@@ -307,6 +308,7 @@ export default function DashboardParroco({
       titolo: "Sacramenti",
       descrizione:
         "Battesimi, Prime Comunioni, Cresime e Matrimoni.",
+      stanza: "sacramenti",
     },
     {
       icona: (
@@ -353,6 +355,10 @@ export default function DashboardParroco({
         "Dati della parrocchia, configurazioni e servizi attivi.",
     },
   ];
+
+  if (stanzaAperta === "sacramenti") {
+    return <SacramentiParroco tornaDashboard={() => setStanzaAperta(null)} />;
+  }
 
   if (stanzaAperta === "intenzioni") {
     return <IntenzioniMesseParroco parrocchiaId={parrocchia?.id}
