@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { supabase } from "../../../supabaseClient";
 
 const sacramenti = [
@@ -72,9 +72,11 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
   const [anteprima, setAnteprima] = useState(false);
   const [caricamento, setCaricamento] = useState(false);
   const [operazione, setOperazione] = useState(false);
+  const modificaRichiesta = useRef(false);
 
   useEffect(() => {
     let attivo = true;
+    modificaRichiesta.current = false;
     setSalvato(false);
     setModifica(true);
     setAnteprima(false);
@@ -88,7 +90,7 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
       if (!attivo) return;
       setCaricamento(false);
       if (error) { setMessaggio("Impossibile caricare le impostazioni: " + error.message); return; }
-      if (data) {
+      if (data && !modificaRichiesta.current) {
         setImpostazioni({ anno: data.anno_pastorale, durata: String(data.durata),
           informazioni: data.informazioni || "",
           date: { 1: { apertura: "", chiusura: "", ...(data.date_iscrizioni?.[1] || {}) },
@@ -136,7 +138,7 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
 
   async function salvaImpostazioni(e) {
     e.preventDefault();
-    if (!modifica || operazione) return;
+    if (!modifica || operazione || caricamento) return;
     const errore = controllaImpostazioni();
     if (errore) { setMessaggio(errore); return; }
     if (!parrocchiaId) { setMessaggio("Parrocchia non disponibile: torna alla dashboard e riprova."); return; }
@@ -151,6 +153,7 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
     }, { onConflict: "parrocchia_id" });
     setOperazione(false);
     if (error) { setMessaggio("Salvataggio non riuscito: " + error.message); return; }
+    modificaRichiesta.current = false;
     setSalvato(true);
     setModifica(false);
     setMessaggio("Impostazioni salvate correttamente.");
@@ -253,7 +256,7 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
             <div className="ars-sac-form-footer">
               <div className="ars-sac-azioni">
                 {modifica ? <button type="submit" className="ars-sac-conferma" disabled={caricamento || operazione}>{operazione ? "Salvataggio..." : salvato ? "Salva modifiche" : "Salva impostazioni"}</button>
-                  : <button type="button" className="ars-sac-conferma" onClick={() => { setModifica(true); setMessaggio(""); }}>Modifica impostazioni</button>}
+                  : <button type="button" className="ars-sac-conferma" onClick={() => { modificaRichiesta.current = true; setModifica(true); setMessaggio(""); }}>Modifica impostazioni</button>}
                 <button type="button" className="ars-sac-stampa" onClick={() => setAnteprima((v) => !v)}>{anteprima ? "Chiudi anteprima" : "Anteprima volantino"}</button>
                 {anteprima && <button type="button" className="ars-sac-stampa" onClick={stampaVolantino}>Stampa volantino</button>}
               </div>
