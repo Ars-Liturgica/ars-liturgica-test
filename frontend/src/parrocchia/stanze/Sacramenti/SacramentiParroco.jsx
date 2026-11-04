@@ -24,10 +24,13 @@ function Simbolo({ tipo }) {
         <path d="M48 68v12M33 82h30M42 80h12" strokeWidth="4" />
       </>}
       {tipo === "cresima" && <>
-        <path d="M48 34c-6-12-19-16-30-13 4 11 11 17 22 19-13-2-21 3-26 12 13 8 26 5 34-4 8 9 21 12 34 4-5-9-13-14-26-12 11-2 18-8 22-19-11-3-24 1-30 13Z" fill="#fffaf0" />
-        <path d="M48 34v23M40 57l8 8 8-8" />
-        <path d="M48 8c-8 9-8 16 0 21 8-5 8-12 0-21Z" fill="#f2c86a" />
-        <circle cx="48" cy="38" r="3" fill="currentColor" />
+        {/* Colomba dello Spirito Santo: testa, becco, ali spiegate e coda */}
+        <path d="M48 34 C44 28 38 26 34 29 C31 31 31 36 34 39 L28 40 C18 35 12 27 9 17 C22 19 33 23 43 32 L48 37 L53 32 C63 23 74 19 87 17 C84 27 78 35 68 40 L62 39 C65 36 65 31 62 29 C58 26 52 28 48 34Z" fill="#fffdf8" />
+        <path d="M48 37 C42 44 39 52 42 60 L48 55 L54 60 C57 52 54 44 48 37Z" fill="#fffdf8" />
+        <path d="M42 59 L34 72 L43 69 L48 79 L53 69 L62 72 L54 59" fill="#fffdf8" />
+        <circle cx="45" cy="34" r="1.5" fill="#b98a31" stroke="none" />
+        <path d="M42 36 L35 38 L42 40" fill="#dba94b" strokeWidth="1.5" />
+        <path d="M48 6 C40 15 41 22 48 27 C55 22 56 15 48 6Z" fill="#f2c86a" />
       </>}
       {tipo === "matrimonio" && <>
         <circle cx="36" cy="55" r="20" fill="none" strokeWidth="6" />
