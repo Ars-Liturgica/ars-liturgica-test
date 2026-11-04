@@ -57,12 +57,11 @@ const annoCorrente = new Date().getFullYear();
 const impostazioniIniziali = {
   anno: `${annoCorrente}/${annoCorrente + 1}`,
   durata: "2",
-  parrocchia: "",
   informazioni: "",
   date: { 1: { apertura: "", chiusura: "" }, 2: { apertura: "", chiusura: "" }, 3: { apertura: "", chiusura: "" } },
 };
 
-export default function SacramentiParroco({ tornaDashboard }) {
+export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "" }) {
   const [scelto, setScelto] = useState(null);
   const [sezione, setSezione] = useState(null);
   const [impostazioni, setImpostazioni] = useState(impostazioniIniziali);
@@ -109,8 +108,8 @@ export default function SacramentiParroco({ tornaDashboard }) {
   function stampaVolantino() {
     const errore = controllaImpostazioni();
     if (errore) { setMessaggio(errore); return; }
-    if (!impostazioni.parrocchia.trim()) {
-      setMessaggio("Inserisci il nome della parrocchia prima di stampare.");
+    if (!nomeParrocchia.trim()) {
+      setMessaggio("Nome della parrocchia non disponibile. Riprova dalla dashboard.");
       return;
     }
     setMessaggio("");
@@ -192,10 +191,6 @@ export default function SacramentiParroco({ tornaDashboard }) {
                 </div>
               </fieldset>
             ))}
-            <label className="ars-sac-intera">Nome della parrocchia (per il volantino)
-              <input type="text" value={impostazioni.parrocchia} placeholder="Inserisci il nome della parrocchia"
-                onChange={(e) => aggiorna("parrocchia", e.target.value)} />
-            </label>
             <label className="ars-sac-intera">Informazioni e istruzioni per le famiglie
               <textarea rows="6" value={impostazioni.informazioni}
                 placeholder="Orari, documenti necessari, incontri informativi e altre comunicazioni..."
@@ -211,7 +206,7 @@ export default function SacramentiParroco({ tornaDashboard }) {
           {messaggio && <p className="ars-sac-messaggio" role="status">{messaggio}</p>}
           <div className="ars-sac-volantino" aria-label="Volantino per le famiglie">
             <div className="ars-sac-volantino-interno">
-              <div className="ars-sac-volantino-parrocchia">{impostazioni.parrocchia.trim() || "Nome della parrocchia"}</div>
+              <div className="ars-sac-volantino-parrocchia">{nomeParrocchia ? `Parrocchia ${nomeParrocchia.replace(/^parrocchia\s+/i, "")}` : "Parrocchia"}</div>
               <div className="ars-sac-volantino-simbolo"><Simbolo tipo="comunione" /></div>
               <h1>Prima Comunione</h1>
               <h2>Anno catechistico {impostazioni.anno}</h2>
