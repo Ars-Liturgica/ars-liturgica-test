@@ -233,7 +233,7 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
               </select>
             </label>
             {[1, 2, 3].map((anno) => (
-              <fieldset className="ars-sac-anno" key={anno} disabled={!modifica || caricamento || operazione || anno > Number(impostazioni.durata)}>
+              <fieldset className={`ars-sac-anno ${anno > Number(impostazioni.durata) ? "ars-sac-anno-non-previsto" : ""}`} key={anno} disabled={!modifica || caricamento || operazione || anno > Number(impostazioni.durata)}>
                 <legend>{anno}° anno {anno > Number(impostazioni.durata) ? "(non previsto)" : ""}</legend>
                 <div className="ars-sac-date">
                   <label>Apertura iscrizioni
@@ -324,14 +324,14 @@ const STILE = `
 .ars-sac-pannello h3{font:700 1.5rem Georgia,serif;margin:0 0 8px}
 .ars-sac-pannello>p{color:#5f6d70;margin:0 0 22px;line-height:1.5}
 .ars-sac-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
-.ars-sac-form input:disabled,.ars-sac-form select:disabled,.ars-sac-form textarea:disabled{background:#f7f6f2;color:#35494b;opacity:1}
+.ars-sac-form input:disabled,.ars-sac-form select:disabled,.ars-sac-form textarea:disabled{background:#fff;color:#243c40;opacity:1;cursor:default}
 .ars-sac-form label{display:flex;flex-direction:column;gap:7px;font-weight:600;font-size:.95rem}
 .ars-sac-form input,.ars-sac-form select,.ars-sac-form textarea{box-sizing:border-box;width:100%;min-height:44px;border:1px solid #d8c9a8;border-radius:9px;background:white;color:#243c40;padding:10px;font:inherit}
 .ars-sac-form textarea{resize:vertical;line-height:1.5}
 .ars-sac-intera{grid-column:1/-1}
 .ars-sac-anno{grid-column:1/-1;min-width:0;border:1px solid #e2d2b3;border-radius:11px;padding:14px;margin:0}
 .ars-sac-anno legend{font-weight:700;color:#594c36;padding:0 7px}
-.ars-sac-anno:disabled{opacity:.48}
+.ars-sac-anno:disabled{opacity:1;color:#243c40}.ars-sac-anno:disabled label{color:#243c40}.ars-sac-anno.ars-sac-anno-non-previsto{opacity:.48}
 .ars-sac-date{display:grid;grid-template-columns:1fr 1fr;gap:15px}
 .ars-sac-azioni{display:flex;gap:10px;flex-wrap:wrap}
 .ars-sac-stampa{border:1px solid #a67a29;border-radius:9px;background:white;color:#795a24;padding:12px 18px;font-weight:700;cursor:pointer}
