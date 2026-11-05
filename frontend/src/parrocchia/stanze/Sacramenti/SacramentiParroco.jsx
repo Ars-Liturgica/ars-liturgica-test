@@ -155,6 +155,7 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
     if (error) { setMessaggio("Salvataggio non riuscito: " + error.message); return; }
     modificaRichiesta.current = false;
     setSalvato(true);
+    setModifica(false);
     setMessaggio("Impostazioni salvate correttamente.");
   }
 
