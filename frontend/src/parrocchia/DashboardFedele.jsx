@@ -8,6 +8,7 @@ import IntenzioniMesseFedele from "./stanze/Celebrazioni/IntenzioniMesseFedele";
 import PartecipazioneComunita from "./stanze/Collaboratori/PartecipazioneComunita";
 import AttivitaGruppiFedele from "./stanze/AttivitaGruppi/AttivitaGruppiFedele";
 import ProgettiDonazioniFedele from "./stanze/ProgettiDonazioni/ProgettiDonazioniFedele";
+import SacramentiFedele from "./SacramentiFedele";
 
 export default function DashboardFedele() {
   const [stanzaAperta, setStanzaAperta] = useState(null);
@@ -127,6 +128,10 @@ export default function DashboardFedele() {
         tornaDashboard={() => setStanzaAperta(null)}
       />
     );
+  }
+
+  if (stanzaAperta === "sacramenti") {
+    return <SacramentiFedele tornaDashboard={() => setStanzaAperta(null)} />;
   }
 
   const stileCard = {
@@ -500,6 +505,13 @@ export default function DashboardFedele() {
               }}
             >
               Scopri le attività della parrocchia e, quando saranno aperte, le iscrizioni.
+            </p>
+          </button>
+          <button type="button" onClick={() => setStanzaAperta("sacramenti")} style={stileCard}>
+            <div style={{ fontSize: "34px", marginBottom: "16px" }}>✝️</div>
+            <h2 style={{ margin: "0 0 10px", fontSize: "22px", fontWeight: "500", color: "#49392c" }}>Sacramenti</h2>
+            <p style={{ margin: 0, fontFamily: "Arial, sans-serif", fontSize: "15px", lineHeight: "1.6", color: "#75695e" }}>
+              Battesimo, Prima Comunione, Cresima e Matrimonio.
             </p>
           </button>
         </div>
