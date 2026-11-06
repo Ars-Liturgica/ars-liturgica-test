@@ -45,7 +45,7 @@ export default function SacramentiFedele({ tornaDashboard }) {
   const [scelto, setScelto] = useState(null);
   const sacramento = sacramenti.find((s) => s.id === scelto);
   return (
-    <main className="ars-sacramenti-fedele">
+    <main className="ars-sacramenti-fedele" style={{ boxSizing: "border-box", width: "100%", minHeight: "100vh", backgroundColor: "#f7f3ed", color: "#243c40", isolation: "isolate" }}>
       <style>{STILE}</style>
       <button type="button" className="ars-sac-indietro" onClick={() => sacramento ? setScelto(null) : tornaDashboard?.()}>
         ← {sacramento ? "Tutti i Sacramenti" : "Torna alla dashboard"}
@@ -76,7 +76,7 @@ export default function SacramentiFedele({ tornaDashboard }) {
 }
 
 const STILE = `
-.ars-sacramenti-fedele{max-width:960px;margin:0 auto;padding:18px;color:#243c40}
+.ars-sacramenti-fedele{box-sizing:border-box;width:100%;min-height:100vh;max-width:none;margin:0;padding:32px max(18px,calc((100% - 960px)/2));background:#f7f3ed;color:#243c40}
 .ars-sac-header{text-align:center;margin:14px 0 25px}
 .ars-sac-header h2{font-family:Georgia,serif;font-size:2rem;color:#243c40;margin:0 0 8px}
 .ars-sac-header p{color:#5f6d70;margin:0}
