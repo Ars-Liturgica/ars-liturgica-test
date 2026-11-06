@@ -8,7 +8,7 @@ import IntenzioniMesseFedele from "./stanze/Celebrazioni/IntenzioniMesseFedele";
 import PartecipazioneComunita from "./stanze/Collaboratori/PartecipazioneComunita";
 import AttivitaGruppiFedele from "./stanze/AttivitaGruppi/AttivitaGruppiFedele";
 import ProgettiDonazioniFedele from "./stanze/ProgettiDonazioni/ProgettiDonazioniFedele";
-import SacramentiFedele from "./SacramentiFedele";
+import SacramentiFedele from "./stanze/Sacramenti/SacramentiFedele";
 
 export default function DashboardFedele() {
   const [stanzaAperta, setStanzaAperta] = useState(null);
