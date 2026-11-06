@@ -508,7 +508,11 @@ export default function DashboardFedele() {
             </p>
           </button>
           <button type="button" onClick={() => setStanzaAperta("sacramenti")} style={stileCard}>
-            <div style={{ fontSize: "34px", marginBottom: "16px" }}>✝️</div>
+            <div style={{ width: "40px", height: "44px", marginBottom: "12px", color: "#b18426" }} aria-hidden="true">
+              <svg viewBox="0 0 32 40" width="40" height="44" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M13 2H19V13H28V19H19V38H13V19H4V13H13V2Z" fill="currentColor" />
+              </svg>
+            </div>
             <h2 style={{ margin: "0 0 10px", fontSize: "22px", fontWeight: "500", color: "#49392c" }}>Sacramenti</h2>
             <p style={{ margin: 0, fontFamily: "Arial, sans-serif", fontSize: "15px", lineHeight: "1.6", color: "#75695e" }}>
               Battesimo, Prima Comunione, Cresima e Matrimonio.
