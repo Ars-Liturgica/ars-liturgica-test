@@ -1,8 +1,10 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { supabase } from "../../../supabaseClient";
 
 // Ars Liturgica — Sacramenti lato fedele.
 // Struttura delle sottocard della Prima Comunione approvata il 6 novembre 2026.
-// Questo file prepara la navigazione e i testi, senza simulare invii a Supabase.
+// Modulo Prima Comunione: legge le impostazioni pubblicate e prepara le RPC.
+// Invio effettivo soltanto quando le funzioni sono autorizzate su Supabase.
 
 const sacramenti = [
   { id: "battesimo", nome: "Battesimo", descrizione: "Richieste e celebrazioni" },
@@ -54,30 +56,337 @@ function Simbolo({ tipo }) {
   );
 }
 
-function DettaglioSottocard({ sezione }) {
+
+const MODULO_VUOTO = {
+  annoPercorso: "1", gruppo: "", nome: "", cognome: "", dataNascita: "", codiceFiscale: "",
+  luogoNascita: "", indirizzo: "", comune: "", cap: "", parrocchiaBattesimo: "", dataBattesimo: "",
+  genitore1Nome: "", genitore1Cognome: "", genitore1CF: "", genitore1Telefono: "", genitore1Email: "",
+  genitore2Nome: "", genitore2Cognome: "", genitore2Telefono: "", genitore2Email: "",
+  tutore: "", delegati: "", telefonoRagazzo: "", privacyVista: false,
+  autorizzaAccount: false, autorizzaChat: false,
+};
+
+function formattaData(data) {
+  if (!data || !/^\d{4}-\d{2}-\d{2}$/.test(data)) return data || "—";
+  const [anno, mese, giorno] = data.split("-");
+  return `${giorno}/${mese}/${anno}`;
+}
+
+function ModuloComunione({ parrocchiaId, utenteId, nomeParrocchia }) {
+  const [config, setConfig] = useState(null);
+  const [caricamento, setCaricamento] = useState(true);
+  const [erroreConfig, setErroreConfig] = useState("");
+  const [mostraModulo, setMostraModulo] = useState(false);
+  const [mostraPrivacy, setMostraPrivacy] = useState(false);
+  const [modulo, setModulo] = useState({ ...MODULO_VUOTO });
+  const [ricerca, setRicerca] = useState("idle");
+  const [candidati, setCandidati] = useState([]);
+  const [sceltaAccount, setSceltaAccount] = useState("");
+  const [messaggioRicerca, setMessaggioRicerca] = useState("");
+  const [messaggio, setMessaggio] = useState("");
+  const [inInvio, setInInvio] = useState(false);
+  const [ricevuta, setRicevuta] = useState(null);
+
+  useEffect(() => {
+    let attivo = true;
+    setConfig(null);
+    setErroreConfig("");
+    setCaricamento(true);
+    if (!parrocchiaId) {
+      setErroreConfig("Non è disponibile la parrocchia. Torna alla dashboard e riprova.");
+      setCaricamento(false);
+      return undefined;
+    }
+    (async () => {
+      const { data, error } = await supabase
+        .from("ars_comunione_impostazioni")
+        .select("anno_pastorale, durata, date_iscrizioni, informazioni, modulo_iscrizione_tipo, modulo_pdf_percorso, informativa_privacy_testo, informativa_privacy_versione")
+        .eq("parrocchia_id", parrocchiaId)
+        .maybeSingle();
+      if (!attivo) return;
+      setCaricamento(false);
+      if (error) setErroreConfig("Non è possibile leggere le impostazioni della parrocchia: " + error.message);
+      else if (!data) setErroreConfig("La parrocchia non ha ancora configurato il catechismo.");
+      else setConfig(data);
+    })();
+    return () => { attivo = false; };
+  }, [parrocchiaId]);
+
+  const aggiorna = (chiave, valore) => {
+    setModulo(prev => ({ ...prev, [chiave]: valore }));
+    setMessaggio("");
+    setRicevuta(null);
+    if (["nome", "cognome", "telefonoRagazzo"].includes(chiave)) {
+      setRicerca("idle");
+      setCandidati([]);
+      setSceltaAccount("");
+      setMessaggioRicerca("");
+    }
+  };
+  const campo = (chiave, nome, tipo = "text", obbligatorio = false) => (
+    <label className="ars-sac-campo" key={chiave}>
+      <span>{nome}{obbligatorio ? " *" : ""}</span>
+      <input type={tipo} value={modulo[chiave]} required={obbligatorio}
+        onChange={e => aggiorna(chiave, e.target.value)} maxLength={tipo === "tel" ? 60 : 254} />
+    </label>
+  );
+  const spunta = (chiave, testo) => (
+    <label className="ars-sac-spunta" key={chiave}>
+      <input type="checkbox" checked={modulo[chiave]} onChange={e => {
+        const valore = e.target.checked;
+        aggiorna(chiave, valore);
+        if (chiave === "autorizzaAccount" && !valore) aggiorna("autorizzaChat", false);
+      }} />
+      <span>{testo}</span>
+    </label>
+  );
+
+  const privacy = String(config?.informativa_privacy_testo || "").trim();
+  const versionePrivacy = String(config?.informativa_privacy_versione || "").trim();
+  const privacyPubblicata = Boolean(privacy && versionePrivacy);
+  const durata = Number(config?.durata || 2);
+  const date = config?.date_iscrizioni || {};
+  const fascia = date[modulo.annoPercorso] || {};
+  const oggi = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Rome" });
+  const aperto = Boolean(fascia.apertura && fascia.chiusura && oggi >= fascia.apertura && oggi <= fascia.chiusura);
+
+  async function cercaAccount() {
+    setMessaggioRicerca("");
+    setCandidati([]);
+    setSceltaAccount("");
+    if (!modulo.nome.trim() || !modulo.cognome.trim()) {
+      setMessaggioRicerca("Inserisci nome e cognome del ragazzo prima di cercare un account.");
+      return;
+    }
+    setRicerca("loading");
+    const { data, error } = await supabase.rpc("ars_comunione_cerca_account_ragazzo", {
+      p_nome: modulo.nome.trim(), p_cognome: modulo.cognome.trim(),
+    });
+    if (error) {
+      setRicerca("failed");
+      setMessaggioRicerca("La ricerca degli account non è ancora disponibile. Nessun collegamento sarà effettuato.");
+      return;
+    }
+    setRicerca("ready");
+    setCandidati(Array.isArray(data) ? data : []);
+    setMessaggioRicerca(Array.isArray(data) && data.length
+      ? "Se riconosci l'account di tuo figlio, selezionalo. Il cellulare è mostrato solo in parte."
+      : "Nessun account con questo nome e cognome: potrai autorizzarne la creazione.");
+    setSceltaAccount(Array.isArray(data) && data.length ? "" : "nessuno");
+  }
+
+  function validaDomanda() {
+    if (!parrocchiaId || !utenteId) return "Accedi alla parrocchia come fedele per inviare la domanda.";
+    if (!privacyPubblicata) return "La parrocchia deve ancora pubblicare l'informativa privacy.";
+    if (!aperto) return "Le iscrizioni per l'anno scelto non sono aperte.";
+    for (const chiave of ["nome", "cognome", "dataNascita", "genitore1Nome", "genitore1Cognome"]) {
+      if (!String(modulo[chiave] || "").trim()) return "Compila i dati obbligatori del bambino e del genitore.";
+    }
+    if (!modulo.privacyVista) return "Leggi l'informativa e conferma di averne preso visione.";
+    if (modulo.autorizzaAccount && ricerca !== "ready") return "Prima di autorizzare l'account, completa la ricerca dei possibili account esistenti.";
+    if (modulo.autorizzaAccount && !sceltaAccount) return "Seleziona l'account di tuo figlio o scegli 'Nessuno di questi'.";
+    return "";
+  }
+
+  async function inviaDomanda(e) {
+    e.preventDefault();
+    const errore = validaDomanda();
+    if (errore) { setMessaggio(errore); return; }
+    if (inInvio || ricevuta) return;
+    setInInvio(true);
+    setMessaggio("");
+    const dati = { ...modulo };
+    delete dati.privacyVista;
+    delete dati.autorizzaAccount;
+    delete dati.autorizzaChat;
+    // I dati sanitari non vengono inviati con questa domanda.
+    const { data, error } = await supabase.rpc("ars_comunione_presenta_domanda_con_account", {
+      p_parrocchia_id: parrocchiaId,
+      p_utente_id: utenteId,
+      p_anno_percorso: Number(modulo.annoPercorso),
+      p_dati: dati,
+      p_privacy_presa_visione: true,
+      p_consenso_account: modulo.autorizzaAccount,
+      p_consenso_chat: modulo.autorizzaAccount && modulo.autorizzaChat,
+      p_account_esistente_id: modulo.autorizzaAccount && !["nessuno", "nonso"].includes(sceltaAccount)
+        ? (sceltaAccount || null) : null,
+    });
+    setInInvio(false);
+    if (error) {
+      setMessaggio("Domanda non inviata: " + error.message + ". Puoi conservare i dati inseriti e riprovare quando il servizio sarà attivo.");
+      return;
+    }
+    if (!data?.ok || !data?.iscrizione_id) {
+      setMessaggio("Non abbiamo ricevuto la conferma della registrazione. Non ripetere l'invio prima di verificare.");
+      return;
+    }
+    setRicevuta(data);
+    setMessaggio("Domanda registrata correttamente. Puoi stampare e firmare la domanda e l'informativa.");
+  }
+
+  function stampa() {
+    if (!privacyPubblicata) { setMessaggio("La parrocchia non ha ancora pubblicato l'informativa da stampare."); return; }
+    if (!modulo.nome.trim() || !modulo.cognome.trim() || !modulo.genitore1Nome.trim() || !modulo.genitore1Cognome.trim()) {
+      setMessaggio("Compila almeno nome e cognome del bambino e del genitore prima di stampare."); return;
+    }
+    setMessaggio("");
+    window.print();
+  }
+
+  const campiStampa = [
+    ["Anno del percorso", modulo.annoPercorso + "°"], ["Gruppo (se noto)", modulo.gruppo],
+    ["Nome del bambino", modulo.nome], ["Cognome", modulo.cognome],
+    ["Data di nascita", formattaData(modulo.dataNascita)], ["Luogo di nascita", modulo.luogoNascita],
+    ["Codice fiscale", modulo.codiceFiscale], ["Residenza", modulo.indirizzo], ["Comune", modulo.comune],
+    ["CAP", modulo.cap], ["Parrocchia del battesimo", modulo.parrocchiaBattesimo],
+    ["Data del battesimo", formattaData(modulo.dataBattesimo)],
+    ["Nome del genitore", modulo.genitore1Nome], ["Cognome del genitore", modulo.genitore1Cognome],
+    ["Telefono del genitore", modulo.genitore1Telefono], ["Email del genitore", modulo.genitore1Email],
+    ["Secondo genitore", [modulo.genitore2Nome, modulo.genitore2Cognome].filter(Boolean).join(" ")],
+    ["Telefono secondo genitore", modulo.genitore2Telefono], ["Email secondo genitore", modulo.genitore2Email],
+    ["Tutore/qualità", modulo.tutore], ["Persone delegate", modulo.delegati],
+  ];
+
+  return <div className="ars-sac-iscrizioni">
+    {caricamento && <p role="status">Caricamento delle informazioni della parrocchia…</p>}
+    {erroreConfig && <p role="alert" className="ars-sac-errore">{erroreConfig}</p>}
+    {config && <>
+      <div className="ars-sac-nota">
+        <h4>Anno catechistico {config.anno_pastorale}</h4>
+        <p>{config.informazioni || "Informazioni sulle iscrizioni e il percorso di Prima Comunione."}</p>
+        {!privacyPubblicata && <p className="ars-sac-errore">L'informativa privacy non è ancora pubblicata: la domanda non può essere inviata.</p>}
+      </div>
+      <p>Il genitore presenta la domanda per il primo anno oppure ricompila il modulo per ogni rinnovo annuale.</p>
+      <div className="ars-sac-azioni">
+        <button className="ars-sac-azione" type="button" onClick={() => setMostraModulo(v => !v)}>
+          {mostraModulo ? "Chiudi il modulo" : "Compila iscrizione o rinnovo"}
+        </button>
+      </div>
+    </>}
+
+    {config && mostraModulo && <form className="ars-sac-modulo" onSubmit={inviaDomanda}>
+      <fieldset><legend>Anno di catechismo</legend>
+        <label className="ars-sac-campo"><span>Anno del percorso</span>
+          <select value={modulo.annoPercorso} onChange={e => aggiorna("annoPercorso", e.target.value)}>
+            {[1, 2, 3].filter(n => n <= durata).map(n => <option value={String(n)} key={n}>{n}° anno — {n === 1 ? "nuova iscrizione" : "rinnovo"}</option>)}
+          </select>
+        </label>
+        <p className="ars-sac-info-date">Iscrizioni dal {formattaData(fascia.apertura)} al {formattaData(fascia.chiusura)}.
+          {!aperto && <strong> Attualmente chiuse per questo anno.</strong>}</p>
+        {campo("gruppo", "Gruppo (se noto)")}
+      </fieldset>
+
+      <fieldset><legend>Dati del bambino</legend><div className="ars-sac-form-grid">
+        {campo("nome", "Nome", "text", true)}{campo("cognome", "Cognome", "text", true)}
+        {campo("dataNascita", "Data di nascita", "date", true)}{campo("luogoNascita", "Luogo di nascita")}
+        {campo("codiceFiscale", "Codice fiscale (se richiesto)")}
+        {campo("indirizzo", "Indirizzo di residenza")}{campo("comune", "Comune")}{campo("cap", "CAP")}
+        {campo("parrocchiaBattesimo", "Parrocchia del Battesimo")}{campo("dataBattesimo", "Data del Battesimo", "date")}
+      </div></fieldset>
+
+      <fieldset><legend>Genitore o tutore richiedente</legend><div className="ars-sac-form-grid">
+        {campo("genitore1Nome", "Nome", "text", true)}{campo("genitore1Cognome", "Cognome", "text", true)}
+        {campo("genitore1CF", "Codice fiscale")}{campo("genitore1Telefono", "Telefono", "tel")}
+        {campo("genitore1Email", "Email", "email")}{campo("tutore", "Qualità del tutore, se pertinente")}
+      </div></fieldset>
+      <fieldset><legend>Secondo genitore (se presente)</legend><div className="ars-sac-form-grid">
+        {campo("genitore2Nome", "Nome")}{campo("genitore2Cognome", "Cognome")}
+        {campo("genitore2Telefono", "Telefono", "tel")}{campo("genitore2Email", "Email", "email")}
+      </div></fieldset>
+      <fieldset><legend>Deleghe (se previste)</legend>
+        <label className="ars-sac-campo">Persone delegate al ritiro
+          <textarea value={modulo.delegati} onChange={e => aggiorna("delegati", e.target.value)} rows={2} />
+        </label>
+        <p className="ars-sac-avvertenza">Eventuali informazioni sanitarie riservate vanno consegnate separatamente alla parrocchia, non in questo modulo online.</p>
+      </fieldset>
+
+      <fieldset><legend>Account personale del ragazzo — facoltativo</legend>
+        <p>Se tuo figlio ha già un account Ars Liturgica puoi riutilizzarlo. L'iscrizione al Catechismo è possibile anche senza autorizzare un account.</p>
+        {spunta("autorizzaAccount", "Autorizzo l'utilizzo o la creazione di un account Ars Liturgica per mio figlio.")}
+        {modulo.autorizzaAccount && <div className="ars-sac-scelta-account">
+          <p>Per riconoscere un account già esistente, confrontiamo nome e cognome. Il cellulare serve a distinguerlo dagli omonimi.</p>
+          {campo("telefonoRagazzo", "Cellulare del ragazzo (se noto)", "tel")}
+          <button className="ars-sac-azione ars-sac-azione-chiara" type="button" onClick={cercaAccount} disabled={ricerca === "loading"}>
+            {ricerca === "loading" ? "Ricerca in corso…" : "Cerca account esistenti"}
+          </button>
+          {messaggioRicerca && <p role="status" className="ars-sac-avvertenza">{messaggioRicerca}</p>}
+          {ricerca === "ready" && candidati.length > 0 && <div className="ars-sac-risultati" role="group" aria-label="Account trovati">
+            {candidati.map(c => <label className="ars-sac-spunta" key={c.account_id}>
+              <input type="radio" name="accountFiglio" value={c.account_id} checked={sceltaAccount === c.account_id}
+                onChange={() => setSceltaAccount(c.account_id)} />
+              <span><strong>{c.nome} {c.cognome}</strong> — Cell. {c.cellulare}</span>
+            </label>)}
+            <label className="ars-sac-spunta"><input type="radio" name="accountFiglio" value="nessuno"
+              checked={sceltaAccount === "nessuno"} onChange={() => setSceltaAccount("nessuno")} />
+              <span>Nessuno di questi account è di mio figlio</span></label>
+            <label className="ars-sac-spunta"><input type="radio" name="accountFiglio" value="nonso"
+              checked={sceltaAccount === "nonso"} onChange={() => setSceltaAccount("nonso")} />
+              <span>Non so riconoscere l'account: prosegui con la domanda</span></label>
+          </div>}
+          {spunta("autorizzaChat", "Autorizzo separatamente mio figlio a partecipare allo spazio di dialogo del proprio gruppo di catechismo, seguito dalla parrocchia.")}
+          <p className="ars-sac-avvertenza">Il ragazzo non avrà accesso ai dati riservati del genitore né ai pagamenti. Nessuna conversazione privata fra ragazzi.</p>
+        </div>}
+      </fieldset>
+
+      <fieldset><legend>Informativa privacy della parrocchia</legend>
+        {privacyPubblicata ? <>
+          <p>Informativa pubblicata dalla parrocchia — versione {versionePrivacy}.</p>
+          <button className="ars-sac-azione ars-sac-azione-chiara" type="button" onClick={() => setMostraPrivacy(v => !v)}>
+            {mostraPrivacy ? "Chiudi informativa" : "Leggi l'informativa privacy"}
+          </button>
+          {mostraPrivacy && <div className="ars-sac-testo-informativa" tabIndex={0}>{privacy}</div>}
+          {spunta("privacyVista", "Dichiaro di aver preso visione dell'informativa privacy della parrocchia. La stamperò e firmerò insieme alla domanda.")}
+        </> : <p role="alert" className="ars-sac-errore">L'informativa non è ancora disponibile. La parrocchia deve pubblicarla prima dell'invio.</p>}
+        <p className="ars-sac-avvertenza">La spunta online non sostituisce la firma: domanda e informativa devono essere stampate, firmate e riconsegnate in parrocchia.</p>
+      </fieldset>
+
+      {messaggio && <p className={ricevuta ? "ars-sac-successo" : "ars-sac-errore"} role="status">{messaggio}</p>}
+      {ricevuta && <p className="ars-sac-successo">Pratica registrata: {ricevuta.iscrizione_id}.
+        {ricevuta.account_stato === "da_verificare" ? " L'eventuale account del ragazzo sarà verificato separatamente." : ""}</p>}
+      <div className="ars-sac-azioni">
+        <button className="ars-sac-azione" type="button" onClick={stampa} disabled={!privacyPubblicata}>
+          Stampa domanda e informativa
+        </button>
+        <button className="ars-sac-azione" type="submit" disabled={inInvio || Boolean(ricevuta) || !privacyPubblicata || !aperto}>
+          {inInvio ? "Invio in corso…" : ricevuta ? "Domanda registrata" : "Invia domanda"}
+        </button>
+      </div>
+      <p className="ars-sac-avvertenza">L'invio risulterà effettivo soltanto dopo la conferma del sistema. Se la funzione non è ancora abilitata in Supabase, nessuna domanda viene registrata.</p>
+
+      <div className="ars-sac-documenti-stampa" aria-hidden="true">
+        <section className="ars-sac-pagina-stampa">
+          <h2>{nomeParrocchia || "Parrocchia"}</h2>
+          <h3>Domanda di iscrizione o rinnovo — Prima Comunione</h3>
+          <p>Anno catechistico {config.anno_pastorale}</p>
+          {ricevuta?.iscrizione_id && <p>Pratica: {ricevuta.iscrizione_id}</p>}
+          <div className="ars-sac-righe-stampa">
+            {campiStampa.map(([etichetta, valore]) => <div key={etichetta}><strong>{etichetta}:</strong> {valore || "_________________"}</div>)}
+          </div>
+          <p>Chiedo l'iscrizione del minore sopra indicato al percorso di preparazione alla Prima Comunione.</p>
+          <p>Autorizzazione account: {modulo.autorizzaAccount ? "Sì" : "No"} — Autorizzazione dialogo del gruppo: {modulo.autorizzaAccount && modulo.autorizzaChat ? "Sì" : "No"}.</p>
+          <p>Presa visione dell'informativa privacy versione {versionePrivacy}: {modulo.privacyVista ? "Confermata online" : "Da confermare"}.</p>
+          <div className="ars-sac-firme-stampa">
+            <p>Luogo e data: ____________________________________________</p>
+            <p>Firma genitore/tutore: _____________________________________</p>
+            <p>Firma secondo genitore, se richiesta: _________________________</p>
+          </div>
+        </section>
+        <section className="ars-sac-pagina-stampa ars-sac-privacy-stampa">
+          <div className="ars-sac-stampa-privacy-testo">{privacy}</div>
+          <p>Versione informativa: {versionePrivacy}</p>
+          <p>Data e luogo: ____________________________________________</p>
+          <p>Firma genitore/tutore: _____________________________________</p>
+          <p>Firma secondo genitore, se richiesta: _________________________</p>
+        </section>
+      </div>
+    </form>}
+  </div>;
+}
+
+function DettaglioSottocard({ sezione, parrocchiaId, utenteId, nomeParrocchia }) {
   switch (sezione) {
     case "iscrizioni":
-      return (
-        <>
-          <p>Da qui le famiglie potranno presentare la domanda del primo anno, rinnovarla annualmente e consultare le proprie iscrizioni.</p>
-          <div className="ars-sac-nota">
-            <h4>Un account Ars Liturgica anche per tuo figlio</h4>
-            <p>Durante l'iscrizione potrai autorizzare la creazione automatica di un account personale per tuo figlio, senza compilare altri moduli.</p>
-            <p>L'account del ragazzo consentirà di <strong>consultare le sezioni dell'app a lui accessibili</strong> e di <strong>scrivere soltanto nello spazio di dialogo del proprio gruppo di Catechismo</strong>.</p>
-            <h4>Uno spazio di dialogo seguito dalla parrocchia</h4>
-            <p>Le conversazioni di gruppo si svolgeranno alla presenza dei catechisti autorizzati e del parroco. <strong>Non saranno possibili conversazioni private fra ragazzi.</strong> Le eventuali comunicazioni individuali dei responsabili con un minore saranno visibili anche al genitore o tutore.</p>
-            <p>I dati personali riservati, i documenti e le informazioni familiari resteranno nell'area riservata del genitore e non saranno mostrati nell'account del ragazzo.</p>
-          </div>
-          <div className="ars-sac-consenso-preview">
-            <label>
-              <input type="checkbox" disabled />
-              <span>Autorizzo la creazione dell'account Ars Liturgica per mio figlio, con le funzionalità limitate sopra descritte, e dichiaro di aver preso visione dell'informativa.</span>
-            </label>
-            <small>La spunta sarà attivata nel modulo definitivo. Il consenso alla creazione dell'account sarà distinto dalla presa visione dell'informativa privacy del Catechismo.</small>
-          </div>
-          <p className="ars-sac-prossimamente">Il modulo e l'elenco delle domande saranno disponibili dopo il collegamento sicuro a Supabase.</p>
-        </>
-      );
+      return <ModuloComunione parrocchiaId={parrocchiaId} utenteId={utenteId} nomeParrocchia={nomeParrocchia} />;
     case "gruppo":
       return <><p>Qui troverai il gruppo di Catechismo assegnato e lo spazio di dialogo condiviso con i catechisti e il parroco.</p><p>Ai ragazzi sarà consentito scrivere nel gruppo, ma non inviare messaggi privati ad altri ragazzi.</p><p className="ars-sac-prossimamente">Le conversazioni saranno attivate dopo la predisposizione dei gruppi e delle autorizzazioni.</p></>;
     case "calendario":
@@ -88,17 +397,18 @@ function DettaglioSottocard({ sezione }) {
       return <><p>Qui il genitore potrà consultare le eventuali quote del Catechismo, lo stato dei pagamenti e le relative ricevute.</p><p>I ragazzi non avranno accesso alle funzioni di pagamento.</p><p className="ars-sac-prossimamente">La sezione sarà collegata al sistema dei pagamenti già esistente, senza duplicarlo.</p></>;
     case "celebrazioni":
       return <><p>Informazioni sulla preparazione alla Prima Comunione, le celebrazioni e gli appuntamenti collegati.</p><p className="ars-sac-prossimamente">Le informazioni saranno pubblicate dalla parrocchia.</p></>;
-    default:
-      return null;
+    default: return null;
   }
 }
 
-export default function SacramentiFedele({ tornaDashboard }) {
+export default function SacramentiFedele({ tornaDashboard, utenteId = null, parrocchiaId = null, nomeParrocchia = "" }) {
   const [scelto, setScelto] = useState(null);
   const [sottocardScelta, setSottocardScelta] = useState(null);
-  const sacramento = sacramenti.find((s) => s.id === scelto);
-  const sottocard = sottocardComunione.find((s) => s.id === sottocardScelta);
-
+  const parrocchiaAttuale = parrocchiaId || (typeof window !== "undefined" ? localStorage.getItem("ars_parrocchia_id") : null);
+  const utenteAttuale = utenteId || (typeof window !== "undefined" ? localStorage.getItem("ars_utente_id") : null);
+  const nomeAttuale = nomeParrocchia || (typeof window !== "undefined" ? localStorage.getItem("ars_nome_parrocchia") : "") || "La tua Parrocchia";
+  const sacramento = sacramenti.find(s => s.id === scelto);
+  const sottocard = sottocardComunione.find(s => s.id === sottocardScelta);
   const tornaIndietro = () => {
     if (sottocardScelta) { setSottocardScelta(null); return; }
     if (sacramento) { setScelto(null); return; }
@@ -115,33 +425,30 @@ export default function SacramentiFedele({ tornaDashboard }) {
         <h2>{sottocard ? sottocard.nome : sacramento ? sacramento.nome : "Sacramenti"}</h2>
         <p>{sottocard ? sottocard.descrizione : sacramento ? sacramento.descrizione : "Battesimo, Prima Comunione, Cresima e Matrimonio"}</p>
       </header>
-
       {!sacramento ? (
         <div className="ars-sac-griglia">
-          {sacramenti.map((s) => (
-            <button type="button" className="ars-sac-card" key={s.id} onClick={() => { setScelto(s.id); setSottocardScelta(null); }} aria-label={`${s.nome} — ${s.descrizione}`}>
-              <span className="ars-sac-simbolo" aria-hidden="true"><Simbolo tipo={s.id} /></span>
-              <strong>{s.nome}</strong>
-              <span className="ars-sac-descrizione">{s.descrizione}</span>
-            </button>
-          ))}
+          {sacramenti.map(s => <button type="button" className="ars-sac-card" key={s.id}
+            onClick={() => { setScelto(s.id); setSottocardScelta(null); }} aria-label={`${s.nome} — ${s.descrizione}`}>
+            <span className="ars-sac-simbolo" aria-hidden="true"><Simbolo tipo={s.id} /></span>
+            <strong>{s.nome}</strong>
+            <span className="ars-sac-descrizione">{s.descrizione}</span>
+          </button>)}
         </div>
       ) : sacramento.id === "comunione" && !sottocard ? (
         <section aria-label="Funzioni Prima Comunione">
           <div className="ars-sac-griglia ars-sac-griglia-sottocard">
-            {sottocardComunione.map((s) => (
-              <button type="button" className="ars-sac-card ars-sac-card-sezione" key={s.id} onClick={() => setSottocardScelta(s.id)}>
-                <span className="ars-sac-mini-simbolo" aria-hidden="true">{s.simbolo}</span>
-                <strong>{s.nome}</strong>
-                <span className="ars-sac-descrizione">{s.descrizione}</span>
-              </button>
-            ))}
+            {sottocardComunione.map(s => <button type="button" className="ars-sac-card ars-sac-card-sezione" key={s.id}
+              onClick={() => setSottocardScelta(s.id)}>
+              <span className="ars-sac-mini-simbolo" aria-hidden="true">{s.simbolo}</span>
+              <strong>{s.nome}</strong><span className="ars-sac-descrizione">{s.descrizione}</span>
+            </button>)}
           </div>
         </section>
       ) : sacramento.id === "comunione" && sottocard ? (
         <section className="ars-sac-pannello" aria-label={sottocard.nome}>
           <h3>{sottocard.nome}</h3>
-          <DettaglioSottocard sezione={sottocard.id} />
+          <DettaglioSottocard sezione={sottocard.id} parrocchiaId={parrocchiaAttuale}
+            utenteId={utenteAttuale} nomeParrocchia={nomeAttuale} />
         </section>
       ) : (
         <section className="ars-sac-dettaglio">
@@ -153,7 +460,6 @@ export default function SacramentiFedele({ tornaDashboard }) {
     </main>
   );
 }
-
 const STILE = `
 .ars-sacramenti-fedele{box-sizing:border-box;width:100%;min-height:100vh;max-width:none;margin:0;padding:32px max(18px,calc((100% - 960px)/2));background:#f7f3ed;color:#243c40}
 .ars-sacramenti-fedele *{box-sizing:border-box}
@@ -191,4 +497,40 @@ const STILE = `
 .ars-sac-card:focus-visible,.ars-sac-indietro:focus-visible{outline:3px solid #c58928;outline-offset:3px}
 @media(max-width:650px){.ars-sacramenti-fedele{padding:12px}.ars-sac-griglia{gap:12px}.ars-sac-card{min-height:185px;padding:15px 8px}.ars-sac-card strong{font-size:1.08rem}.ars-sac-descrizione{font-size:.83rem}.ars-sac-header h2{font-size:1.65rem}.ars-sac-simbolo{width:78px;height:78px}.ars-sac-simbolo svg{width:65px;height:65px}.ars-sac-card-sezione{min-height:160px}.ars-sac-card-sezione strong{font-size:1rem}.ars-sac-pannello{padding:18px}}
 @media(max-width:380px){.ars-sac-griglia{grid-template-columns:1fr}.ars-sac-card{min-height:165px}.ars-sac-card-sezione{min-height:145px}}
+
+.ars-sac-azioni{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:16px 0}
+.ars-sac-azione{padding:11px 17px;border-radius:9px;background:#a67a29;color:white;border:1px solid #a67a29;font:700 .95rem Georgia,serif;cursor:pointer}
+.ars-sac-azione:disabled{opacity:.55;cursor:not-allowed}
+.ars-sac-azione-chiara{background:#fffdf8;color:#75541e}
+.ars-sac-azione-chiara:hover{background:#f8efd9}
+.ars-sac-iscrizioni fieldset{min-width:0;margin:20px 0;border:1px solid #e2d2b3;border-radius:12px;padding:17px}
+.ars-sac-iscrizioni legend{font:700 1.1rem Georgia,serif;color:#79551f;padding:0 7px}
+.ars-sac-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 16px}
+.ars-sac-campo{display:flex;flex-direction:column;gap:7px;margin:10px 0;font-size:.95rem;font-weight:600}
+.ars-sac-campo input,.ars-sac-campo select,.ars-sac-campo textarea{font:inherit;background:white;color:#243c40;border:1px solid #d8c9a8;border-radius:8px;padding:11px;min-height:43px;width:100%;box-sizing:border-box}
+.ars-sac-spunta{display:flex;align-items:flex-start;gap:11px;line-height:1.5;margin:14px 0;color:#243c40}
+.ars-sac-spunta input{accent-color:#b98a31;flex:0 0 auto;margin-top:5px}
+.ars-sac-scelta-account,.ars-sac-risultati{background:#fffaf0;border:1px solid #e2d2b3;border-radius:12px;padding:14px;margin:12px 0}
+.ars-sac-risultati{background:#fff}
+.ars-sac-avvertenza,.ars-sac-info-date{background:#fbf5e9;padding:12px;border-radius:8px;color:#755c34;font-size:.92rem}
+.ars-sac-testo-informativa{white-space:pre-wrap;overflow-wrap:anywhere;max-height:370px;overflow:auto;border:1px solid #dec9a2;background:white;padding:20px;border-radius:10px;line-height:1.65;margin:15px 0}
+.ars-sac-errore{color:#9b2929!important;font-weight:600;overflow-wrap:anywhere}
+.ars-sac-successo{color:#225a45!important;background:#f0f7f0;padding:13px;border-radius:9px;overflow-wrap:anywhere}
+.ars-sac-documenti-stampa{display:none}
+@media(max-width:650px){.ars-sac-form-grid{grid-template-columns:1fr}.ars-sac-iscrizioni fieldset{padding:12px}}
+@media print {
+  @page{size:A4;margin:14mm}
+  body *{visibility:hidden!important}
+  .ars-sac-documenti-stampa,.ars-sac-documenti-stampa *{visibility:visible!important}
+  .ars-sac-documenti-stampa{display:block!important;position:absolute!important;left:0;top:0;width:100%!important;margin:0!important;padding:0!important;background:white!important;color:#111!important;font:12pt/1.5 Georgia,serif!important}
+  .ars-sac-pagina-stampa{display:block;break-after:page;page-break-after:always;white-space:normal;overflow-wrap:anywhere}
+  .ars-sac-pagina-stampa:last-child{break-after:auto;page-break-after:auto}
+  .ars-sac-pagina-stampa h2{text-align:center;font-size:18pt;margin:0 0 10px}
+  .ars-sac-pagina-stampa h3{text-align:center;font-size:15pt}
+  .ars-sac-righe-stampa{display:grid;grid-template-columns:1fr 1fr;gap:7px 14px;font:10pt/1.4 Arial,sans-serif;margin:20px 0}
+  .ars-sac-righe-stampa div{border-bottom:1px solid #ccc;padding:3px;break-inside:avoid}
+  .ars-sac-firme-stampa{margin-top:20px;font-size:11pt}
+  .ars-sac-stampa-privacy-testo{white-space:pre-wrap!important;overflow-wrap:anywhere;font:10.5pt/1.55 Georgia,serif!important}
+  .ars-sac-privacy-stampa{font-size:11pt}
+}
 `;
