@@ -54,6 +54,64 @@ function Simbolo({ tipo }) {
   );
 }
 
+
+// Il modello è una bozza da completare: non viene pubblicato automaticamente.
+function modelloPrivacyComunione(parrocchia, nomeParrocchia, anno) {
+  const valore = (x, segnaposto) => String(x || "").trim() || `[${segnaposto}]`;
+  const nome = valore(parrocchia?.nome || nomeParrocchia, "Denominazione completa della parrocchia");
+  const indirizzo = valore(parrocchia?.indirizzo, "Indirizzo completo e sede della parrocchia");
+  const email = valore(parrocchia?.email, "Email della parrocchia");
+  const telefono = valore(parrocchia?.telefono, "Telefono della parrocchia");
+  return `${nome}
+${indirizzo} • ${telefono} • ${email}
+
+INFORMATIVA SUL TRATTAMENTO DEI DATI PERSONALI
+Iscrizioni al percorso di preparazione alla Prima Comunione
+Anno catechistico ${anno}
+
+1. TITOLARE DEL TRATTAMENTO
+Il titolare del trattamento è ${nome}, con sede in ${indirizzo}, contattabile tramite ${email} e ${telefono}.
+Responsabile della protezione dei dati, se nominato: [Indicare il contatto o specificare se non nominato].
+
+2. DATI TRATTATI E FINALITÀ
+La parrocchia utilizza i dati anagrafici e i recapiti della famiglia e del minore per gestire la domanda, i rinnovi, i gruppi di catechismo, gli incontri e le comunicazioni relative al percorso. Eventuali ulteriori trattamenti: [Descrivere eventuali finalità ulteriori, oppure scrivere “Nessuna”].
+I dati sanitari, se necessari, sono raccolti con una procedura separata e riservata.
+
+3. BASE GIURIDICA E CONFERIMENTO
+[Indicare la base giuridica e, ove pertinente, la condizione applicabile al trattamento di categorie particolari di dati].
+I dati necessari all'iscrizione sono: [Specificare].
+Il mancato conferimento dei dati necessari comporta: [Specificare].
+I dati facoltativi sono: [Specificare].
+
+4. DESTINATARI E MODALITÀ DEL TRATTAMENTO
+I dati sono trattati dal personale e dai collaboratori autorizzati della parrocchia e dagli eventuali fornitori incaricati.
+[Indicare categorie di destinatari, fornitori pertinenti e trasferimenti fuori dallo Spazio economico europeo, oppure specificare che non sono previsti].
+
+5. CONSERVAZIONE
+[Indicare i tempi di conservazione o i criteri utilizzati, distinguendo ove necessario i registri sacramentali dalla documentazione delle iscrizioni].
+
+6. DIRITTI DEGLI INTERESSATI
+Nei casi previsti dalla normativa applicabile è possibile richiedere accesso, rettifica, cancellazione, limitazione, opposizione e, ove applicabile, portabilità. Il consenso, quando costituisce la base giuridica del trattamento, può essere revocato. È possibile proporre reclamo al Garante per la protezione dei dati personali.
+Per esercitare i diritti: ${email}.
+
+7. DECISIONI AUTOMATIZZATE
+[Specificare se sono previste decisioni automatizzate o profilazione].
+
+PRESA VISIONE E FIRMA
+Dichiaro di avere ricevuto e letto questa informativa. Gli eventuali consensi facoltativi per l'account personale del minore e per la chat del gruppo catechistico sono richiesti separatamente.
+
+Luogo e data: __________________________________
+Firma del genitore o tutore: ________________________________
+Firma dell'altro genitore, se richiesta: ________________________________`;
+}
+
+function prossimaVersionePrivacy(versione) {
+  const v = String(versione || "").trim();
+  if (!v) return "1";
+  const m = v.match(/^(.*?)(\d+)$/);
+  return m ? `${m[1]}${Number(m[2]) + 1}` : `${v}-2`;
+}
+
 const annoCorrente = new Date().getFullYear();
 const impostazioniIniziali = {
   anno: `${annoCorrente}/${annoCorrente + 1}`,
@@ -73,6 +131,17 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
   const [caricamento, setCaricamento] = useState(false);
   const [operazione, setOperazione] = useState(false);
   const modificaRichiesta = useRef(false);
+  // Privacy Prima Comunione: gestione distinta dalle impostazioni già operative.
+  const [privacyTesto, setPrivacyTesto] = useState("");
+  const [privacyVersione, setPrivacyVersione] = useState("");
+  const [privacyModifica, setPrivacyModifica] = useState(true);
+  const [privacyAnteprima, setPrivacyAnteprima] = useState(false);
+  const [privacyStampa, setPrivacyStampa] = useState(false);
+  const [privacyOperazione, setPrivacyOperazione] = useState(false);
+  const [privacyMessaggio, setPrivacyMessaggio] = useState("");
+  const [parrocchiaPrivacy, setParrocchiaPrivacy] = useState(null);
+  const privacyPubblicata = useRef({ testo: "", versione: "" });
+  const privacyModificaRichiesta = useRef(false);
 
   useEffect(() => {
     let attivo = true;
@@ -81,11 +150,20 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
     setModifica(true);
     setAnteprima(false);
     setImpostazioni({ ...impostazioniIniziali, date: { 1: { apertura: "", chiusura: "" }, 2: { apertura: "", chiusura: "" }, 3: { apertura: "", chiusura: "" } } });
+    privacyModificaRichiesta.current = false;
+    privacyPubblicata.current = { testo: "", versione: "" };
+    setPrivacyTesto("");
+    setPrivacyVersione("");
+    setPrivacyModifica(true);
+    setPrivacyAnteprima(false);
+    setPrivacyStampa(false);
+    setPrivacyMessaggio("");
+    setParrocchiaPrivacy(null);
     if (!parrocchiaId) return;
     async function carica() {
       setCaricamento(true);
       const { data, error } = await supabase.from("ars_comunione_impostazioni")
-        .select("anno_pastorale, durata, date_iscrizioni, informazioni")
+        .select("anno_pastorale, durata, date_iscrizioni, informazioni, informativa_privacy_testo, informativa_privacy_versione")
         .eq("parrocchia_id", parrocchiaId).maybeSingle();
       if (!attivo) return;
       setCaricamento(false);
@@ -99,7 +177,24 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
         setSalvato(true);
         setModifica(false);
       }
+      if (data && !privacyModificaRichiesta.current) {
+        const testo = data.informativa_privacy_testo || "";
+        const versione = data.informativa_privacy_versione || "";
+        privacyPubblicata.current = { testo, versione };
+        setPrivacyTesto(testo);
+        setPrivacyVersione(versione);
+        setPrivacyModifica(!testo.trim());
+      }
     }
+    async function caricaParrocchia() {
+      // Campi richiesti solo per completare l'intestazione del modello.
+      const { data, error } = await supabase.from("parrocchie")
+        .select("nome, indirizzo, telefono, email")
+        .eq("id", parrocchiaId).maybeSingle();
+      if (!attivo) return;
+      if (!error && data) setParrocchiaPrivacy(data);
+    }
+    caricaParrocchia();
     carica();
     return () => { attivo = false; };
   }, [parrocchiaId]);
@@ -159,6 +254,87 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
     setMessaggio("Impostazioni salvate correttamente.");
   }
 
+  function inserisciModelloPrivacy() {
+    if (privacyPubblicata.current.testo.trim() && !privacyModifica) {
+      setPrivacyMessaggio("Seleziona prima 'Modifica informativa' per preparare una nuova versione.");
+      return;
+    }
+    if (privacyTesto.trim() && !window.confirm(
+      "Sostituire il testo presente nell'editor con il modello? La versione pubblicata non sarà modificata finché non premi 'Pubblica informativa'."
+    )) return;
+    privacyModificaRichiesta.current = true;
+    setPrivacyTesto(modelloPrivacyComunione(parrocchiaPrivacy, nomeParrocchia, impostazioni.anno));
+    setPrivacyMessaggio("Modello caricato nell'editor: completa i campi tra parentesi quadre prima di pubblicare.");
+    setPrivacyModifica(true);
+    setPrivacyAnteprima(false);
+  }
+
+  async function pubblicaPrivacy() {
+    if (!parrocchiaId) {
+      setPrivacyMessaggio("Parrocchia non disponibile: torna alla dashboard e riprova.");
+      return;
+    }
+    if (!privacyModifica || privacyOperazione || caricamento) return;
+    const testo = privacyTesto.trim();
+    if (testo.length < 300) {
+      setPrivacyMessaggio("Il testo è incompleto: compila l'informativa prima di pubblicarla.");
+      return;
+    }
+    if (/\[[^\]\r\n]+\]/.test(testo)) {
+      setPrivacyMessaggio("Completa o rimuovi tutti i campi tra parentesi quadre prima di pubblicare.");
+      return;
+    }
+    const precedente = privacyPubblicata.current;
+    if (testo === precedente.testo.trim()) {
+      setPrivacyMessaggio("Il testo coincide con la versione già pubblicata.");
+      setPrivacyModifica(false);
+      return;
+    }
+    const versione = prossimaVersionePrivacy(precedente.versione);
+    if (!window.confirm(`Pubblicare l'informativa versione ${versione}? Le nuove iscrizioni conserveranno questo testo; quelle già inviate manterranno il precedente.`)) return;
+    setPrivacyOperazione(true);
+    setPrivacyMessaggio("");
+    // Controllo versione: evita di sovrascrivere una revisione pubblicata altrove.
+    let query = supabase.from("ars_comunione_impostazioni")
+      .update({ informativa_privacy_testo: testo,
+                informativa_privacy_versione: versione,
+                aggiornato_il: new Date().toISOString() })
+      .eq("parrocchia_id", parrocchiaId);
+    if (precedente.versione) query = query.eq("informativa_privacy_versione", precedente.versione);
+    else query = query.is("informativa_privacy_versione", null);
+    const { data, error } = await query.select("informativa_privacy_versione").maybeSingle();
+    setPrivacyOperazione(false);
+    if (error) {
+      setPrivacyMessaggio("Pubblicazione non riuscita: " + error.message);
+      return;
+    }
+    if (!data || data.informativa_privacy_versione !== versione) {
+      setPrivacyMessaggio("Informativa non aggiornata. Potrebbe essere stata modificata da un altro operatore: ricarica la pagina prima di riprovare.");
+      return;
+    }
+    privacyPubblicata.current = { testo, versione };
+    setPrivacyTesto(testo);
+    setPrivacyVersione(versione);
+    privacyModificaRichiesta.current = false;
+    setPrivacyModifica(false);
+    setPrivacyMessaggio(`Informativa versione ${versione} pubblicata correttamente.`);
+  }
+
+  function stampaInformativa() {
+    if (!privacyTesto.trim()) {
+      setPrivacyMessaggio("Inserisci prima il testo dell'informativa.");
+      return;
+    }
+    setPrivacyStampa(true);
+    setPrivacyAnteprima(true);
+    setPrivacyMessaggio("");
+    // Il layout di stampa cambia soltanto per l'informativa.
+    window.setTimeout(() => {
+      window.print();
+      setPrivacyStampa(false);
+    }, 80);
+  }
+
   function stampaVolantino() {
     const errore = controllaImpostazioni();
     if (errore) { setMessaggio(errore); return; }
@@ -178,7 +354,7 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
   }
 
   return (
-    <main className="ars-sacramenti-parroco">
+    <main className={`ars-sacramenti-parroco ${privacyStampa ? "ars-privacy-stampa-attiva" : ""}`}>
       <style>{STILE}</style>
       <button type="button" className="ars-sac-indietro" onClick={indietro}>
         ← {sezione ? "Prima Comunione" : sacramento ? "Tutti i Sacramenti" : "Torna alla dashboard"}
@@ -285,6 +461,52 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
               <div className="ars-sac-volantino-fine">La comunità parrocchiale vi aspetta</div>
             </div>
           </div>
+
+          <div className="ars-sac-privacy-pannello" aria-label="Informativa privacy Prima Comunione">
+            <h3>Informativa privacy per le iscrizioni</h3>
+            <p>Il parroco può preparare un modello con i dati della parrocchia, completarlo e pubblicarlo. Le iscrizioni conserveranno il testo e la versione letti dalla famiglia.</p>
+            <p className="ars-sac-privacy-stato">
+              {privacyVersione ? `Versione pubblicata: ${privacyVersione}` : "Nessuna informativa ancora pubblicata"}
+            </p>
+            <div className="ars-sac-privacy-azioni">
+              <button type="button" className="ars-sac-stampa"
+                onClick={inserisciModelloPrivacy} disabled={caricamento || privacyOperazione}>
+                Inserisci modello con i dati della parrocchia
+              </button>
+              {!privacyModifica && <button type="button" className="ars-sac-stampa"
+                onClick={() => { privacyModificaRichiesta.current = true; setPrivacyModifica(true); setPrivacyMessaggio(""); }}>
+                Modifica informativa
+              </button>}
+            </div>
+            <label className="ars-sac-privacy-etichetta">Testo dell'informativa
+              <textarea value={privacyTesto} rows={16} maxLength={30000}
+                disabled={!privacyModifica || caricamento || privacyOperazione}
+                onChange={(e) => { privacyModificaRichiesta.current = true; setPrivacyTesto(e.target.value); setPrivacyMessaggio(""); }}
+                placeholder="Inserisci il modello e completa l'informativa della parrocchia" />
+            </label>
+            <p className="ars-sac-privacy-nota">Il modello è una bozza: controlla basi giuridiche, destinatari, tempi di conservazione e recapiti prima della pubblicazione. La spunta online documenta la presa visione; domanda e informativa vanno anche stampate e firmate.</p>
+            <div className="ars-sac-privacy-azioni">
+              {privacyModifica && <button type="button" className="ars-sac-conferma"
+                onClick={pubblicaPrivacy} disabled={caricamento || privacyOperazione}>
+                {privacyOperazione ? "Pubblicazione..." : "Pubblica informativa"}
+              </button>}
+              <button type="button" className="ars-sac-stampa"
+                onClick={() => setPrivacyAnteprima((v) => !v)} disabled={!privacyTesto.trim()}>
+                {privacyAnteprima ? "Chiudi anteprima" : "Anteprima informativa"}
+              </button>
+              <button type="button" className="ars-sac-stampa"
+                onClick={stampaInformativa} disabled={!privacyTesto.trim()}>Stampa informativa</button>
+            </div>
+            {privacyMessaggio && <p className="ars-sac-messaggio" role="status">{privacyMessaggio}</p>}
+            {privacyAnteprima && <div className="ars-sac-privacy-stampa" aria-label="Anteprima informativa privacy">
+              <p className="ars-sac-privacy-marcatura">
+                {privacyTesto.trim() === privacyPubblicata.current.testo.trim() && privacyVersione
+                  ? `Informativa pubblicata — versione ${privacyVersione}`
+                  : "BOZZA DA COMPLETARE — NON PUBBLICATA"}
+              </p>
+              <div className="ars-sac-privacy-testo">{privacyTesto}</div>
+            </div>}
+          </div>
         </section>
       ) : (
         <section className="ars-sac-dettaglio">
@@ -353,9 +575,27 @@ const STILE = `
 .ars-sac-conferma{border:0;border-radius:9px;background:#a67a29;color:white;padding:12px 18px;font-weight:700;cursor:pointer}
 .ars-sac-form-footer small{color:#687477}
 .ars-sac-messaggio{margin-top:16px!important;color:#5c4825!important;font-weight:600}
+ .ars-sac-privacy-pannello{margin:34px 0 0;padding:23px;background:#fffdf8;border:1px solid #e2d2b3;border-radius:13px}
+ .ars-sac-privacy-pannello h3{font:700 1.28rem Georgia,serif;color:#243c40;margin:0 0 8px}
+ .ars-sac-privacy-pannello>p{line-height:1.55;color:#5f6d70}
+ .ars-sac-privacy-stato{font-weight:700;color:#785a22!important}
+ .ars-sac-privacy-azioni{display:flex;gap:10px;flex-wrap:wrap;margin:15px 0}
+ .ars-sac-privacy-azioni button:disabled{opacity:.6;cursor:default}
+ .ars-sac-privacy-etichetta{display:flex;flex-direction:column;gap:8px;font-weight:700}
+ .ars-sac-privacy-etichetta textarea{width:100%;box-sizing:border-box;min-height:260px;border:1px solid #d8c9a8;border-radius:9px;padding:12px;line-height:1.6;font:inherit;background:white;color:#243c40;resize:vertical}
+ .ars-sac-privacy-etichetta textarea:disabled{background:#fff;color:#243c40;opacity:1}
+ .ars-sac-privacy-nota{font-size:.9rem;line-height:1.5}
+ .ars-sac-privacy-stampa{background:#fff;color:#111;border:1px solid #bbb;padding:26px;margin:16px 0 0;font:14px/1.6 Arial,sans-serif}
+ .ars-sac-privacy-marcatura{font-weight:bold;color:#6b5127;border-bottom:1px solid #ccc;padding-bottom:8px}
+ .ars-sac-privacy-testo{white-space:pre-wrap;overflow-wrap:anywhere;color:#111}
 @media print{
   @page{size:A4;margin:12mm}
   body *{visibility:hidden!important}
+   .ars-privacy-stampa-attiva .ars-sac-volantino{display:none!important}
+   .ars-privacy-stampa-attiva .ars-sac-privacy-stampa,.ars-privacy-stampa-attiva .ars-sac-privacy-stampa *{visibility:visible!important}
+   .ars-privacy-stampa-attiva .ars-sac-privacy-stampa{display:block!important;position:absolute;left:0;top:0;width:100%;max-width:none;box-sizing:border-box;margin:0;padding:10mm;border:0!important;box-shadow:none!important;background:white!important;color:black!important}
+   .ars-privacy-stampa-attiva .ars-sac-privacy-testo{white-space:pre-wrap;font:11pt/1.45 Arial,sans-serif}
+   .ars-sacramenti-parroco:not(.ars-privacy-stampa-attiva) .ars-sac-privacy-stampa{display:none!important}
   .ars-sac-volantino,.ars-sac-volantino *{visibility:visible!important}
   .ars-sac-volantino-nascosto{display:none!important}
   .ars-sac-volantino{position:absolute;left:0;top:0;width:100%;max-width:none;box-sizing:border-box;margin:0;padding:0;box-shadow:none!important;background:#fff!important;color:#111!important}
