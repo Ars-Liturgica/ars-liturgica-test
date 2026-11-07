@@ -224,7 +224,27 @@ function ModuloComunione({ parrocchiaId, utenteId, nomeParrocchia }) {
     setMessaggio("Domanda registrata correttamente. Puoi stampare e firmare la domanda e l'informativa.");
   }
 
+  // Stampa autonoma della scheda sanitaria. Il foglio non viene mai
+  // inviato a Supabase e non fa parte della domanda online.
+  function stampaSchedaSanitaria() {
+    const classeStampa = "ars-sac-stampa-sanitaria";
+    const ripristina = () => {
+      document.body.classList.remove(classeStampa);
+      window.removeEventListener("afterprint", ripristina);
+    };
+    document.body.classList.add(classeStampa);
+    window.addEventListener("afterprint", ripristina);
+    try {
+      window.print();
+    } catch (errore) {
+      ripristina();
+      setMessaggio("Non è stato possibile avviare la stampa della scheda sanitaria.");
+    }
+  }
+
   function stampa() {
+    // Ripristina la stampa ordinaria, distinta dalla scheda sanitaria.
+    document.body.classList.remove("ars-sac-stampa-sanitaria");
     if (!privacyPubblicata) { setMessaggio("La parrocchia non ha ancora pubblicato l'informativa da stampare."); return; }
     if (!modulo.nome.trim() || !modulo.cognome.trim() || !modulo.genitore1Nome.trim() || !modulo.genitore1Cognome.trim()) {
       setMessaggio("Compila almeno nome e cognome del bambino e del genitore prima di stampare."); return;
@@ -297,7 +317,14 @@ function ModuloComunione({ parrocchiaId, utenteId, nomeParrocchia }) {
         <label className="ars-sac-campo">Persone delegate al ritiro
           <textarea value={modulo.delegati} onChange={e => aggiorna("delegati", e.target.value)} rows={2} />
         </label>
-        <p className="ars-sac-avvertenza">Eventuali informazioni sanitarie riservate vanno consegnate separatamente alla parrocchia, non in questo modulo online.</p>
+        <div className="ars-sac-sanitaria-avviso">
+          <p><strong>Informazioni sanitarie riservate — facoltative</strong></p>
+          <p>Se hai informazioni importanti per la partecipazione di tuo figlio, puoi utilizzare una scheda separata. Non devi scriverle in questa domanda online.</p>
+          <button className="ars-sac-azione ars-sac-azione-chiara" type="button" onClick={stampaSchedaSanitaria}>
+            Stampa scheda sanitaria (facoltativa)
+          </button>
+          <p className="ars-sac-sanitaria-nota">Compila il foglio a mano, firmalo e consegnalo in busta chiusa alla parrocchia. Se non hai informazioni da segnalare, non occorre consegnarlo. Prima della consegna, chiedi alla parrocchia l’informativa specifica sul trattamento dei dati sanitari.</p>
+        </div>
       </fieldset>
 
       <fieldset><legend>Account personale del ragazzo — facoltativo</legend>
@@ -379,6 +406,39 @@ function ModuloComunione({ parrocchiaId, utenteId, nomeParrocchia }) {
           <p>Firma secondo genitore, se richiesta: _________________________</p>
         </section>
       </div>
+
+      {/* Documento cartaceo autonomo, mai inviato né salvato online. */}
+      <section className="ars-sac-scheda-sanitaria-stampa" aria-hidden="true">
+        <div className="ars-sac-sanitaria-intestazione">
+          <p className="ars-sac-sanitaria-parrocchia">{nomeParrocchia || "Parrocchia"}</p>
+          <h2>Scheda riservata facoltativa del minore</h2>
+          <p>Prima Comunione — Anno catechistico {config.anno_pastorale}</p>
+        </div>
+        <p className="ars-sac-sanitaria-istruzioni">Da compilare soltanto se vi sono informazioni particolari da comunicare alla parrocchia. Consegnare in <strong>busta chiusa</strong> al responsabile indicato dalla parrocchia.</p>
+        <div className="ars-sac-sanitaria-dati">
+          <p><strong>Nome e cognome del minore:</strong> {[modulo.nome.trim(), modulo.cognome.trim()].filter(Boolean).join(" ") || "____________________________________"}</p>
+          <p><strong>Anno del percorso:</strong> {modulo.annoPercorso}° <span><strong>Gruppo/classe:</strong> {modulo.gruppo.trim() || "____________________"}</span></p>
+        </div>
+        {[
+          "Patologie ed eventuali terapie in corso rilevanti per la partecipazione",
+          "Allergie e intolleranze (anche alimentari)",
+          "Indicazioni utili in caso di necessità o emergenza",
+          "Altre informazioni strettamente necessarie",
+        ].map(titolo => <div className="ars-sac-sanitaria-righe" key={titolo}>
+          <h3>{titolo}</h3>
+          <div className="ars-sac-sanitaria-riga" />
+          <div className="ars-sac-sanitaria-riga" />
+          <div className="ars-sac-sanitaria-riga" />
+        </div>)}
+        <div className="ars-sac-sanitaria-firma">
+          <p>Le informazioni indicate sono facoltative e sono consegnate separatamente. Per la loro gestione è necessaria l’informativa specifica fornita dalla parrocchia.</p>
+          <p>☐ Ho letto l’informativa specifica e acconsento al trattamento delle informazioni sanitarie che consegno, per le finalità indicate.</p>
+          <p>Luogo e data: __________________________________________</p>
+          <p>Firma del genitore/tutore: _________________________________</p>
+          <p>Firma dell'altro genitore, se richiesta: _________________________</p>
+        </div>
+        <p className="ars-sac-sanitaria-piede">Documento riservato — non allegare alla domanda online e non inserire nell'archivio ordinario delle iscrizioni.</p>
+      </section>
     </form>}
   </div>;
 }
@@ -517,6 +577,10 @@ const STILE = `
 .ars-sac-errore{color:#9b2929!important;font-weight:600;overflow-wrap:anywhere}
 .ars-sac-successo{color:#225a45!important;background:#f0f7f0;padding:13px;border-radius:9px;overflow-wrap:anywhere}
 .ars-sac-documenti-stampa{display:none}
+.ars-sac-scheda-sanitaria-stampa{display:none}
+.ars-sac-sanitaria-avviso{border:1px solid #e2d2b3;background:#fbf5e9;border-radius:10px;padding:16px;margin:12px 0;color:#243c40}
+.ars-sac-sanitaria-avviso p{margin:0 0 12px}
+.ars-sac-sanitaria-avviso .ars-sac-sanitaria-nota{font-size:.9rem;color:#6b5d43;margin:12px 0 0}
 @media(max-width:650px){.ars-sac-form-grid{grid-template-columns:1fr}.ars-sac-iscrizioni fieldset{padding:12px}}
 @media print {
   @page{size:A4;margin:14mm}
@@ -532,5 +596,27 @@ const STILE = `
   .ars-sac-firme-stampa{margin-top:20px;font-size:11pt}
   .ars-sac-stampa-privacy-testo{white-space:pre-wrap!important;overflow-wrap:anywhere;font:10.5pt/1.55 Georgia,serif!important}
   .ars-sac-privacy-stampa{font-size:11pt}
+  /* Nella stampa ordinaria la scheda sanitaria non compare. */
+  body:not(.ars-sac-stampa-sanitaria) .ars-sac-scheda-sanitaria-stampa{display:none!important}
+  /* La scheda sanitaria si stampa da sola, senza domanda e informativa. */
+  body.ars-sac-stampa-sanitaria .ars-sac-documenti-stampa,
+  body.ars-sac-stampa-sanitaria .ars-sac-documenti-stampa *{display:none!important;visibility:hidden!important}
+  body.ars-sac-stampa-sanitaria .ars-sac-scheda-sanitaria-stampa,
+  body.ars-sac-stampa-sanitaria .ars-sac-scheda-sanitaria-stampa *{visibility:visible!important}
+  body.ars-sac-stampa-sanitaria .ars-sac-scheda-sanitaria-stampa{display:block!important;position:absolute!important;left:0!important;top:0!important;width:100%!important;box-sizing:border-box!important;padding:0!important;background:#fff!important;color:#111!important;font:10pt/1.35 Arial,sans-serif!important}
+  .ars-sac-sanitaria-intestazione{text-align:center;border-bottom:1px solid #888;padding-bottom:9px;margin-bottom:10px}
+  .ars-sac-sanitaria-intestazione .ars-sac-sanitaria-parrocchia{font:700 14pt Georgia,serif!important;margin:0 0 7px!important;color:#111!important}
+  .ars-sac-sanitaria-intestazione h2{font:700 17pt Georgia,serif!important;margin:0 0 5px!important;color:#111!important}
+  .ars-sac-sanitaria-intestazione p{margin:0!important;color:#111!important}
+  .ars-sac-sanitaria-istruzioni{font:10pt/1.35 Arial,sans-serif!important;margin:10px 0!important;color:#111!important}
+  .ars-sac-sanitaria-dati{margin:12px 0!important;border:1px solid #bbb;padding:8px 10px}
+  .ars-sac-sanitaria-dati p{margin:3px 0!important;color:#111!important}
+  .ars-sac-sanitaria-dati span{margin-left:25px}
+  .ars-sac-sanitaria-righe{margin:10px 0 13px!important;break-inside:avoid}
+  .ars-sac-sanitaria-righe h3{font:700 10pt Arial,sans-serif!important;text-align:left!important;margin:0 0 4px!important;color:#111!important}
+  .ars-sac-sanitaria-riga{border-bottom:1px solid #aaa;height:18px}
+  .ars-sac-sanitaria-firma{border-top:1px solid #aaa;margin-top:15px;padding-top:10px;break-inside:avoid}
+  .ars-sac-sanitaria-firma p{margin:5px 0!important;font:9pt/1.3 Arial,sans-serif!important;color:#111!important}
+  .ars-sac-sanitaria-piede{margin-top:10px!important;font:italic 8pt Arial,sans-serif!important;color:#555!important;text-align:center}
 }
 `;
