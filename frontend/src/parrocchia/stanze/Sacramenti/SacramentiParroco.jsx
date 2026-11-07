@@ -143,6 +143,42 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
   const [parrocchiaPrivacy, setParrocchiaPrivacy] = useState(null);
   const privacyPubblicata = useRef({ testo: "", versione: "" });
   const privacyModificaRichiesta = useRef(false);
+  // Finestra di conferma in stile Ars Liturgica: sostituisce l'avviso del browser.
+  const [confermaCambioInformativa, setConfermaCambioInformativa] = useState(null);
+  const pulsanteAnnullaConferma = useRef(null);
+  const finestraConferma = useRef(null);
+
+  useEffect(() => {
+    if (!confermaCambioInformativa) return undefined;
+    const elementoPrecedente = document.activeElement;
+    pulsanteAnnullaConferma.current?.focus();
+
+    const tastoFinestra = (evento) => {
+      if (evento.key === "Escape") {
+        evento.preventDefault();
+        setConfermaCambioInformativa(null);
+      }
+      if (evento.key !== "Tab" || !finestraConferma.current) return;
+      const pulsanti = Array.from(
+        finestraConferma.current.querySelectorAll('button:not([disabled])')
+      );
+      if (!pulsanti.length) return;
+      const primo = pulsanti[0];
+      const ultimo = pulsanti[pulsanti.length - 1];
+      if (evento.shiftKey && document.activeElement === primo) {
+        evento.preventDefault();
+        ultimo.focus();
+      } else if (!evento.shiftKey && document.activeElement === ultimo) {
+        evento.preventDefault();
+        primo.focus();
+      }
+    };
+    document.addEventListener("keydown", tastoFinestra);
+    return () => {
+      document.removeEventListener("keydown", tastoFinestra);
+      elementoPrecedente?.focus?.();
+    };
+  }, [confermaCambioInformativa]);
 
   useEffect(() => {
     let attivo = true;
@@ -161,6 +197,7 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
     setPrivacyStampa(false);
     setPrivacyMessaggio("");
     setParrocchiaPrivacy(null);
+    setConfermaCambioInformativa(null);
     if (!parrocchiaId) return;
     async function carica() {
       setCaricamento(true);
@@ -258,21 +295,7 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
 
   // Due percorsi chiari: modello Ars Liturgica oppure testo libero della parrocchia.
   // Il testo pubblicato resta sempre invariato fino a una nuova pubblicazione.
-  function scegliInformativa(tipo) {
-    if (caricamento || privacyOperazione) return;
-    if (privacyScelta === tipo && privacyModifica) return;
-
-    const testoPresente = privacyTesto.trim().length > 0;
-    if (testoPresente) {
-      const azione = tipo === "modello"
-        ? "sostituire il testo nell'editor con il modello Ars Liturgica"
-        : "svuotare l'editor per scrivere o incollare la tua informativa";
-      const avviso = privacyPubblicata.current.testo.trim()
-        ? "La versione già pubblicata resterà invariata fino a una nuova pubblicazione."
-        : "Il testo non pubblicato presente nell'editor verrà sostituito.";
-      if (!window.confirm(`Vuoi ${azione}?\n\n${avviso}`)) return;
-    }
-
+  function applicaSceltaInformativa(tipo) {
     privacyModificaRichiesta.current = true;
     setPrivacyScelta(tipo);
     setPrivacyTesto(tipo === "modello"
@@ -284,6 +307,23 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
       ? "Modello inserito. Completa i campi tra parentesi quadre prima della pubblicazione."
       : "Scrivi qui il testo della parrocchia oppure incolla quello fornito dalla Diocesi."
     );
+  }
+
+  function scegliInformativa(tipo) {
+    if (caricamento || privacyOperazione || confermaCambioInformativa) return;
+    if (privacyScelta === tipo && privacyModifica) return;
+    if (privacyTesto.trim()) {
+      setConfermaCambioInformativa({ tipo });
+      return;
+    }
+    applicaSceltaInformativa(tipo);
+  }
+
+  function confermaSceltaInformativa() {
+    if (!confermaCambioInformativa || caricamento || privacyOperazione) return;
+    const tipo = confermaCambioInformativa.tipo;
+    setConfermaCambioInformativa(null);
+    applicaSceltaInformativa(tipo);
   }
 
   async function pubblicaPrivacy() {
@@ -373,6 +413,42 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
   return (
     <main className={`ars-sacramenti-parroco ${privacyStampa ? "ars-privacy-stampa-attiva" : ""}`}>
       <style>{STILE}</style>
+      {confermaCambioInformativa && (
+        <div className="ars-sac-conferma-sfondo">
+          <section
+            className="ars-sac-conferma-finestra"
+            role="alertdialog"
+            aria-modal="true"
+            aria-labelledby="ars-sac-conferma-titolo"
+            aria-describedby="ars-sac-conferma-descrizione"
+            ref={finestraConferma}
+          >
+            <div className="ars-sac-conferma-simbolo" aria-hidden="true">!</div>
+            <h3 id="ars-sac-conferma-titolo">Vuoi sostituire il testo?</h3>
+            <p id="ars-sac-conferma-descrizione">
+              {confermaCambioInformativa.tipo === "modello"
+                ? "Il testo nell'editor verrà sostituito con il modello Ars Liturgica."
+                : "Il testo nell'editor verrà cancellato, così potrai scrivere o incollare la tua informativa."}
+            </p>
+            <p className="ars-sac-conferma-nota">
+              {privacyPubblicata.current.testo.trim()
+                ? "L'informativa già pubblicata resterà invariata fino a una nuova pubblicazione."
+                : "Il testo attuale non è stato pubblicato e andrà perso se continui."}
+            </p>
+            <div className="ars-sac-conferma-pulsanti">
+              <button type="button" className="ars-sac-conferma-annulla"
+                ref={pulsanteAnnullaConferma}
+                onClick={() => setConfermaCambioInformativa(null)}>
+                Annulla
+              </button>
+              <button type="button" className="ars-sac-conferma-continua"
+                onClick={confermaSceltaInformativa}>
+                {confermaCambioInformativa.tipo === "modello" ? "Usa il modello" : "Svuota l'editor"}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
       <button type="button" className="ars-sac-indietro" onClick={indietro}>
         ← {sezione ? "Prima Comunione" : sacramento ? "Tutti i Sacramenti" : "Torna alla dashboard"}
       </button>
@@ -629,7 +705,22 @@ const STILE = `
  .ars-sac-privacy-stampa{background:#fff;color:#111;border:1px solid #bbb;padding:26px;margin:16px 0 0;font:14px/1.6 Arial,sans-serif}
  .ars-sac-privacy-marcatura{font-weight:bold;color:#6b5127;border-bottom:1px solid #ccc;padding-bottom:8px}
  .ars-sac-privacy-testo{white-space:pre-wrap;overflow-wrap:anywhere;color:#111}
+/* Conferma discreta in stile crema e oro: non modifica l'editor o la stampa. */
+.ars-sac-conferma-sfondo{position:fixed;inset:0;z-index:10000;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(27,34,34,.56);box-sizing:border-box}
+.ars-sac-conferma-finestra{box-sizing:border-box;width:min(100%,470px);max-height:calc(100dvh - 40px);overflow-y:auto;padding:28px 30px 24px;background:linear-gradient(165deg,#fffefa,#fff8eb);border:1px solid #d8bc82;border-top:4px solid #b58c43;border-radius:17px;box-shadow:0 20px 70px rgba(20,26,27,.26);color:#243c40;text-align:center}
+.ars-sac-conferma-simbolo{display:flex;align-items:center;justify-content:center;margin:0 auto 14px;width:44px;height:44px;border-radius:50%;border:1px solid #e3cf9e;background:#fff0d1;color:#8d6728;font:700 1.45rem Georgia,serif}
+.ars-sac-conferma-finestra h3{font:700 1.5rem Georgia,serif;color:#334746;margin:0 0 12px}
+.ars-sac-conferma-finestra p{font-size:1rem;line-height:1.55;margin:0 0 13px;color:#3e5554}
+.ars-sac-conferma-finestra .ars-sac-conferma-nota{font-size:.91rem;color:#735c35;background:#fff3dc;padding:11px 13px;border:1px solid #eddbb9;border-radius:9px;margin:15px 0 23px}
+.ars-sac-conferma-pulsanti{display:flex;justify-content:center;gap:11px;flex-wrap:wrap}
+.ars-sac-conferma-pulsanti button{min-width:145px;min-height:44px;padding:10px 17px;border-radius:9px;font-family:inherit;font-size:.96rem;font-weight:700;cursor:pointer;transition:background .15s,border-color .15s}
+.ars-sac-conferma-annulla{background:white;border:1px solid #bea675;color:#73551f}
+.ars-sac-conferma-annulla:hover{background:#fcf2df}
+.ars-sac-conferma-continua{background:#a67a29;border:1px solid #a67a29;color:white}
+.ars-sac-conferma-continua:hover{background:#8e661d}
+.ars-sac-conferma-pulsanti button:focus-visible{outline:3px solid #ae8a42;outline-offset:3px}
 @media print{
+  .ars-sac-conferma-sfondo{display:none!important}
   @page{size:A4;margin:12mm}
   body *{visibility:hidden!important}
    .ars-privacy-stampa-attiva .ars-sac-volantino{display:none!important}
