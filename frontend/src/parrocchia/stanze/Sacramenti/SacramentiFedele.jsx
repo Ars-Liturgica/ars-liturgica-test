@@ -98,11 +98,11 @@ function ModuloComunione({ parrocchiaId, utenteId, nomeParrocchia }) {
       return undefined;
     }
     (async () => {
-      const { data, error } = await supabase
-        .from("ars_comunione_impostazioni")
-        .select("anno_pastorale, durata, date_iscrizioni, informazioni, modulo_iscrizione_tipo, modulo_pdf_percorso, informativa_privacy_testo, informativa_privacy_versione")
-        .eq("parrocchia_id", parrocchiaId)
-        .maybeSingle();
+      // Lettura tramite RPC dedicata: la tabella di configurazione resta
+      // riservata al parroco, mentre il fedele legge i soli campi pubblici.
+      const { data, error } = await supabase.rpc("ars_comunione_configurazione_fedele", {
+        p_parrocchia_id: parrocchiaId,
+      });
       if (!attivo) return;
       setCaricamento(false);
       if (error) setErroreConfig("Non è possibile leggere le impostazioni della parrocchia: " + error.message);
