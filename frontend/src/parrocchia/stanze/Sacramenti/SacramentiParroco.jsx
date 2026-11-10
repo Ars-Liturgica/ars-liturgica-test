@@ -120,6 +120,257 @@ const impostazioniIniziali = {
   date: { 1: { apertura: "", chiusura: "" }, 2: { apertura: "", chiusura: "" }, 3: { apertura: "", chiusura: "" } },
 };
 
+// CARD 03 - Iscrizioni e rinnovi: consulta le domande gia' registrate.
+// I gruppi vengono formati esclusivamente nella card 05.
+const SEZIONI_DOMANDA = [
+  ["Dati del bambino", [
+    ["Nome", "nome"], ["Cognome", "cognome"], ["Data di nascita", "dataNascita"],
+    ["Luogo di nascita", "luogoNascita"], ["Codice fiscale", "codiceFiscale"],
+    ["Indirizzo di residenza", "indirizzo"], ["Comune", "comune"], ["CAP", "cap"],
+    ["Parrocchia del Battesimo", "parrocchiaBattesimo"], ["Data del Battesimo", "dataBattesimo"],
+  ]],
+  ["Genitore o tutore richiedente", [
+    ["Nome", "genitore1Nome"], ["Cognome", "genitore1Cognome"],
+    ["Codice fiscale", "genitore1CF"], ["Telefono", "genitore1Telefono"],
+    ["Email", "genitore1Email"], ["Rapporto con il bambino", "tutore"],
+  ]],
+  ["Secondo genitore", [
+    ["Nome", "genitore2Nome"], ["Cognome", "genitore2Cognome"],
+    ["Telefono", "genitore2Telefono"], ["Email", "genitore2Email"],
+  ]],
+  ["Deleghe", [["Persone delegate al ritiro", "delegati"]]],
+];
+
+const DOCUMENTI_COMUNIONE = [
+  { tipo: "domanda_firmata", nome: "Domanda firmata" },
+  { tipo: "informativa_firmata", nome: "Informativa privacy firmata" },
+];
+
+function mostraDataComunione(valore, dataOra = false) {
+  if (!valore) return "—";
+  const s = String(valore);
+  if (!dataOra && /^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const [a, m, g] = s.split("-"); return `${g}/${m}/${a}`;
+  }
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return s;
+  return dataOra ? d.toLocaleString("it-IT", { dateStyle: "short", timeStyle: "short" }) : d.toLocaleDateString("it-IT");
+}
+
+function documentoRicevuto(riga, tipo) {
+  return (riga?.documenti || []).some(d => d.tipo === tipo && d.stato === "ricevuto");
+}
+
+function DomandaComunioneDettaglio({ riga, nomeParrocchia, perStampa = false }) {
+  const d = riga.dati_modulo || {};
+  const righeUtili = (campi) => campi.filter(([, chiave]) => String(d[chiave] ?? "").trim().length);
+  return <div className={perStampa ? "ars-com-domanda-foglio" : "ars-com-domanda-dettaglio"}>
+    <header className="ars-com-intestazione-domanda">
+      <h3>{nomeParrocchia || "Parrocchia"}</h3>
+      <h4>Domanda di iscrizione o rinnovo — Prima Comunione</h4>
+      <p>Anno catechistico {riga.anno_pastorale} · {riga.anno_percorso}° anno del percorso</p>
+      <p>Domanda presentata il {mostraDataComunione(riga.presentata_il, true)}</p>
+    </header>
+    {SEZIONI_DOMANDA.map(([titolo, campi]) => {
+      const presenti = righeUtili(campi);
+      if (!presenti.length) return null;
+      return <section className="ars-com-sezione-domanda" key={titolo}>
+        <h5>{titolo}</h5>
+        <dl>{presenti.map(([etichetta, chiave]) =>
+          <div key={chiave}><dt>{etichetta}</dt><dd>{chiave.startsWith("data") || chiave === "dataBattesimo"
+            ? mostraDataComunione(d[chiave]) : String(d[chiave])}</dd></div>
+        )}</dl>
+      </section>;
+    })}
+    <section className="ars-com-sezione-domanda">
+      <h5>Privacy e autorizzazioni</h5>
+      <dl>
+        <div><dt>Account del ragazzo</dt><dd>{d.autorizzaAccount ? "Autorizzato" : "Non autorizzato"}</dd></div>
+        <div><dt>Chat del Catechismo</dt><dd>{d.autorizzaChat ? "Autorizzata" : "Non autorizzata"}</dd></div>
+        <div><dt>Informativa privacy</dt><dd>Versione {riga.privacy_versione || "—"}</dd></div>
+        <div><dt>Presa visione</dt><dd>{riga.privacy_presa_visione_il ? mostraDataComunione(riga.privacy_presa_visione_il, true) : "Non registrata"}</dd></div>
+      </dl>
+    </section>
+    <section className="ars-com-sezione-domanda">
+      <h5>Documenti da riconsegnare</h5>
+      <dl>{DOCUMENTI_COMUNIONE.map(doc => <div key={doc.tipo}>
+        <dt>{doc.nome}</dt>
+        <dd>{documentoRicevuto(riga, doc.tipo) ? "Ricevuto" : "Da consegnare"}</dd>
+      </div>)}</dl>
+    </section>
+    {perStampa && <>
+      <div className="ars-com-firme-domanda">
+        <p>Luogo e data: _______________________________________</p>
+        <p>Firma del genitore/tutore: _____________________________</p>
+        <p>Firma del secondo genitore, se richiesta: ________________</p>
+      </div>
+      {riga.privacy_testo && <section className="ars-com-informativa-stampa">
+        <h4>Informativa privacy — versione {riga.privacy_versione || "—"}</h4>
+        <div>{riga.privacy_testo}</div>
+        <div className="ars-com-firme-domanda">
+          <p>Luogo e data: _______________________________________</p>
+          <p>Firma del genitore/tutore: _____________________________</p>
+          <p>Firma del secondo genitore, se richiesta: ________________</p>
+        </div>
+      </section>}
+    </>}
+  </div>;
+}
+
+function IscrizioniComunioneParroco({ parrocchiaId, nomeParrocchia, annoAttivo }) {
+  const [domande, setDomande] = useState([]);
+  const [caricamento, setCaricamento] = useState(true);
+  const [errore, setErrore] = useState("");
+  const [ricerca, setRicerca] = useState("");
+  const [annoFiltro, setAnnoFiltro] = useState("corrente");
+  const [apertaId, setApertaId] = useState(null);
+  const [stampaId, setStampaId] = useState(null);
+  const [aggiorna, setAggiorna] = useState(0);
+  const [documentoInSalvataggio, setDocumentoInSalvataggio] = useState("");
+  const [messaggioDocumento, setMessaggioDocumento] = useState("");
+
+  useEffect(() => {
+    let attivo = true;
+    setCaricamento(true); setErrore("");
+    if (!parrocchiaId) {
+      setErrore("Parrocchia non disponibile. Rientra dalla dashboard.");
+      setCaricamento(false); return undefined;
+    }
+    (async () => {
+      const { data, error } = await supabase.rpc("ars_comunione_elenco_domande_parroco", {
+        p_parrocchia_id: parrocchiaId,
+      });
+      if (!attivo) return;
+      setCaricamento(false);
+      if (error || !Array.isArray(data)) {
+        setErrore("Non è stato possibile caricare le iscrizioni. Verifica che il SQL della card 03 sia stato installato.");
+        setDomande([]);
+      } else setDomande(data);
+    })();
+    return () => { attivo = false; };
+  }, [parrocchiaId, aggiorna]);
+
+  useEffect(() => {
+    if (!stampaId) return undefined;
+    const classe = "ars-com-stampa-iscrizione";
+    const termina = () => { document.body.classList.remove(classe); setStampaId(null); };
+    document.body.classList.add(classe);
+    window.addEventListener("afterprint", termina);
+    const timer = window.setTimeout(() => {
+      try { window.print(); } catch (_errore) { termina(); }
+    }, 150);
+    return () => {
+      window.clearTimeout(timer);
+      window.removeEventListener("afterprint", termina);
+      document.body.classList.remove(classe);
+    };
+  }, [stampaId]);
+
+  const anni = [...new Set(domande.map(d => d.anno_pastorale).filter(Boolean))]
+    .sort((a, b) => b.localeCompare(a));
+  const annoCorrenteParrocchia = annoAttivo || anni[0] || "";
+  const filtrate = domande.filter(r => {
+    const d = r.dati_modulo || {};
+    const testo = [d.nome, d.cognome, d.genitore1Nome, d.genitore1Cognome]
+      .map(s => String(s || "")).join(" ").toLocaleLowerCase("it");
+    return (annoFiltro === "tutti" || r.anno_pastorale === (annoFiltro === "corrente" ? annoCorrenteParrocchia : annoFiltro))
+      && testo.includes(ricerca.trim().toLocaleLowerCase("it"));
+  });
+  const selezionata = domande.find(r => r.id === apertaId);
+  const daStampare = domande.find(r => r.id === stampaId);
+  const documentiCompleti = filtrate.filter(r => DOCUMENTI_COMUNIONE.every(doc => documentoRicevuto(r, doc.tipo))).length;
+
+  async function cambiaDocumento(riga, tipo, nuovoStato) {
+    if (documentoInSalvataggio) return;
+    setMessaggioDocumento("");
+    setDocumentoInSalvataggio(`${riga.id}:${tipo}`);
+    const { data, error } = await supabase.rpc("ars_comunione_segna_documento_parroco", {
+      p_parrocchia_id: parrocchiaId,
+      p_iscrizione_id: riga.id,
+      p_tipo: tipo,
+      p_stato: nuovoStato,
+    });
+    setDocumentoInSalvataggio("");
+    if (error || !data) {
+      setMessaggioDocumento("Non è stato possibile aggiornare la consegna del documento.");
+      return;
+    }
+    setDomande(precedenti => precedenti.map(d => d.id !== riga.id ? d : ({
+      ...d, documenti: [...(d.documenti || []).filter(x => x.tipo !== tipo), data],
+    })));
+    setMessaggioDocumento("Consegna del documento aggiornata.");
+  }
+
+  return <section className="ars-sac-pannello ars-com-iscrizioni-pannello">
+    <h3>Iscrizioni e rinnovi</h3>
+    <p>Qui trovi le domande ricevute e lo storico degli anni precedenti. I ragazzi saranno assegnati nella card «Gruppi di catechismo».</p>
+    <div className="ars-com-filtri-iscrizioni">
+      <label>Anno catechistico
+        <select value={annoFiltro} onChange={e => { setAnnoFiltro(e.target.value); setApertaId(null); setMessaggioDocumento(""); }}>
+          <option value="corrente">{annoCorrenteParrocchia ? `${annoCorrenteParrocchia} — anno corrente` : "Anno corrente"}</option>
+          <option value="tutti">Archivio — tutti gli anni</option>
+          {anni.filter(anno => anno !== annoCorrenteParrocchia).map(anno => <option value={anno} key={anno}>{anno}</option>)}
+        </select>
+      </label>
+      <label>Cerca ragazzo o genitore
+        <input type="search" value={ricerca} onChange={e => setRicerca(e.target.value)} placeholder="Nome o cognome" />
+      </label>
+    </div>
+    <div className="ars-com-riepilogo-iscrizioni">
+      <span><strong>{filtrate.length}</strong> domande</span>
+      <span><strong>{filtrate.filter(r => Number(r.anno_percorso) === 1).length}</strong> prime iscrizioni</span>
+      <span><strong>{filtrate.filter(r => Number(r.anno_percorso) > 1).length}</strong> rinnovi</span>
+      <span><strong>{documentiCompleti}</strong> documentazioni complete</span>
+    </div>
+    {caricamento ? <p role="status">Caricamento delle iscrizioni…</p> : errore ?
+      <p className="ars-com-errore-iscrizioni" role="alert">{errore}</p> :
+      filtrate.length ? <div className="ars-com-elenco-iscrizioni">
+        {filtrate.map(r => { const d = r.dati_modulo || {};
+          const completi = DOCUMENTI_COMUNIONE.every(doc => documentoRicevuto(r, doc.tipo));
+          return <article className="ars-com-riga-iscrizione" key={r.id}>
+            <div className="ars-com-anagrafica-iscrizione">
+              <strong>{[d.nome, d.cognome].filter(Boolean).join(" ") || "Ragazzo"}</strong>
+              <span>{r.anno_percorso}° anno · {r.anno_pastorale} · {mostraDataComunione(r.presentata_il)}</span>
+              <small>Genitore: {[d.genitore1Nome, d.genitore1Cognome].filter(Boolean).join(" ") || "—"}</small>
+              <small className={completi ? "ars-com-stato-ok" : "ars-com-stato-attesa"}>
+                Documenti: {completi ? "completi" : "da completare"}
+              </small>
+            </div>
+            <button type="button" className="ars-sac-stampa" onClick={() => {setApertaId(v => v === r.id ? null : r.id);setMessaggioDocumento("");}}>
+              {apertaId === r.id ? "Chiudi" : "Apri domanda"}
+            </button>
+            {apertaId === r.id && <div className="ars-com-scheda-iscrizione">
+              <DomandaComunioneDettaglio riga={r} nomeParrocchia={nomeParrocchia} />
+              <div className="ars-com-gestione-documenti">
+                <h4>Documenti riconsegnati in parrocchia</h4>
+                {DOCUMENTI_COMUNIONE.map(doc => {
+                  const ricevuto = documentoRicevuto(r, doc.tipo);
+                  const busy = Boolean(documentoInSalvataggio);
+                  return <div className="ars-com-riga-documento" key={doc.tipo}>
+                    <span>{doc.nome}</span>
+                    <strong className={ricevuto ? "ars-com-stato-ok" : "ars-com-stato-attesa"}>
+                      {ricevuto ? "Ricevuto" : "Da consegnare"}
+                    </strong>
+                    <button type="button" className="ars-sac-stampa" disabled={busy}
+                      onClick={() => cambiaDocumento(r, doc.tipo, ricevuto ? "da_consegnare" : "ricevuto") }>
+                      {documentoInSalvataggio === `${r.id}:${doc.tipo}` ? "Salvataggio…" : ricevuto ? "Segna da consegnare" : "Segna ricevuto"}
+                    </button>
+                  </div>;
+                })}
+                {messaggioDocumento && <p className="ars-com-messaggio-documenti" role="status">{messaggioDocumento}</p>}
+              </div>
+              <button type="button" className="ars-sac-conferma" onClick={() => setStampaId(r.id)}>Stampa domanda e informativa</button>
+            </div>}
+          </article>;
+        })}
+      </div> : <p className="ars-com-vuoto-iscrizioni">Nessuna domanda trovata per l'anno o la ricerca selezionati.</p>}
+    <div className="ars-com-piede-iscrizioni">
+      <button type="button" className="ars-sac-stampa" disabled={caricamento} onClick={() => {setAggiorna(n => n + 1);setMessaggioDocumento("");}}>Aggiorna elenco</button>
+    </div>
+    {daStampare && <div className="ars-com-solo-stampa"><DomandaComunioneDettaglio riga={daStampare} nomeParrocchia={nomeParrocchia} perStampa /></div>}
+  </section>;
+}
+
 export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "", parrocchiaId }) {
   const [scelto, setScelto] = useState(null);
   const [sezione, setSezione] = useState(null);
@@ -729,6 +980,9 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
             </div>}
           </div>
         </section>
+      ) : sezione === "iscrizioni" ? (
+        <IscrizioniComunioneParroco parrocchiaId={parrocchiaId}
+          nomeParrocchia={nomeParrocchia} annoAttivo={impostazioni.anno} />
       ) : (
         <section className="ars-sac-dettaglio">
           <h3>{sezioneAttiva.nome}</h3>
@@ -740,6 +994,58 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
 }
 
 const STILE = `
+
+/* Card 03 — Iscrizioni e rinnovi. Stili confinati alla card. */
+.ars-com-iscrizioni-pannello{max-width:900px}
+.ars-com-filtri-iscrizioni{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin:18px 0}
+.ars-com-filtri-iscrizioni label{display:flex;flex-direction:column;gap:6px;font-weight:600}
+.ars-com-filtri-iscrizioni :is(input,select){min-height:44px;width:100%;padding:9px;border:1px solid #d8c9a8;border-radius:8px;background:white;color:#243c40;font:inherit}
+.ars-com-riepilogo-iscrizioni{display:flex;gap:10px;flex-wrap:wrap;margin:16px 0}
+.ars-com-riepilogo-iscrizioni span{border:1px solid #e5d4b2;border-radius:9px;padding:10px 13px;background:#fff8eb}
+.ars-com-riepilogo-iscrizioni strong{color:#926b27;font-size:1.2rem}
+.ars-com-elenco-iscrizioni{display:flex;flex-direction:column;gap:12px}
+.ars-com-riga-iscrizione{border:1px solid #e5d4b2;border-radius:12px;padding:16px;background:#fffefa;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:center}
+.ars-com-anagrafica-iscrizione{display:flex;flex-direction:column;gap:5px;min-width:0}
+.ars-com-anagrafica-iscrizione strong{font:700 1.12rem Georgia,serif;color:#243c40}
+.ars-com-anagrafica-iscrizione span,.ars-com-anagrafica-iscrizione small{color:#65716f}
+.ars-com-stato-ok{color:#276445!important}
+.ars-com-stato-attesa{color:#8b642b!important}
+.ars-com-scheda-iscrizione{grid-column:1/-1;border-top:1px solid #e5d4b2;padding-top:15px}
+.ars-com-intestazione-domanda h3{font:700 1.38rem Georgia,serif;margin:0 0 7px;color:#243c40}
+.ars-com-intestazione-domanda h4{font:700 1.07rem Georgia,serif;margin:0 0 8px;color:#243c40}
+.ars-com-intestazione-domanda p{margin:0 0 6px;color:#5f6d70}
+.ars-com-sezione-domanda{margin:17px 0}
+.ars-com-sezione-domanda h5{font:700 1rem Georgia,serif;margin:0 0 9px;color:#795a24}
+.ars-com-sezione-domanda dl{display:grid;grid-template-columns:1fr 1fr;gap:9px 14px;margin:0}
+.ars-com-sezione-domanda dl>div{border-bottom:1px solid #eee4d2;padding:5px 0;overflow-wrap:anywhere}
+.ars-com-sezione-domanda dt{font-size:.83rem;font-weight:600;color:#617072}
+.ars-com-sezione-domanda dd{margin:3px 0 0;color:#243c40}
+.ars-com-gestione-documenti{margin:20px 0;border:1px solid #e6d5b4;background:#fffaf1;border-radius:11px;padding:15px}
+.ars-com-gestione-documenti h4{font:700 1.05rem Georgia,serif;margin:0 0 12px}
+.ars-com-riga-documento{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid #eee1c9}
+.ars-com-riga-documento:last-of-type{border-bottom:none}
+.ars-com-riga-documento>span{font-weight:600;flex:1;min-width:140px}
+.ars-com-riga-documento button{padding:8px 13px}
+.ars-com-messaggio-documenti{margin:12px 0 0;color:#365d4a}
+.ars-com-errore-iscrizioni{color:#a32424!important}
+.ars-com-vuoto-iscrizioni{padding:20px;background:#fff8eb;border-radius:8px}
+.ars-com-piede-iscrizioni{margin-top:18px}
+.ars-com-solo-stampa{display:none}
+.ars-com-firme-domanda{margin-top:24px}
+.ars-com-firme-domanda p{margin:7px 0}
+.ars-com-informativa-stampa{margin-top:25px;padding-top:20px;border-top:1px solid #aaa;break-before:page}
+.ars-com-informativa-stampa>div{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5;font-size:10pt}
+@media(max-width:650px){.ars-com-filtri-iscrizioni{grid-template-columns:1fr}.ars-com-riga-iscrizione{grid-template-columns:1fr}.ars-com-sezione-domanda dl{grid-template-columns:1fr}}
+@media print{
+  body.ars-com-stampa-iscrizione .ars-sac-volantino,body.ars-com-stampa-iscrizione .ars-sac-privacy-stampa{display:none!important;visibility:hidden!important}
+  body.ars-com-stampa-iscrizione *,body.ars-com-stampa-iscrizione .ars-sac-volantino *{visibility:hidden!important}
+  body.ars-com-stampa-iscrizione .ars-com-solo-stampa,body.ars-com-stampa-iscrizione .ars-com-solo-stampa *{visibility:visible!important}
+  body.ars-com-stampa-iscrizione .ars-com-solo-stampa{display:block!important;position:absolute!important;left:0!important;top:0!important;width:100%!important;box-sizing:border-box!important;background:#fff!important;color:#111!important;margin:0!important;padding:0!important;font:11pt/1.4 Arial,sans-serif!important}
+  body.ars-com-stampa-iscrizione .ars-com-sezione-domanda{break-inside:avoid}
+  body.ars-com-stampa-iscrizione .ars-com-sezione-domanda dl{grid-template-columns:1fr 1fr}
+  body.ars-com-stampa-iscrizione .ars-com-informativa-stampa{break-before:page}
+}
+
 .ars-sacramenti-parroco{max-width:960px;margin:0 auto;padding:18px;color:#243c40}
 .ars-sac-header{text-align:center;margin:14px 0 25px}
 .ars-sac-header h2{font-family:Georgia,serif;font-size:2rem;color:#243c40;margin:0 0 8px}
