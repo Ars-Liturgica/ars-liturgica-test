@@ -124,6 +124,8 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
   const [scelto, setScelto] = useState(null);
   const [sezione, setSezione] = useState(null);
   const [impostazioni, setImpostazioni] = useState(impostazioniIniziali);
+  // Orari per anno pastorale e anno di percorso: i gruppi si formano nella card 05.
+  const [orariCatechismo, setOrariCatechismo] = useState({});
   const [messaggio, setMessaggio] = useState("");
   const [salvato, setSalvato] = useState(false);
   const [modifica, setModifica] = useState(true);
@@ -186,6 +188,7 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
     setSalvato(false);
     setModifica(true);
     setAnteprima(false);
+    setOrariCatechismo({});
     setImpostazioni({ ...impostazioniIniziali, date: { 1: { apertura: "", chiusura: "" }, 2: { apertura: "", chiusura: "" }, 3: { apertura: "", chiusura: "" } } });
     privacyModificaRichiesta.current = false;
     privacyPubblicata.current = { testo: "", versione: "" };
@@ -202,12 +205,14 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
     async function carica() {
       setCaricamento(true);
       const { data, error } = await supabase.from("ars_comunione_impostazioni")
-        .select("anno_pastorale, durata, date_iscrizioni, informazioni, informativa_privacy_testo, informativa_privacy_versione")
+        .select("anno_pastorale, durata, date_iscrizioni, informazioni, orari_catechismo, informativa_privacy_testo, informativa_privacy_versione")
         .eq("parrocchia_id", parrocchiaId).maybeSingle();
       if (!attivo) return;
       setCaricamento(false);
       if (error) { setMessaggio("Impossibile caricare le impostazioni: " + error.message); return; }
       if (data && !modificaRichiesta.current) {
+        setOrariCatechismo(data.orari_catechismo && typeof data.orari_catechismo === "object"
+          ? data.orari_catechismo : {});
         setImpostazioni({ anno: data.anno_pastorale, durata: String(data.durata),
           informazioni: data.informazioni || "",
           date: { 1: { apertura: "", chiusura: "", ...(data.date_iscrizioni?.[1] || {}) },
@@ -259,6 +264,52 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
     setMessaggio("");
   }
 
+  // Orari generali pubblicabili alle famiglie; la decisione dei gruppi resta al parroco.
+  const orarioVuoto = () => ({ giorno: "", inizio: "", fine: "" });
+  const orariAnno = (anno) =>
+    orariCatechismo[impostazioni.anno]?.[String(anno)] || { stato: "da_definire", fasce: [] };
+
+  function modificaOrari(anno, trasformazione) {
+    setOrariCatechismo((precedenti) => {
+      const annoPastorale = impostazioni.anno;
+      const periodo = precedenti[annoPastorale] || {};
+      const corrente = periodo[String(anno)] || { stato: "da_definire", fasce: [] };
+      return {
+        ...precedenti,
+        [annoPastorale]: { ...periodo, [String(anno)]: trasformazione(corrente) },
+      };
+    });
+    setMessaggio("");
+  }
+
+  function cambiaStatoOrari(anno, stato) {
+    modificaOrari(anno, (attuale) => ({
+      ...attuale, stato,
+      fasce: stato === "definiti" && !(attuale.fasce || []).length
+        ? [orarioVuoto()] : (attuale.fasce || []),
+    }));
+  }
+
+  function aggiornaFascia(anno, indice, campo, valore) {
+    modificaOrari(anno, (attuale) => ({
+      ...attuale,
+      fasce: (attuale.fasce || []).map((fascia, i) =>
+        i === indice ? { ...fascia, [campo]: valore } : fascia),
+    }));
+  }
+
+  function aggiungiFascia(anno) {
+    modificaOrari(anno, (attuale) => ({
+      ...attuale, fasce: [...(attuale.fasce || []), orarioVuoto()],
+    }));
+  }
+
+  function eliminaFascia(anno, indice) {
+    modificaOrari(anno, (attuale) => ({
+      ...attuale, fasce: (attuale.fasce || []).filter((_, i) => i !== indice),
+    }));
+  }
+
   function controllaImpostazioni() {
     if (!/^\d{4}\/\d{4}$/.test(impostazioni.anno)) return "Inserisci l'anno pastorale nel formato 2026/2027.";
     const [inizio, fine] = impostazioni.anno.split("/").map(Number);
@@ -266,6 +317,15 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
     for (let anno = 1; anno <= Number(impostazioni.durata); anno++) {
       const { apertura, chiusura } = impostazioni.date[anno];
       if (apertura && chiusura && chiusura < apertura) return `Per il ${anno}° anno la chiusura precede l'apertura.`;
+      const orari = orariAnno(anno);
+      if (orari.stato === "definiti") {
+        if (!Array.isArray(orari.fasce) || !orari.fasce.length)
+          return `Inserisci almeno un giorno e un orario per il ${anno}° anno.`;
+        for (const fascia of orari.fasce) {
+          if (!fascia.giorno || !fascia.inizio || !fascia.fine || fascia.fine <= fascia.inizio)
+            return `Controlla il giorno e gli orari del ${anno}° anno: l'ora finale deve essere successiva all'inizio.`;
+        }
+      }
     }
     return "";
   }
@@ -283,6 +343,7 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
       durata: Number(impostazioni.durata),
       date_iscrizioni: impostazioni.date,
       informazioni: impostazioni.informazioni,
+      orari_catechismo: orariCatechismo,
       aggiornato_il: new Date().toISOString(),
     }, { onConflict: "parrocchia_id" });
     setOperazione(false);
@@ -348,7 +409,6 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
       return;
     }
     const versione = prossimaVersionePrivacy(precedente.versione);
-    if (!window.confirm(`Pubblicare l'informativa versione ${versione}? Le nuove iscrizioni conserveranno questo testo; quelle già inviate manterranno il precedente.`)) return;
     setPrivacyOperazione(true);
     setPrivacyMessaggio("");
     // Controllo versione: evita di sovrascrivere una revisione pubblicata altrove.
@@ -488,7 +548,7 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
       ) : sezione === "impostazioni" ? (
         <section className="ars-sac-pannello">
           <h3>Impostazioni anno catechistico</h3>
-          <p>Definisci l'anno pastorale e le date delle iscrizioni per ciascun anno di catechismo.</p>
+          <p>Definisci l'anno pastorale, le iscrizioni e gli eventuali giorni e orari del Catechismo.</p>
           <form className="ars-sac-form" onSubmit={salvaImpostazioni}>
             <>
             <label>Anno pastorale
@@ -516,6 +576,48 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
                 </div>
               </fieldset>
             ))}
+            <fieldset className="ars-sac-anno ars-sac-orari-sezione" disabled={!modifica || caricamento || operazione}>
+              <legend>Giorni e orari del Catechismo</legend>
+              <p className="ars-sac-orari-intro">Puoi indicare gli orari già stabiliti, oppure comunicarli alle famiglie in seguito. I gruppi e le assegnazioni saranno organizzati nella card «Gruppi di catechismo».</p>
+              {[1, 2, 3].filter((anno) => anno <= Number(impostazioni.durata)).map((anno) => {
+                const configOrari = orariAnno(anno);
+                const definiti = configOrari.stato === "definiti";
+                return <div className="ars-sac-orari-anno" key={anno}>
+                  <h4>{anno}° anno</h4>
+                  <label className="ars-sac-orari-stato">Disponibilità degli orari
+                    <select value={definiti ? "definiti" : "da_definire"}
+                      onChange={(e) => cambiaStatoOrari(anno, e.target.value)}>
+                      <option value="da_definire">Giorni e orari da definire</option>
+                      <option value="definiti">Giorni e orari già stabiliti</option>
+                    </select>
+                  </label>
+                  {definiti ? <>
+                    {(configOrari.fasce || []).map((fascia, indice) => <div className="ars-sac-orari-fascia" key={indice}>
+                      <label>Giorno
+                        <select value={fascia.giorno} onChange={(e) => aggiornaFascia(anno, indice, "giorno", e.target.value)}>
+                          <option value="">Seleziona il giorno</option>
+                          {["Lunedì", "Martedì", "Mercoledì", "Giovedì", "Venerdì", "Sabato", "Domenica"].map(giorno =>
+                            <option value={giorno} key={giorno}>{giorno}</option>)}
+                        </select>
+                      </label>
+                      <label>Dalle
+                        <input type="time" value={fascia.inizio || ""}
+                          onChange={(e) => aggiornaFascia(anno, indice, "inizio", e.target.value)} />
+                      </label>
+                      <label>Alle
+                        <input type="time" value={fascia.fine || ""}
+                          onChange={(e) => aggiornaFascia(anno, indice, "fine", e.target.value)} />
+                      </label>
+                      <button type="button" className="ars-sac-orari-rimuovi"
+                        onClick={() => eliminaFascia(anno, indice)}>Rimuovi</button>
+                    </div>)}
+                    <button type="button" className="ars-sac-stampa" onClick={() => aggiungiFascia(anno)}>
+                      + Aggiungi giorno e orario
+                    </button>
+                  </> : <p className="ars-sac-orari-avviso">I giorni e gli orari del Catechismo saranno comunicati dalla Parrocchia non appena definiti. Le famiglie potranno consultarli nel Calendario del Catechismo e riceveranno un avviso nelle Comunicazioni.</p>}
+                </div>;
+              })}
+            </fieldset>
             <label className="ars-sac-intera">Informazioni e istruzioni per le famiglie
               <textarea rows="6" value={impostazioni.informazioni}
                 placeholder="Orari, documenti necessari, incontri informativi e altre comunicazioni..."
@@ -547,6 +649,16 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
                   <span>Chiusura: {formattaData(impostazioni.date[anno].chiusura)}</span>
                 </div>
               ))}
+              <div className="ars-sac-volantino-info">
+                <h3>Giorni e orari del Catechismo</h3>
+                {[1, 2, 3].filter((anno) => anno <= Number(impostazioni.durata)).map((anno) => {
+                  const configOrari = orariAnno(anno);
+                  const fasce = configOrari.stato === "definiti" ? (configOrari.fasce || []) : [];
+                  return <p key={anno}><strong>{anno}° anno:</strong> {fasce.length
+                    ? fasce.map((f) => `${f.giorno}, ${f.inizio}–${f.fine}`).join("; ")
+                    : "Giorni e orari saranno comunicati dalla Parrocchia."}</p>;
+                })}
+              </div>
               {impostazioni.informazioni.trim() && <div className="ars-sac-volantino-info">
                 <h3>Informazioni per le famiglie</h3>
                 <p>{impostazioni.informazioni}</p>
@@ -736,4 +848,14 @@ const STILE = `
 }
 @media(max-width:650px){.ars-sac-privacy-scelte{grid-template-columns:1fr}.ars-sacramenti-parroco{padding:12px}.ars-sac-griglia{gap:12px}.ars-sac-card{min-height:185px;padding:15px 8px}.ars-sac-card strong{font-size:1.08rem}.ars-sac-descrizione{font-size:.83rem}.ars-sac-header h2{font-size:1.65rem}.ars-sac-simbolo{width:78px;height:78px}.ars-sac-simbolo svg{width:65px;height:65px}.ars-sac-griglia-sezioni{grid-template-columns:repeat(2,minmax(0,1fr))}.ars-sac-card-sezione{min-height:150px}.ars-sac-pannello{padding:18px}.ars-sac-form{grid-template-columns:1fr}.ars-sac-date{grid-template-columns:1fr}.ars-sac-volantino-interno{padding:15px}.ars-sac-volantino-anno{grid-template-columns:1fr;gap:4px}}
 @media(max-width:380px){.ars-sac-griglia{grid-template-columns:1fr}.ars-sac-card{min-height:165px}}
+
+.ars-sac-orari-sezione{background:#fffdf8}
+.ars-sac-orari-intro{font-size:.93rem;line-height:1.6;color:#5f6d70;margin:7px 0 16px}
+.ars-sac-orari-anno{padding:15px 0;border-top:1px solid #e9dcc1}
+.ars-sac-orari-anno h4{font:700 1.12rem Georgia,serif;color:#79551f;margin:0 0 13px}
+.ars-sac-orari-stato{max-width:420px;margin:0 0 13px}
+.ars-sac-orari-fascia{display:grid;grid-template-columns:minmax(145px,1.3fr) minmax(110px,1fr) minmax(110px,1fr) auto;gap:9px;align-items:end;padding:10px 0}
+.ars-sac-orari-rimuovi{min-height:44px;border:1px solid #dcc7a1;border-radius:9px;background:#fffaf0;color:#795a24;padding:9px 12px;cursor:pointer;font-weight:600}
+.ars-sac-orari-avviso{border:1px solid #e8d7b4;border-radius:9px;padding:13px 14px;background:#fff8ea;color:#645235;line-height:1.6;font-size:.92rem}
+@media(max-width:650px){.ars-sac-orari-fascia{grid-template-columns:1fr 1fr}.ars-sac-orari-fascia label:first-child{grid-column:1/-1}.ars-sac-orari-rimuovi{grid-column:1/-1}}
 `;
