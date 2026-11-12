@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "../../../supabaseClient";
+import FirmaSemplice from "../../componenti/FirmaSemplice";
 
 // Ars Liturgica — Sacramenti lato fedele.
 // Struttura delle sottocard della Prima Comunione approvata il 6 novembre 2026.
@@ -72,130 +73,241 @@ function formattaData(data) {
   return `${giorno}/${mese}/${anno}`;
 }
 
-// La pratica personale si recupera soltanto con la ricevuta casuale rilasciata dal server.
-// Non legge elenchi generali per nome/ID, né invia messaggi alla campanella.
+// Le domande già inviate sono associate al profilo del genitore nel database.
+// Nessun codice ricevuta, nessun collegamento manuale, nessun refresh richiesto.
 const DOCUMENTI_PERSONALI_COMUNIONE = [
   { tipo: "domanda_firmata", nome: "Domanda di iscrizione firmata" },
   { tipo: "informativa_firmata", nome: "Informativa privacy firmata" },
 ];
-const REGEXP_RICEVUTA_COMUNIONE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-function chiaveRicevuteComunione(parrocchiaId, utenteId) {
-  return `ars_comunione_ricevute_v1_${parrocchiaId || ""}_${utenteId || ""}`;
+const CAMPI_OBBLIGATORI_GENITORE = [
+  ["nome", "Nome del bambino"], ["cognome", "Cognome del bambino"],
+  ["dataNascita", "Data di nascita"], ["luogoNascita", "Luogo di nascita"],
+  ["indirizzo", "Indirizzo di residenza"], ["comune", "Comune di residenza"],
+  ["genitore1Nome", "Nome del genitore"], ["genitore1Cognome", "Cognome del genitore"],
+];
+const DETTAGLI_PRATICA = [
+  ["nome", "Nome del bambino"], ["cognome", "Cognome del bambino"],
+  ["dataNascita", "Data di nascita"], ["luogoNascita", "Luogo di nascita"],
+  ["indirizzo", "Indirizzo"], ["comune", "Comune"], ["cap", "CAP"],
+  ["codiceFiscale", "Codice fiscale (facoltativo)"],
+  ["parrocchiaBattesimo", "Parrocchia del Battesimo"], ["dataBattesimo", "Data del Battesimo"],
+  ["genitore1Nome", "Nome del genitore"], ["genitore1Cognome", "Cognome del genitore"],
+  ["genitore1Telefono", "Telefono"], ["genitore1Email", "Email"],
+  ["genitore2Nome", "Secondo genitore: nome"], ["genitore2Cognome", "Secondo genitore: cognome"],
+  ["delegati", "Persone delegate"],
+];
+function documentoConfermato(pratica, tipo) {
+  return (pratica.documenti || []).some(d => d.tipo === tipo && ["ricevuto", "non_necessario"].includes(d.stato));
 }
-function StatoDomandeComunioneGenitore({ parrocchiaId, utenteId, ricevutaNuova }) {
-  const [codici, setCodici] = useState([]);
-  const [stati, setStati] = useState([]);
-  const [nuovoCodice, setNuovoCodice] = useState("");
-  const [caricamento, setCaricamento] = useState(false);
-  const [errore, setErrore] = useState("");
-  const [aggiornamento, setAggiornamento] = useState(0);
+function fotoPresente(pratica, tipo) {
+  return (pratica.foto || []).some(f => f.tipo === tipo);
+}
 
-  useEffect(() => {
-    try {
-      const salvate = JSON.parse(localStorage.getItem(chiaveRicevuteComunione(parrocchiaId,utenteId)) || "[]");
-      setCodici(Array.isArray(salvate) ? [...new Set(salvate.filter(c => REGEXP_RICEVUTA_COMUNIONE.test(c)))] : []);
-    } catch (_errore) { setCodici([]); }
-  }, [parrocchiaId,utenteId]);
-
-  useEffect(() => {
-    const codice = String(ricevutaNuova?.ricevuta || "").trim();
-    if (!REGEXP_RICEVUTA_COMUNIONE.test(codice) || !parrocchiaId || !utenteId) return;
-    setCodici(prev => {
-      const nuovi = [...new Set([codice, ...prev])];
-      try {localStorage.setItem(chiaveRicevuteComunione(parrocchiaId,utenteId), JSON.stringify(nuovi));}
-      catch (_errore) { /* Browser senza memorizzazione disponibile */ }
-      return nuovi;
+async function fotoInJpeg(file) {
+  if (!file || !file.type.startsWith("image/")) throw new Error("Seleziona una fotografia, non un documento PDF.");
+  if (file.size > 20 * 1024 * 1024) throw new Error("La foto supera 20 MB: scegline una più piccola.");
+  const url = URL.createObjectURL(file);
+  try {
+    const img = await new Promise((resolve, reject) => {
+      const x = new Image();
+      x.onload = () => resolve(x);
+      x.onerror = () => reject(new Error("Impossibile aprire questa foto. Usa JPG, PNG o WebP."));
+      x.src = url;
     });
-  }, [ricevutaNuova?.ricevuta,parrocchiaId,utenteId]);
+    const scala = Math.min(1, 1800 / Math.max(img.naturalWidth, img.naturalHeight));
+    const canvas = document.createElement("canvas");
+    canvas.width = Math.max(1, Math.round(img.naturalWidth * scala));
+    canvas.height = Math.max(1, Math.round(img.naturalHeight * scala));
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Non è possibile preparare la fotografia.");
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    const blob = await new Promise(resolve => canvas.toBlob(resolve, "image/jpeg", .84));
+    if (!blob || blob.size > 5 * 1024 * 1024) throw new Error("La fotografia è troppo grande: prova con una foto più leggera.");
+    return blob;
+  } finally { URL.revokeObjectURL(url); }
+}
+async function caricaFotoComunione({ parrocchiaId, utenteId, iscrizioneId, tipo, file }) {
+  const jpeg = await fotoInJpeg(file);
+  const { data: ticket, error: pre } = await supabase.rpc("ars_comunione_prepara_foto", {
+    p_parrocchia_id: parrocchiaId, p_iscrizione_id: iscrizioneId,
+    p_utente_id: utenteId, p_tipo: tipo,
+  });
+  if (pre || !ticket?.token || !ticket?.percorso) throw new Error(pre?.message || "Impossibile preparare il caricamento.");
+  const { error: upload } = await supabase.storage.from("ars-comunione-documenti")
+    .upload(ticket.percorso, jpeg, {contentType:"image/jpeg",upsert:false,cacheControl:"0"});
+  if (upload) throw new Error("La foto non è stata caricata: " + upload.message);
+  const { data: conferma, error } = await supabase.rpc("ars_comunione_conferma_foto", {
+    p_parrocchia_id: parrocchiaId, p_iscrizione_id: iscrizioneId,
+    p_utente_id: utenteId, p_token: ticket.token,
+  });
+  if (error || !conferma?.ok) throw new Error(error?.message || "Foto caricata, ma non ancora associata alla domanda.");
+  return conferma;
+}
 
+function ConfermaFirmaDomandaEsistente({pratica,parrocchiaId,utenteId,onConfermata}) {
+  const dati=pratica.dati_modulo || {};
+  const [nominativo, setNominativo] = useState([dati.genitore1Nome,dati.genitore1Cognome].filter(Boolean).join(" "));
+  const [conferma, setConferma] = useState(false);
+  const [salvataggio, setSalvataggio] = useState(false);
+  const [messaggio, setMessaggio] = useState("");
+  async function confermaDomanda() {
+    if (!conferma || !nominativo.trim() || salvataggio) return;
+    setSalvataggio(true); setMessaggio("");
+    const {data,error} = await supabase.rpc("ars_comunione_conferma_domanda_esistente",{
+      p_parrocchia_id:parrocchiaId,p_iscrizione_id:pratica.id,
+      p_utente_id:utenteId,p_nominativo_firma:nominativo,p_conferma:true,
+    });
+    setSalvataggio(false);
+    if (error || !data?.ok) {setMessaggio(error?.message || "Non è stato possibile confermare la domanda.");return;}
+    setMessaggio("Conferma della domanda registrata.");
+    onConfermata?.();
+  }
+  return <div className="ars-com-firma-esistente">
+    <h6>Conferma la domanda nell'app</h6>
+    <FirmaSemplice documento="domanda di Prima Comunione" modalitaDisponibili="app"
+      modalita="app" nominativo={nominativo} onNominativoChange={setNominativo}
+      conferma={conferma} onConfermaChange={setConferma} disabilitato={salvataggio} />
+    <button type="button" className="ars-sac-azione" onClick={confermaDomanda}
+      disabled={!conferma || !nominativo.trim() || salvataggio}>
+      {salvataggio ? "Conferma in corso…" : "Registra la conferma della domanda"}
+    </button>
+    {messaggio && <p role="status">{messaggio}</p>}
+  </div>;
+}
+
+function CompletaFotoComunione({ pratica, parrocchiaId, utenteId, onCaricata, modalitaFirme }) {
+  const [inCorso, setInCorso] = useState("");
+  const [messaggio, setMessaggio] = useState("");
+  async function scegliFoto(tipo, e) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setInCorso(tipo); setMessaggio("");
+    try {
+      await caricaFotoComunione({parrocchiaId,utenteId,iscrizioneId:pratica.id,tipo,file});
+      setMessaggio("Foto caricata correttamente. La parrocchia la verificherà.");
+      onCaricata?.();
+    } catch (err) { setMessaggio(err.message || "Impossibile caricare la foto."); }
+    finally { setInCorso(""); e.target.value = ""; }
+  }
+  return <div className="ars-com-genitore-foto">
+    <h6>Completa i documenti</h6>
+    {["app","entrambe"].includes(modalitaFirme) &&
+      !documentoConfermato(pratica,"domanda_firmata") &&
+      <ConfermaFirmaDomandaEsistente pratica={pratica} parrocchiaId={parrocchiaId}
+        utenteId={utenteId} onConfermata={onCaricata} />}
+    {["app","entrambe"].includes(modalitaFirme) &&
+      !documentoConfermato(pratica,"domanda_firmata") && <p>In alternativa puoi scegliere la firma cartacea.</p>}
+    <p>Scatta una foto leggibile del documento firmato o scegline una dalla galleria.
+      In alternativa, puoi consegnare il documento direttamente in parrocchia.</p>
+    {DOCUMENTI_PERSONALI_COMUNIONE.filter(doc => !documentoConfermato(pratica,doc.tipo)).map(doc =>
+      <label className="ars-com-genitore-file" key={doc.tipo}>
+        <strong>{doc.nome}</strong>
+        <span>Fotografa e carica</span>
+        <input type="file" accept="image/*"
+          disabled={Boolean(inCorso)} onChange={e => scegliFoto(doc.tipo,e)} />
+        {inCorso === doc.tipo && <small>Caricamento della fotografia…</small>}
+      </label>)}
+    {messaggio && <p role="status">{messaggio}</p>}
+  </div>;
+}
+
+function StatoDomandeComunioneGenitore({ parrocchiaId, utenteId, nuovaIscrizioneId }) {
+  const [domande, setDomande] = useState([]);
+  const [caricamento, setCaricamento] = useState(true);
+  const [errore, setErrore] = useState("");
+  const [apertaId, setApertaId] = useState(null);
+  const [completaId, setCompletaId] = useState(null);
+  const [revisione, setRevisione] = useState(0);
+  const [modalitaFirme, setModalitaFirme] = useState("cartacea");
+  useEffect(() => {
+    let attivo=true;
+    if (!parrocchiaId) return undefined;
+    (async () => {
+      const {data,error}=await supabase.rpc("ars_firme_leggi_modalita",{
+        p_parrocchia_id:parrocchiaId,p_ambito:"prima_comunione",
+      });
+      if(attivo && !error && data?.modalita) setModalitaFirme(data.modalita);
+    })();
+    return () => {attivo=false;};
+  },[parrocchiaId]);
   useEffect(() => {
     let attivo = true;
-    if (!parrocchiaId || !utenteId || !codici.length) {setStati([]);return undefined;}
+    if (!parrocchiaId || !utenteId) {setDomande([]);setCaricamento(false);return undefined;}
     setCaricamento(true); setErrore("");
     (async () => {
-      const risposte = await Promise.all(codici.map(async codice => {
-        const {data,error} = await supabase.rpc("ars_comunione_stato_domanda_ricevuta", {
-          p_parrocchia_id: parrocchiaId, p_ricevuta: codice,
-        });
-        return { codice, data, error };
-      }));
+      const {data,error} = await supabase.rpc("ars_comunione_mie_domande", {
+        p_parrocchia_id:parrocchiaId,p_utente_id:utenteId,
+      });
       if (!attivo) return;
       setCaricamento(false);
-      setStati(risposte.filter(r => r.data));
-      if (risposte.some(r => r.error)) {
-        setErrore("Non è stato possibile aggiornare tutte le pratiche. Riprova con «Aggiorna stato».");
-      } else if (risposte.some(r => !r.data)) {
-        setErrore("Uno o più codici ricevuta non corrispondono a domande della parrocchia selezionata.");
-      }
+      if (error || !Array.isArray(data)) {
+        setErrore(error?.message || "Non è stato possibile leggere le domande.");
+      } else setDomande(data);
     })();
-    return () => { attivo = false; };
-  }, [parrocchiaId,utenteId,codici,aggiornamento]);
-
-  function collegaRicevuta(e) {
-    e.preventDefault();
-    const codice = nuovoCodice.trim();
-    if (!REGEXP_RICEVUTA_COMUNIONE.test(codice)) {
-      setErrore("Il codice pratica non è valido: controlla la ricevuta consegnata dalla parrocchia."); return;
-    }
-    const nuovi = [...new Set([...codici,codice])];
-    try {localStorage.setItem(chiaveRicevuteComunione(parrocchiaId,utenteId), JSON.stringify(nuovi));}
-    catch (_errore) { setErrore("Il browser non consente di salvare il codice su questo dispositivo."); }
-    setCodici(nuovi); setNuovoCodice("");
-  }
-
+    return () => { attivo=false; };
+  }, [parrocchiaId,utenteId,nuovaIscrizioneId,revisione]);
   return <section className="ars-com-genitore-stato" aria-label="Le mie domande di Prima Comunione">
     <h4>Le mie domande e documenti</h4>
-    <p>Qui trovi lo stato delle tue domande e gli eventuali solleciti della parrocchia, esclusivamente all'interno della pratica.</p>
-    <div className="ars-sac-azioni">
-      <button type="button" className="ars-sac-azione ars-sac-azione-chiara"
-        onClick={() => setAggiornamento(n => n+1)} disabled={caricamento}>
-        {caricamento ? "Aggiornamento…" : "Aggiorna stato delle domande"}
-      </button>
-    </div>
+    <p>Le domande già inviate restano qui. Puoi consultarle in qualsiasi momento e completare i documenti mancanti.</p>
+    {caricamento && <p role="status">Caricamento delle tue domande…</p>}
     {errore && <p className="ars-sac-errore" role="alert">{errore}</p>}
-    {stati.map(({data,codice}) => {
-      const mancanti = DOCUMENTI_PERSONALI_COMUNIONE.filter(doc =>
-        !(data.documenti || []).some(d => d.tipo === doc.tipo &&
-          (d.stato === "ricevuto" || d.stato === "non_necessario")));
-      const solleciti = Array.isArray(data.solleciti) ? data.solleciti : [];
-      return <article className="ars-com-genitore-pratica" key={data.id || codice}>
-        <h5>{data.nome} {data.cognome} — {data.anno_pastorale}, {data.anno_percorso}° anno</h5>
-        {mancanti.length ? <div className="ars-com-genitore-mancanti" role="status">
-          <strong>Documentazione da completare</strong>
-          <p>La parrocchia è in attesa dei seguenti documenti:</p>
-          <ul>{mancanti.map(doc => <li key={doc.tipo}>{doc.nome}</li>)}</ul>
-        </div> : <p className="ars-sac-successo">Documentazione completa: la domanda è nell'archivio della parrocchia.</p>}
-        {solleciti.length>0 && <div className="ars-com-genitore-solleciti">
-          <strong>Solleciti della parrocchia</strong>
-          {solleciti.map(s => <div key={s.id}>
-            <small>{s.creato_il ? new Date(s.creato_il).toLocaleString("it-IT") : ""}</small>
-            <p>Ti invitiamo a consegnare in parrocchia: {(s.documenti_mancanti||[]).join(", ")}.</p>
-          </div>)}
+    {!caricamento && !errore && domande.length === 0 && <p>Non hai ancora inviato domande di Prima Comunione.</p>}
+    {domande.map(pratica => {
+      const d = pratica.dati_modulo || {};
+      const documentiMancanti = DOCUMENTI_PERSONALI_COMUNIONE.filter(x => !documentoConfermato(pratica,x.tipo));
+      const datiMancanti = CAMPI_OBBLIGATORI_GENITORE.filter(([k]) => !String(d[k] || "").trim()).map(([,nome]) => nome);
+      if (!d.genitore1Telefono && !d.genitore1Email) datiMancanti.push("Telefono o email del genitore");
+      const completa = datiMancanti.length===0 && documentiMancanti.length===0;
+      return <article className="ars-com-genitore-pratica" key={pratica.id}>
+        <div className="ars-com-genitore-riepilogo">
+          <strong>{d.nome || "Bambino"} {d.cognome || ""}</strong>
+          <small>{pratica.anno_percorso}° anno · {pratica.anno_pastorale} · Domanda del {pratica.presentata_il ? new Date(pratica.presentata_il).toLocaleDateString("it-IT") : "—"}</small>
+          <small>Genitore: {d.genitore1Nome || ""} {d.genitore1Cognome || ""}</small>
+          {completa ? <p className="ars-sac-successo">Documentazione completa — domanda conservata nell'archivio.</p> :
+            <div className="ars-com-genitore-mancanti" role="status">
+              <strong>Documentazione incompleta</strong>
+              {datiMancanti.length>0 && <p>Dati ancora da completare in parrocchia: {datiMancanti.join(", ")}.</p>}
+              {documentiMancanti.length > 0 && <><p>Documenti non ancora ricevuti:</p>
+                <ul>{documentiMancanti.map(doc => <li key={doc.tipo}>
+                  {doc.nome}: <strong>{fotoPresente(pratica,doc.tipo) ? "foto caricata, in attesa di verifica" : "da consegnare"}</strong>
+                </li>)}</ul></>}
+              <p>Se manca un documento, caricane una fotografia oppure consegnalo direttamente in parrocchia.</p>
+            </div>}
+        </div>
+        <div className="ars-com-genitore-pulsanti">
+          <button className="ars-sac-azione ars-sac-azione-chiara" type="button"
+            onClick={() => setApertaId(v => v===pratica.id ? null:pratica.id)}>
+            {apertaId===pratica.id ? "Chiudi domanda" : "Apri domanda"}
+          </button>
+          {!completa && <button className="ars-sac-azione" type="button"
+            onClick={() => setCompletaId(v => v===pratica.id ? null:pratica.id)}>
+            {completaId===pratica.id ? "Chiudi documenti" : "Completa documenti"}
+          </button>}
+        </div>
+        {apertaId===pratica.id && <div className="ars-com-genitore-dettaglio">
+          <h5>Domanda inviata alla parrocchia</h5>
+          <dl>{DETTAGLI_PRATICA.filter(([k]) => String(d[k] || "").trim()).map(([k,nome]) =>
+            <div key={k}><dt>{nome}</dt><dd>{String(d[k])}</dd></div>)}</dl>
+          <p>Informativa privacy: versione {pratica.privacy_versione || "—"}.
+            Presa visione {pratica.privacy_presa_visione_il ? "registrata" : "non registrata"}.</p>
+          <h6>Stato dei documenti</h6>
+          {DOCUMENTI_PERSONALI_COMUNIONE.map(doc => <p key={doc.tipo}><strong>{doc.nome}:</strong> {
+            documentoConfermato(pratica,doc.tipo) ? "Completato" : fotoPresente(pratica,doc.tipo) ? "Foto caricata, in attesa di verifica" : "Da consegnare"}</p>)}
+          {(pratica.solleciti || []).length>0 && <div className="ars-com-genitore-solleciti">
+            <h6>Promemoria della parrocchia</h6>
+            {pratica.solleciti.map(s => <p key={s.id}>
+              {new Date(s.creato_il).toLocaleDateString("it-IT")}: {s.documenti_mancanti.join(", ")}
+            </p>)}
+          </div>}
         </div>}
+        {completaId===pratica.id && !completa && <CompletaFotoComunione
+          pratica={pratica} parrocchiaId={parrocchiaId} utenteId={utenteId}
+          modalitaFirme={modalitaFirme}
+          onCaricata={() => setRevisione(v=>v+1)} />}
       </article>;
     })}
-    {!caricamento && codici.length === 0 &&
-      <p className="ars-sac-avvertenza">Le domande che presenti da qui vengono collegate automaticamente a questo dispositivo. Se la segreteria ha registrato la tua iscrizione, puoi aggiungere il codice della ricevuta.</p>}
-    <form className="ars-com-genitore-collega" onSubmit={collegaRicevuta}>
-      <label>Codice ricevuta di una domanda già presentata
-        <input type="text" value={nuovoCodice} onChange={e => setNuovoCodice(e.target.value)}
-          placeholder="Codice consegnato dalla parrocchia" autoComplete="off" />
-      </label>
-      <button type="submit" className="ars-sac-azione ars-sac-azione-chiara">Collega domanda</button>
-    </form>
-    {codici.length > 0 && <div className="ars-com-genitore-codici">
-      <p>Codici ricevuta salvati su questo dispositivo:</p>
-      {codici.map(c => <div key={c}>
-        <code>{c}</code>
-        <button type="button" onClick={() => {
-          const nuovi = codici.filter(x => x !== c);
-          setCodici(nuovi);
-          setErrore("");
-          try {localStorage.setItem(chiaveRicevuteComunione(parrocchiaId,utenteId), JSON.stringify(nuovi));}
-          catch (_errore) { /* La rimozione resta attiva per questa sessione. */ }
-        }}>Rimuovi</button>
-      </div>)}
-    </div>}
   </section>;
 }
 
@@ -213,6 +325,11 @@ function ModuloComunione({ parrocchiaId, utenteId, nomeParrocchia }) {
   const [messaggio, setMessaggio] = useState("");
   const [inInvio, setInInvio] = useState(false);
   const [ricevuta, setRicevuta] = useState(null);
+  const [modalitaDisponibili, setModalitaDisponibili] = useState("cartacea");
+  const [modalitaFirma, setModalitaFirma] = useState("cartacea");
+  const [nominativoFirma, setNominativoFirma] = useState("");
+  const [confermaFirma, setConfermaFirma] = useState(false);
+  const [fotoPrimaInvio, setFotoPrimaInvio] = useState({});
 
   useEffect(() => {
     let attivo = true;
@@ -239,10 +356,26 @@ function ModuloComunione({ parrocchiaId, utenteId, nomeParrocchia }) {
     return () => { attivo = false; };
   }, [parrocchiaId]);
 
+  useEffect(() => {
+    let attivo = true;
+    if (!parrocchiaId) return undefined;
+    (async () => {
+      const {data,error} = await supabase.rpc("ars_firme_leggi_modalita", {
+        p_parrocchia_id:parrocchiaId,p_ambito:"prima_comunione",
+      });
+      if (!attivo || error) return;
+      const disponibile = ["app","cartacea","entrambe"].includes(data?.modalita) ? data.modalita : "cartacea";
+      setModalitaDisponibili(disponibile);
+      setModalitaFirma(disponibile === "app" ? "app" : "cartacea");
+    })();
+    return () => {attivo=false;};
+  }, [parrocchiaId]);
+
   const aggiorna = (chiave, valore) => {
     setModulo(prev => ({ ...prev, [chiave]: valore }));
     setMessaggio("");
-    setRicevuta(null);
+    // La ricevuta di una domanda inviata non viene invalidata da modifiche al modulo.
+    // Una nuova domanda richiede una nuova sessione di compilazione.
     if (["nome", "cognome", "telefonoRagazzo"].includes(chiave)) {
       setRicerca("idle");
       setCandidati([]);
@@ -310,6 +443,10 @@ function ModuloComunione({ parrocchiaId, utenteId, nomeParrocchia }) {
       if (!String(modulo[chiave] || "").trim()) return "Compila i dati obbligatori del bambino e del genitore.";
     }
     if (!modulo.privacyVista) return "Leggi l'informativa e conferma di averne preso visione.";
+    if (modalitaFirma === "app" && !confermaFirma) return "Conferma la sottoscrizione della domanda nell'app.";
+    if (modalitaFirma === "app" && nominativoFirma.trim().toLocaleLowerCase("it") !==
+       `${modulo.genitore1Nome.trim()} ${modulo.genitore1Cognome.trim()}`.toLocaleLowerCase("it"))
+      return "Scrivi il nome e cognome del genitore esattamente come nella domanda.";
     if (modulo.autorizzaAccount && ricerca !== "ready") return "Prima di autorizzare l'account, completa la ricerca dei possibili account esistenti.";
     if (modulo.autorizzaAccount && !sceltaAccount) return "Seleziona l'account di tuo figlio o scegli 'Nessuno di questi'.";
     return "";
@@ -327,7 +464,7 @@ function ModuloComunione({ parrocchiaId, utenteId, nomeParrocchia }) {
     delete dati.autorizzaAccount;
     delete dati.autorizzaChat;
     // I dati sanitari non vengono inviati con questa domanda.
-    const { data, error } = await supabase.rpc("ars_comunione_presenta_domanda_con_account", {
+    const { data, error } = await supabase.rpc("ars_comunione_presenta_domanda_firmata", {
       p_parrocchia_id: parrocchiaId,
       p_utente_id: utenteId,
       p_anno_percorso: Number(modulo.annoPercorso),
@@ -337,18 +474,31 @@ function ModuloComunione({ parrocchiaId, utenteId, nomeParrocchia }) {
       p_consenso_chat: modulo.autorizzaAccount && modulo.autorizzaChat,
       p_account_esistente_id: modulo.autorizzaAccount && !["nessuno", "nonso"].includes(sceltaAccount)
         ? (sceltaAccount || null) : null,
+      p_modalita_firma: modalitaFirma,
+      p_nominativo_firma: nominativoFirma,
+      p_conferma_firma: modalitaFirma === "app" && confermaFirma,
     });
-    setInInvio(false);
     if (error) {
-      setMessaggio("Domanda non inviata: " + error.message + ". Puoi conservare i dati inseriti e riprovare quando il servizio sarà attivo.");
+      setInInvio(false);
+      setMessaggio("Domanda non inviata: " + error.message);
       return;
     }
     if (!data?.ok || !data?.iscrizione_id) {
-      setMessaggio("Non abbiamo ricevuto la conferma della registrazione. Non ripetere l'invio prima di verificare.");
+      setInInvio(false);
+      setMessaggio("Non abbiamo ricevuto la conferma. Non ripetere l'invio prima di verificare.");
       return;
     }
     setRicevuta(data);
-    setMessaggio("Domanda registrata correttamente. Puoi stampare e firmare la domanda e l'informativa.");
+    const foto = Object.entries(fotoPrimaInvio).filter(([,file]) => file);
+    const erroriFoto = [];
+    for (const [tipo,file] of foto) {
+      try { await caricaFotoComunione({parrocchiaId,utenteId,iscrizioneId:data.iscrizione_id,tipo,file}); }
+      catch (err) {erroriFoto.push(err.message);}
+    }
+    setInInvio(false);
+    setMessaggio(erroriFoto.length
+      ? "Domanda inviata correttamente. Una o più foto non sono state caricate: puoi aggiungerle da «Le mie domande e documenti»."
+      : "Domanda inviata alla parrocchia. La trovi in «Le mie domande e documenti». Puoi stamparla, se desideri.");
   }
 
   // Stampa autonoma della scheda sanitaria. Il foglio non viene mai
@@ -412,7 +562,7 @@ function ModuloComunione({ parrocchiaId, utenteId, nomeParrocchia }) {
     </>}
 
     {parrocchiaId && utenteId && <StatoDomandeComunioneGenitore
-      parrocchiaId={parrocchiaId} utenteId={utenteId} ricevutaNuova={ricevuta} />}
+      parrocchiaId={parrocchiaId} utenteId={utenteId} nuovaIscrizioneId={ricevuta?.iscrizione_id} />}
 
     {config && mostraModulo && <form className="ars-sac-modulo" onSubmit={inviaDomanda}>
       <fieldset><legend>Anno di catechismo</legend>
@@ -491,11 +641,28 @@ function ModuloComunione({ parrocchiaId, utenteId, nomeParrocchia }) {
             {mostraPrivacy ? "Chiudi informativa" : "Leggi l'informativa privacy"}
           </button>
           {mostraPrivacy && <div className="ars-sac-testo-informativa" tabIndex={0}>{privacy}</div>}
-          {spunta("privacyVista", "Dichiaro di aver preso visione dell'informativa privacy della parrocchia. La stamperò e firmerò insieme alla domanda.")}
+          {spunta("privacyVista", "Dichiaro di aver preso visione dell’informativa privacy della parrocchia.")}
         </> : <p role="alert" className="ars-sac-errore">L'informativa non è ancora disponibile. La parrocchia deve pubblicarla prima dell'invio.</p>}
-        <p className="ars-sac-avvertenza">La spunta online non sostituisce la firma: domanda e informativa devono essere stampate, firmate e riconsegnate in parrocchia.</p>
+        <p className="ars-sac-avvertenza">La presa visione della privacy viene registrata con la domanda. Se scegli la modalità cartacea, seguirai le istruzioni per consegnare i documenti firmati.</p>
       </fieldset>
 
+      <FirmaSemplice documento="domanda di Prima Comunione"
+        modalitaDisponibili={modalitaDisponibili} modalita={modalitaFirma}
+        onModalitaChange={setModalitaFirma} conferma={confermaFirma}
+        onConfermaChange={setConfermaFirma} nominativo={nominativoFirma}
+        onNominativoChange={setNominativoFirma} disabilitato={Boolean(ricevuta)} />
+      {!ricevuta && <fieldset className="ars-com-foto-preinvio">
+        <legend>Fotografie dei documenti firmati — facoltative</legend>
+        <p><strong>Puoi inviare la domanda anche senza queste fotografie.</strong>
+          Potrai aggiungerle successivamente, oppure consegnare i documenti in parrocchia.</p>
+        {modalitaFirma === "cartacea" ? DOCUMENTI_PERSONALI_COMUNIONE.map(doc =>
+          <label className="ars-com-genitore-file" key={doc.tipo}>
+            <span>{doc.nome} — scegli o scatta una foto</span>
+            <input type="file" accept="image/*"
+              onChange={e=>setFotoPrimaInvio(p=>({...p,[doc.tipo]:e.target.files?.[0] || null}))} />
+            {fotoPrimaInvio[doc.tipo] && <small>Foto scelta: {fotoPrimaInvio[doc.tipo].name}</small>}
+          </label>) : <p>Con la conferma nell’app non occorre allegare fotografie della domanda o dell'informativa.</p>}
+      </fieldset>}
       {messaggio && <p className={ricevuta ? "ars-sac-successo" : "ars-sac-errore"} role="status">{messaggio}</p>}
       {ricevuta && <p className="ars-sac-successo">Pratica registrata: {ricevuta.iscrizione_id}.
         {ricevuta.account_stato === "da_verificare" ? " L'eventuale account del ragazzo sarà verificato separatamente." : ""}</p>}
@@ -504,10 +671,10 @@ function ModuloComunione({ parrocchiaId, utenteId, nomeParrocchia }) {
           Stampa domanda e informativa
         </button>
         <button className="ars-sac-azione" type="submit" disabled={inInvio || Boolean(ricevuta) || !privacyPubblicata || !aperto}>
-          {inInvio ? "Invio in corso…" : ricevuta ? "Domanda registrata" : "Invia domanda"}
+          {inInvio ? "Invio in corso…" : ricevuta ? "Domanda inviata" : "Invia alla parrocchia"}
         </button>
       </div>
-      <p className="ars-sac-avvertenza">L'invio risulterà effettivo soltanto dopo la conferma del sistema. Se la funzione non è ancora abilitata in Supabase, nessuna domanda viene registrata.</p>
+      <p className="ars-sac-avvertenza">L’invio è consentito anche quando mancano le fotografie dei documenti. La domanda rimarrà visibile nella tua area personale.</p>
 
       <div className="ars-sac-documenti-stampa" aria-hidden="true">
         <section className="ars-sac-pagina-stampa">
@@ -518,12 +685,13 @@ function ModuloComunione({ parrocchiaId, utenteId, nomeParrocchia }) {
           <div className="ars-sac-righe-stampa">
             {campiStampa.map(([etichetta, valore]) => <div key={etichetta}><strong>{etichetta}:</strong> {valore || "_________________"}</div>)}
           </div>
-          <p>Chiedo l'iscrizione del minore sopra indicato al percorso di preparazione alla Prima Comunione.</p>
+          <p>Chiedo l’iscrizione del minore sopra indicato al percorso di preparazione alla Prima Comunione.</p>
+          <p>Modalità di sottoscrizione: {modalitaFirma === "app" ? "Conferma semplice nell’app" : "Firma cartacea"}.</p>
           <p>Autorizzazione account: {modulo.autorizzaAccount ? "Sì" : "No"} — Autorizzazione dialogo del gruppo: {modulo.autorizzaAccount && modulo.autorizzaChat ? "Sì" : "No"}.</p>
           <p>Presa visione dell'informativa privacy versione {versionePrivacy}: {modulo.privacyVista ? "Confermata online" : "Da confermare"}.</p>
           <div className="ars-sac-firme-stampa">
             <p>Luogo e data: ____________________________________________</p>
-            <p>Firma genitore/tutore: _____________________________________</p>
+            <p>Firma genitore/tutore: {modalitaFirma === "app" && ricevuta?.firma_id ? `Confermata nell’app — ${nominativoFirma}` : "_____________________________________"}</p>
             <p>Firma secondo genitore, se richiesta: _________________________</p>
           </div>
         </section>
@@ -531,7 +699,7 @@ function ModuloComunione({ parrocchiaId, utenteId, nomeParrocchia }) {
           <div className="ars-sac-stampa-privacy-testo">{privacy}</div>
           <p>Versione informativa: {versionePrivacy}</p>
           <p>Data e luogo: ____________________________________________</p>
-          <p>Firma genitore/tutore: _____________________________________</p>
+          <p>Firma genitore/tutore: {modalitaFirma === "app" && ricevuta?.firma_id ? "Presa visione confermata online" : "_____________________________________"}</p>
           <p>Firma secondo genitore, se richiesta: _________________________</p>
         </section>
       </div>
