@@ -380,6 +380,15 @@ function NuovaIscrizioneComunioneSegreteria({ parrocchiaId, onSalvata, onAnnulla
           Genitore senza account
         </button>
       </div>
+      {modalita === "senza" && <div className="ars-com-avviso-firma" role="note">
+        <strong>Firma in segreteria</strong>
+        <p>Stampa la domanda e l’informativa privacy. Fai firmare entrambi i documenti al genitore o tutore e registra la consegna nella pratica.</p>
+        <p><strong>Non può firmare ora?</strong> Puoi registrare ugualmente l’iscrizione. La scheda indicherà in rosso quali documenti firmati mancano ancora.</p>
+      </div>}
+      {modalita === "con" && <div className="ars-com-avviso-firma" role="note">
+        <strong>Firma del genitore</strong>
+        <p>Il genitore potrà confermare nell’app, se previsto dalla parrocchia, oppure firmare i documenti stampati. La segreteria registra soltanto i documenti effettivamente ricevuti.</p>
+      </div>}
       {modalita === "con" && <div className="ars-com-ricerca-genitore">
         <p>Compila il nome e cognome del genitore nel modulo, poi cerca e conferma il suo account. Non viene creato un secondo profilo.</p>
         <button className="ars-sac-stampa" type="button" disabled={ricercaInCorso || salvataggio}
@@ -464,7 +473,7 @@ function IscrizioniComunioneParroco({ parrocchiaId, nomeParrocchia, annoAttivo }
       setCaricamento(false); return undefined;
     }
     (async () => {
-      const { data, error } = await supabase.rpc("ars_comunione_elenco_domande_parroco", {
+      const { data, error } = await supabase.rpc("ars_comunione_elenco_domande_parroco_con_foto", {
         p_parrocchia_id: parrocchiaId,
       });
       if (!attivo) return;
@@ -521,6 +530,23 @@ function IscrizioniComunioneParroco({ parrocchiaId, nomeParrocchia, annoAttivo }
     setRicerca(""); setPagina(1); setApertaId(risultato.iscrizione_id);
     setMessaggio("Iscrizione registrata. Completa la pratica raccogliendo i documenti firmati.");
     setAggiorna(n => n + 1);
+  }
+
+  async function apriFotoParroco(riga, tipo) {
+    const percorso = (riga.foto || []).find(f => f.tipo===tipo)?.percorso_privato;
+    if (!percorso) {setMessaggio("Fotografia non presente per questo documento.");return;}
+    // La scheda viene aperta con il click, prima di avviare la richiesta asincrona.
+    const finestra = window.open("about:blank","_blank");
+    if (finestra) { finestra.opener = null; finestra.document.title = "Fotografia documento — Ars Liturgica"; }
+    const {data,error} = await supabase.storage.from("ars-comunione-documenti")
+      .createSignedUrl(percorso,90);
+    if (error || !data?.signedUrl) {
+      if (finestra) finestra.close();
+      setMessaggio("Non è stato possibile aprire la foto: " + (error?.message || "riprova"));
+      return;
+    }
+    if (finestra) finestra.location.replace(data.signedUrl);
+    else setMessaggio("Il browser ha bloccato la nuova scheda. Consenti le finestre per questo sito e riprova.");
   }
 
   async function cambiaDocumento(riga, tipo, nuovoStato) {
@@ -667,8 +693,11 @@ function IscrizioniComunioneParroco({ parrocchiaId, nomeParrocchia, annoAttivo }
               <small>Genitore: {[d.genitore1Nome, d.genitore1Cognome].filter(Boolean).join(" ") || "—"}</small>
               {mancanze.tutto.length > 0 ?
                 <div className="ars-com-mancanze" role="status">
-                  <strong>Da completare:</strong>
-                  <ul>{mancanze.tutto.map(x => <li key={x}>{x}</li>)}</ul>
+                  <strong>Pratica incompleta</strong>
+                  {mancanze.dati.length > 0 && <><p>Dati da completare:</p><ul>{mancanze.dati.map(x => <li key={x}>{x}</li>)}</ul></>}
+                  {mancanze.documenti.length > 0 && <><p>Documenti non ancora ricevuti in parrocchia:</p>
+                    <ul>{DOCUMENTI_COMUNIONE.filter(doc => !documentoRicevuto(r,doc.tipo)).map(doc =>
+                      <li key={doc.tipo}>{doc.nome}{(r.foto || []).some(f=>f.tipo===doc.tipo) ? " — foto caricata, in attesa di verifica" : " — da consegnare"}</li>)}</ul></>}
                 </div> : <small className="ars-com-stato-ok">Pratica completa</small>}
             </div>
             <button type="button" className="ars-sac-stampa"
@@ -684,7 +713,11 @@ function IscrizioniComunioneParroco({ parrocchiaId, nomeParrocchia, annoAttivo }
                     return <div className="ars-com-riga-documento" key={doc.tipo}>
                       <span>{doc.nome}</span>
                       <strong className={ricevuto ? "ars-com-stato-ok" : "ars-com-stato-attesa"}>
-                        {ricevuto ? "Ricevuto" : "Da consegnare"}</strong>
+                        {ricevuto ? (r.documenti?.some(d=>d.tipo===doc.tipo && d.stato==="non_necessario") ? "Confermato nell'app" : "Ricevuto") :
+                          (r.foto || []).some(f=>f.tipo===doc.tipo) ? "Foto caricata: da verificare" : "Non ricevuto"}</strong>
+                      {(r.foto || []).some(f => f.tipo===doc.tipo) && <button type="button"
+                        className="ars-sac-stampa" disabled={Boolean(occupato)}
+                        onClick={() => apriFotoParroco(r,doc.tipo)}>Apri foto</button>}
                       <button type="button" className="ars-sac-stampa" disabled={Boolean(occupato)}
                         onClick={() => cambiaDocumento(r, doc.tipo, ricevuto ? "da_consegnare" : "ricevuto") }>
                         {occupato === `${r.id}:${doc.tipo}` ? "Salvataggio…" : ricevuto ? "Segna da consegnare" : "Segna ricevuto"}
@@ -767,7 +800,10 @@ function IscrizioniComunioneParroco({ parrocchiaId, nomeParrocchia, annoAttivo }
                 <h4>Documentazione completa</h4>
                 {DOCUMENTI_COMUNIONE.map(doc => <div className="ars-com-riga-documento" key={doc.tipo}>
                   <span>{doc.nome}</span>
-                  <strong className="ars-com-stato-ok">Ricevuto</strong>
+                  <strong className="ars-com-stato-ok">{r.documenti?.some(d=>d.tipo===doc.tipo && d.stato==="non_necessario") ? "Confermato nell'app" : "Ricevuto"}</strong>
+                  {(r.foto || []).some(f => f.tipo===doc.tipo) && <button type="button"
+                    className="ars-sac-stampa" disabled={Boolean(occupato)}
+                    onClick={() => apriFotoParroco(r,doc.tipo)}>Apri foto</button>}
                   <button type="button" className="ars-sac-stampa" disabled={Boolean(occupato)}
                     onClick={() => cambiaDocumento(r,doc.tipo,"da_consegnare")}>
                     {occupato === `${r.id}:${doc.tipo}` ? "Salvataggio…" : "Correggi: documento da consegnare"}
@@ -806,6 +842,9 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
   const [sezione, setSezione] = useState(null);
   const [impostazioni, setImpostazioni] = useState(impostazioniIniziali);
   // Orari per anno pastorale e anno di percorso: i gruppi si formano nella card 05.
+  const [modalitaFirme, setModalitaFirme] = useState("cartacea");
+  const [modalitaFirmeSalva, setModalitaFirmeSalva] = useState(false);
+  const [modalitaFirmeMessaggio, setModalitaFirmeMessaggio] = useState("");
   const [orariCatechismo, setOrariCatechismo] = useState({});
   const [messaggio, setMessaggio] = useState("");
   const [salvato, setSalvato] = useState(false);
@@ -923,6 +962,33 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
     carica();
     return () => { attivo = false; };
   }, [parrocchiaId]);
+  useEffect(() => {
+    let attivo=true;
+    setModalitaFirme("cartacea"); setModalitaFirmeMessaggio("");
+    if (!parrocchiaId) return undefined;
+    (async () => {
+      const {data,error} = await supabase.rpc("ars_firme_leggi_modalita", {
+        p_parrocchia_id:parrocchiaId,p_ambito:"prima_comunione",
+      });
+      if (!attivo) return;
+      if (error) setModalitaFirmeMessaggio("Impostazioni della firma non disponibili: " + error.message);
+      else setModalitaFirme(["app","cartacea","entrambe"].includes(data?.modalita) ? data.modalita : "cartacea");
+    })();
+    return () => {attivo=false;};
+  },[parrocchiaId]);
+
+  async function salvaModalitaFirme() {
+    if (modalitaFirmeSalva || !parrocchiaId) return;
+    setModalitaFirmeSalva(true); setModalitaFirmeMessaggio("");
+    const {data,error} = await supabase.rpc("ars_firme_imposta_modalita", {
+      p_parrocchia_id:parrocchiaId,p_ambito:"prima_comunione",p_modalita:modalitaFirme,
+    });
+    setModalitaFirmeSalva(false);
+    setModalitaFirmeMessaggio(error || !data?.ok
+      ? "Modalità non salvata: " + (error?.message || "riprova")
+      : "Modalità di conferma salvata per la Prima Comunione.");
+  }
+
   const sacramento = sacramenti.find((s) => s.id === scelto);
   const sezioneAttiva = sezioniComunione.find((s) => s.id === sezione);
 
@@ -1348,6 +1414,24 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
             </div>
           </div>
 
+          <div className="ars-sac-privacy-pannello" aria-label="Modalità di firma Prima Comunione">
+            <h3>Firma e conferma della domanda</h3>
+            <p>Scegli come i genitori possono sottoscrivere la domanda. La segreteria usa sempre la firma cartacea quando il genitore non ha un account.</p>
+            <label className="ars-sac-privacy-etichetta">Modalità consentita
+              <select value={modalitaFirme} disabled={modalitaFirmeSalva}
+                onChange={e => {setModalitaFirme(e.target.value);setModalitaFirmeMessaggio("");}}>
+                <option value="app">Conferma nell'app</option>
+                <option value="cartacea">Firma cartacea</option>
+                <option value="entrambe">Entrambe: decide il genitore</option>
+              </select>
+            </label>
+            <div className="ars-sac-privacy-azioni"><button type="button"
+              className="ars-sac-conferma" disabled={modalitaFirmeSalva}
+              onClick={salvaModalitaFirme}>{modalitaFirmeSalva ? "Salvataggio…" : "Salva modalità di firma"}</button></div>
+            {modalitaFirmeMessaggio && <p role="status" className="ars-sac-privacy-stato">{modalitaFirmeMessaggio}</p>}
+            <p className="ars-sac-privacy-nota">La conferma nell'app non è una firma digitale certificata. La presa visione privacy rimane separata.</p>
+          </div>
+
           <div className="ars-sac-privacy-pannello" aria-label="Informativa privacy Prima Comunione">
             <h3>Informativa privacy per le iscrizioni</h3>
             <p>Scegli come preparare l'informativa della tua parrocchia:</p>
@@ -1426,6 +1510,10 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
 const STILE = `
 
 /* Card 03 — Iscrizioni e rinnovi. Stili confinati alla card. */
+/* Avvisi brevi per le iscrizioni assistite: leggibili anche da telefono */
+.ars-com-avviso-firma{margin:12px 0;padding:12px 14px;background:#fff9ea;border:1px solid #e5cf9b;border-left:4px solid #9f772e;border-radius:9px;color:#493a1e;line-height:1.48;font-size:.92rem}
+.ars-com-avviso-firma>strong{display:block;margin-bottom:3px;font-size:1rem}
+.ars-com-avviso-firma p{margin:5px 0}
 .ars-com-segreteria-apri{display:flex;align-items:center;gap:13px;flex-wrap:wrap;margin:16px 0}
 .ars-com-segreteria-apri>p{flex:1;min-width:210px;font-size:.9rem;color:#63706e;margin:0}
 .ars-com-segreteria{border:1px solid #d6bd88;border-radius:13px;background:#fffaf0;padding:18px;margin:16px 0 24px}
