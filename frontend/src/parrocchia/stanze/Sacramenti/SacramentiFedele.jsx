@@ -159,7 +159,7 @@ async function caricaFotoComunione({ parrocchiaId, utenteId, iscrizioneId, tipo,
 
 function ConfermaFirmaDomandaEsistente({pratica,parrocchiaId,utenteId,onConfermata}) {
   const dati=pratica.dati_modulo || {};
-  const [nominativo, setNominativo] = useState([dati.genitore1Nome,dati.genitore1Cognome].filter(Boolean).join(" "));
+  const nominativo = [dati.genitore1Nome,dati.genitore1Cognome].filter(Boolean).join(" ").trim();
   const [conferma, setConferma] = useState(false);
   const [salvataggio, setSalvataggio] = useState(false);
   const [messaggio, setMessaggio] = useState("");
@@ -178,7 +178,7 @@ function ConfermaFirmaDomandaEsistente({pratica,parrocchiaId,utenteId,onConferma
   return <div className="ars-com-firma-esistente">
     <h6>Conferma la domanda nell'app</h6>
     <FirmaSemplice documento="domanda di Prima Comunione" modalitaDisponibili="app"
-      modalita="app" nominativo={nominativo} onNominativoChange={setNominativo}
+      modalita="app" nominativo={nominativo}
       conferma={conferma} onConfermaChange={setConferma} disabilitato={salvataggio} />
     <button type="button" className="ars-sac-azione" onClick={confermaDomanda}
       disabled={!conferma || !nominativo.trim() || salvataggio}>
@@ -225,7 +225,35 @@ function StatoDomandeComunioneGenitore({ parrocchiaId, utenteId, nuovaIscrizione
   const [apertaId, setApertaId] = useState(null);
   const [completaId, setCompletaId] = useState(null);
   const [revisione, setRevisione] = useState(0);
+  const [firmateOra, setFirmateOra] = useState([]);
+  const [firmaConsentita, setFirmaConsentita] = useState(null);
+  const [firmaModalitaErrore, setFirmaModalitaErrore] = useState(false);
+  const [firmaControllo, setFirmaControllo] = useState(0);
   const [internoObbligatorio, setInternoObbligatorio] = useState(null);
+  useEffect(() => {
+    let attivo=true;
+    setFirmaConsentita(null);
+    setFirmaModalitaErrore(false);
+    if (!parrocchiaId) return undefined;
+    (async () => {
+      const {data,error}=await supabase.rpc("ars_firme_leggi_modalita", {
+        p_parrocchia_id:parrocchiaId,p_ambito:"prima_comunione",
+      });
+      if (!attivo) return;
+      if (error || !["app","cartacea","entrambe"].includes(data?.modalita)) {
+        setFirmaModalitaErrore(true);
+        return;
+      }
+      setFirmaConsentita(["app","entrambe"].includes(data.modalita));
+    })();
+    return () => {attivo=false;};
+  },[parrocchiaId,firmaControllo]);
+  // Aggiornamento automatico quando si ritorna alla pagina, oltre che dopo ogni modifica.
+  useEffect(() => {
+    const aggiornaSeVisibile = () => {if (document.visibilityState === "visible") setRevisione(v=>v+1);};
+    window.addEventListener("focus", aggiornaSeVisibile);
+    return () => window.removeEventListener("focus", aggiornaSeVisibile);
+  }, []);
   useEffect(() => {
     let attivo = true;
     if (!parrocchiaId) return undefined;
@@ -255,9 +283,7 @@ function StatoDomandeComunioneGenitore({ parrocchiaId, utenteId, nuovaIscrizione
   }, [parrocchiaId,utenteId,nuovaIscrizioneId,revisione]);
   return <section className="ars-com-genitore-stato" aria-label="Le mie domande di Prima Comunione">
     <h4>Le mie domande e documenti</h4>
-    <p>Le tue domande restano sempre consultabili. Qui vedi soltanto i dati e i certificati che devi ancora fornire.
-      Se hai appena caricato un certificato, sarà subito registrato come ricevuto.</p>
-    <button type="button" className="ars-sac-azione ars-sac-azione-chiara" onClick={() => setRevisione(v=>v+1)}>Aggiorna lo stato</button>
+    <p>Qui trovi le domande inviate alla parrocchia e le eventuali informazioni o certificati ancora da fornire.</p>
     {caricamento && <p role="status">Caricamento delle tue domande…</p>}
     {errore && <p className="ars-sac-errore" role="alert">{errore}</p>}
     {!caricamento && !errore && domande.length === 0 && <p>Non hai ancora inviato domande di Prima Comunione.</p>}
@@ -267,26 +293,30 @@ function StatoDomandeComunioneGenitore({ parrocchiaId, utenteId, nuovaIscrizione
       const datiMancanti = CAMPI_OBBLIGATORI_GENITORE.filter(([k]) => !String(d[k] || "").trim()).map(([,nome]) => nome);
       if (!d.genitore1Telefono && !d.genitore1Email) datiMancanti.push("Telefono o email del genitore");
       if (!pratica.privacy_presa_visione_il) datiMancanti.push("Presa visione privacy");
-      if (d.modalitaPresentazione === "segreteria_con_account" && !documentoConfermato(pratica,"domanda_firmata"))
-        datiMancanti.push("Conferma della domanda nell'app");
+      const firmaRegistrata = documentoConfermato(pratica,"domanda_firmata") || Boolean(pratica.firma_id || pratica.firma_registrata_il) || firmateOra.includes(pratica.id);
+      const firmaDaConfermare = d.modalitaPresentazione === "segreteria_con_account" && !firmaRegistrata;
+      if (firmaDaConfermare) datiMancanti.push(firmaConsentita === true
+        ? "Conferma la domanda nell'app qui sotto"
+        : firmaConsentita === false ? "Firma da consegnare alla parrocchia"
+        : "Modalità di conferma da verificare");
       if (typeof d.battesimoInQuestaParrocchia !== "boolean" && !documentoConfermato(pratica,"certificato_battesimo"))
         datiMancanti.push("Indicare se il Battesimo è avvenuto in questa parrocchia (per le vecchie domande, chiedi alla segreteria)");
       const completa = internoObbligatorio !== null && datiMancanti.length===0 && documentiMancanti.length===0;
       return <article className="ars-com-genitore-pratica" key={pratica.id}>
         <div className="ars-com-genitore-riepilogo">
-          <strong>{d.nome || "Bambino"} {d.cognome || ""}</strong>
-          <small>{pratica.anno_percorso}° anno · {pratica.anno_pastorale} · Domanda del {pratica.presentata_il ? new Date(pratica.presentata_il).toLocaleDateString("it-IT") : "—"}</small>
-          <small>Genitore: {d.genitore1Nome || ""} {d.genitore1Cognome || ""}</small>
-          {completa ? <p className="ars-sac-successo">Documentazione completa — domanda conservata nell'archivio.</p> :
+          <h5>{d.nome || "Bambino"} {d.cognome || ""}</h5>
+          <p><strong>Anno:</strong> {pratica.anno_percorso}° · {pratica.anno_pastorale}</p>
+          <p><strong>Domanda presentata:</strong> {pratica.presentata_il ? new Date(pratica.presentata_il).toLocaleDateString("it-IT") : "—"}</p>
+          <p><strong>Genitore:</strong> {d.genitore1Nome || ""} {d.genitore1Cognome || ""}</p>
+          {completa ? <p className="ars-sac-successo">Domanda completa: non devi fare altro.</p> :
             <div className="ars-com-genitore-mancanti" role="status">
-              <strong>Documentazione incompleta</strong>
-              {datiMancanti.length>0 && <p>Dati ancora da completare in parrocchia: {datiMancanti.join(", ")}.</p>}
-              {documentiMancanti.length > 0 && <><p>Ti resta da inviare:</p>
-                <ul>{documentiMancanti.map(doc => <li key={doc.tipo}>{doc.nome}</li>)}</ul></>}
-              {documentiMancanti.length > 0 && <p>Scatta una foto leggibile oppure consegna il certificato in segreteria.
-                Dopo l'invio sparirà dalle cose da fare: non occorre una verifica manuale.</p>}
-              {!documentiMancanti.length && datiMancanti.length > 0 && <p>I documenti risultano a posto; restano da completare soltanto i dati indicati sopra.</p>}
-              {internoObbligatorio === null && <p>Stiamo caricando le regole della parrocchia. Riprova con «Aggiorna».</p>}
+              <strong>Per completare la domanda</strong>
+              {datiMancanti.length > 0 && <><p>Informazioni da completare:</p>
+                <ol>{datiMancanti.map(voce => <li key={voce}>{voce}</li>)}</ol></>}
+              {documentiMancanti.length > 0 && <><p>Certificati da consegnare:</p>
+                <ol>{documentiMancanti.map(doc => <li key={doc.tipo}>{doc.nome}</li>)}</ol>
+                <p>Puoi inviare una foto del certificato oppure consegnarlo in segreteria.</p></>}
+              {internoObbligatorio === null && <p>Stiamo verificando le indicazioni della parrocchia.</p>}
             </div>}
         </div>
         <div className="ars-com-genitore-pulsanti">
@@ -301,14 +331,20 @@ function StatoDomandeComunioneGenitore({ parrocchiaId, utenteId, nuovaIscrizione
         </div>
         {apertaId===pratica.id && <div className="ars-com-genitore-dettaglio">
           <h5>Domanda inviata alla parrocchia</h5>
-          <p>Questa è una copia dei dati trasmessi. Non devi stampare o firmare nuovamente la domanda già confermata nell'app.</p>
-          <dl>{DETTAGLI_PRATICA.filter(([k]) =>
-            typeof d[k] === "boolean" || String(d[k] ?? "").trim()).map(([k,nome]) =>
-            <div key={k}><dt>{nome}</dt><dd>{typeof d[k] === "boolean" ? (d[k] ? "Sì" : "No") :
-              (k.startsWith("data") ? formattaData(d[k]) : String(d[k]))}</dd></div>)}</dl>
-          <p>Informativa privacy: versione {pratica.privacy_versione || "—"}.
-            Presa visione {pratica.privacy_presa_visione_il ? "registrata" : "non registrata"}.</p>
-          <h6>Stato del certificato</h6>
+          <p>Questa è la copia della domanda presentata alla parrocchia.</p>
+          {[
+            ["Dati del bambino", DETTAGLI_PRATICA.slice(0,11)],
+            ["Genitori e recapiti", DETTAGLI_PRATICA.slice(11)],
+          ].map(([titolo, campi]) => <section key={titolo}>
+            <h6>{titolo}</h6>
+            <dl>{campi.filter(([k]) => typeof d[k] === "boolean" || String(d[k] ?? "").trim()).map(([k,nome]) =>
+              <div key={k}><dt>{nome}</dt><dd>{typeof d[k] === "boolean" ? (d[k] ? "Sì" : "No") :
+                (k.startsWith("data") ? formattaData(d[k]) : String(d[k]))}</dd></div>)}</dl>
+          </section>)}
+          <h6>Privacy</h6>
+          <p>Informativa versione {pratica.privacy_versione || "—"}: presa visione {pratica.privacy_presa_visione_il ? "registrata" : "non registrata"}.</p>
+          {firmaRegistrata && <p><strong>Conferma della domanda:</strong> registrata.</p>}
+          <h6>Certificato di Battesimo</h6>
           {DOCUMENTI_PERSONALI_COMUNIONE.map(doc => <p key={doc.tipo}><strong>{doc.nome}:</strong> {
             documentoConfermato(pratica,doc.tipo) ? "Ricevuto" : documentiMancanti.some(x=>x.tipo===doc.tipo) ? "Da inviare" : "Non richiesto o da chiarire"}</p>)}
           {(pratica.solleciti || []).length>0 && <div className="ars-com-genitore-solleciti">
@@ -318,10 +354,14 @@ function StatoDomandeComunioneGenitore({ parrocchiaId, utenteId, nuovaIscrizione
             </p>)}
           </div>}
         </div>}
-        {d.modalitaPresentazione === "segreteria_con_account" &&
-          !documentoConfermato(pratica,"domanda_firmata") && <ConfermaFirmaDomandaEsistente
+        {firmaDaConfermare && firmaModalitaErrore && <div className="ars-sac-errore" role="alert">
+          <p>Non riusciamo a leggere le modalità di conferma della parrocchia.</p>
+          <button type="button" className="ars-sac-azione ars-sac-azione-chiara"
+            onClick={() => setFirmaControllo(v => v+1)}>Riprova</button>
+        </div>}
+        {firmaDaConfermare && firmaConsentita === true && <ConfermaFirmaDomandaEsistente
             pratica={pratica} parrocchiaId={parrocchiaId} utenteId={utenteId}
-            onConfermata={() => setRevisione(v=>v+1)} />}
+            onConfermata={() => {setFirmateOra(v => v.includes(pratica.id) ? v : [...v,pratica.id]);setRevisione(v=>v+1);}} />}
         {completaId===pratica.id && !completa && <CompletaFotoComunione
           pratica={pratica} parrocchiaId={parrocchiaId} utenteId={utenteId}
           documentiMancanti={documentiMancanti}
@@ -345,9 +385,11 @@ function ModuloComunione({ parrocchiaId, utenteId, nomeParrocchia }) {
   const [messaggio, setMessaggio] = useState("");
   const [inInvio, setInInvio] = useState(false);
   const [ricevuta, setRicevuta] = useState(null);
-  const [modalitaDisponibili, setModalitaDisponibili] = useState("cartacea");
-  const [modalitaFirma, setModalitaFirma] = useState("cartacea");
-  const [nominativoFirma, setNominativoFirma] = useState("");
+  const [modalitaDisponibili, setModalitaDisponibili] = useState(null);
+  const [modalitaFirma, setModalitaFirma] = useState(null);
+  const [modalitaErrore, setModalitaErrore] = useState("");
+  const [modalitaRevisione, setModalitaRevisione] = useState(0);
+  const nominativoFirma = [modulo.genitore1Nome.trim(), modulo.genitore1Cognome.trim()].filter(Boolean).join(" ");
   const [confermaFirma, setConfermaFirma] = useState(false);
   const [fotoPrimaInvio, setFotoPrimaInvio] = useState({});
 
@@ -378,18 +420,22 @@ function ModuloComunione({ parrocchiaId, utenteId, nomeParrocchia }) {
 
   useEffect(() => {
     let attivo = true;
+    setModalitaDisponibili(null); setModalitaFirma(null); setModalitaErrore("");setConfermaFirma(false);
     if (!parrocchiaId) return undefined;
     (async () => {
       const {data,error} = await supabase.rpc("ars_firme_leggi_modalita", {
         p_parrocchia_id:parrocchiaId,p_ambito:"prima_comunione",
       });
-      if (!attivo || error) return;
-      const disponibile = ["app","cartacea","entrambe"].includes(data?.modalita) ? data.modalita : "cartacea";
-      setModalitaDisponibili(disponibile);
-      setModalitaFirma(disponibile === "app" ? "app" : "cartacea");
+      if (!attivo) return;
+      if (error || !["app","cartacea","entrambe"].includes(data?.modalita)) {
+        setModalitaErrore("Non riusciamo a leggere la modalità di conferma della parrocchia. Riprova.");
+        return;
+      }
+      setModalitaDisponibili(data.modalita);
+      setModalitaFirma(data.modalita === "cartacea" ? "cartacea" : "app");
     })();
     return () => {attivo=false;};
-  }, [parrocchiaId]);
+  }, [parrocchiaId,mostraModulo,modalitaRevisione]);
 
   const aggiorna = (chiave, valore) => {
     setModulo(prev => ({ ...prev, [chiave]: valore }));
@@ -457,6 +503,11 @@ function ModuloComunione({ parrocchiaId, utenteId, nomeParrocchia }) {
 
   function validaDomanda() {
     if (!parrocchiaId || !utenteId) return "Accedi alla parrocchia come fedele per inviare la domanda.";
+    if (modalitaErrore) return modalitaErrore;
+    if (!modalitaFirma || !modalitaDisponibili) return "Attendi la lettura della modalità di conferma della parrocchia.";
+    if (!["app", "cartacea"].includes(modalitaFirma) ||
+      (modalitaDisponibili !== "entrambe" && modalitaFirma !== modalitaDisponibili))
+      return "La modalità di conferma è cambiata. Riapri la domanda per aggiornarla.";
     if (!privacyPubblicata) return "La parrocchia deve ancora pubblicare l'informativa privacy.";
     if (!aperto) return "Le iscrizioni per l'anno scelto non sono aperte.";
     for (const chiave of ["nome", "cognome", "dataNascita", "luogoNascita", "indirizzo", "comune", "genitore1Nome", "genitore1Cognome"]) {
@@ -469,10 +520,8 @@ function ModuloComunione({ parrocchiaId, utenteId, nomeParrocchia }) {
     if (modulo.battesimoInQuestaParrocchia === false && !modulo.parrocchiaBattesimo.trim())
       return "Indica il nome della parrocchia dove è avvenuto il Battesimo.";
     if (!modulo.privacyVista) return "Leggi l'informativa e conferma di averne preso visione.";
-    if (modalitaFirma === "app" && !confermaFirma) return "Conferma la sottoscrizione della domanda nell'app.";
-    if (modalitaFirma === "app" && nominativoFirma.trim().toLocaleLowerCase("it") !==
-       `${modulo.genitore1Nome.trim()} ${modulo.genitore1Cognome.trim()}`.toLocaleLowerCase("it"))
-      return "Scrivi il nome e cognome del genitore esattamente come nella domanda.";
+    if (modalitaFirma === "app" && !confermaFirma)
+      return "Dichiara di aver preso visione della domanda e confermane il contenuto.";
     if (modulo.autorizzaAccount && ricerca !== "ready") return "Prima di autorizzare l'account, completa la ricerca dei possibili account esistenti.";
     if (modulo.autorizzaAccount && !sceltaAccount) return "Seleziona l'account di tuo figlio o scegli 'Nessuno di questi'.";
     return "";
@@ -694,11 +743,18 @@ function ModuloComunione({ parrocchiaId, utenteId, nomeParrocchia }) {
         <p className="ars-sac-avvertenza">La presa visione viene registrata direttamente nell'app. Non occorre fotografare l'informativa privacy.</p>
       </fieldset>
 
-      <FirmaSemplice documento="domanda di Prima Comunione"
+      {modalitaErrore && <div role="alert" className="ars-sac-errore">
+        <p>{modalitaErrore}</p>
+        <button type="button" className="ars-sac-azione ars-sac-azione-chiara"
+          onClick={() => setModalitaRevisione(v=>v+1)}>Riprova</button>
+      </div>}
+      {!modalitaErrore && !modalitaDisponibili && <p role="status">Caricamento della modalità di conferma…</p>}
+      {modalitaDisponibili && modalitaFirma && !modalitaErrore && <FirmaSemplice
+        documento="domanda di Prima Comunione"
         modalitaDisponibili={modalitaDisponibili} modalita={modalitaFirma}
         onModalitaChange={setModalitaFirma} conferma={confermaFirma}
         onConfermaChange={setConfermaFirma} nominativo={nominativoFirma}
-        onNominativoChange={setNominativoFirma} disabilitato={Boolean(ricevuta)} />
+        disabilitato={Boolean(ricevuta)} />}
       {!ricevuta && <fieldset className="ars-com-foto-preinvio">
         <legend>Certificato di Battesimo</legend>
         {modulo.battesimoInQuestaParrocchia === false ||
@@ -722,7 +778,8 @@ function ModuloComunione({ parrocchiaId, utenteId, nomeParrocchia }) {
         <button className="ars-sac-azione" type="button" onClick={stampa} disabled={!privacyPubblicata}>
           Stampa domanda e informativa
         </button>
-        <button className="ars-sac-azione" type="submit" disabled={inInvio || Boolean(ricevuta) || !privacyPubblicata || !aperto}>
+        <button className="ars-sac-azione" type="submit"
+          disabled={inInvio || Boolean(ricevuta) || !privacyPubblicata || !aperto || !modalitaFirma || Boolean(modalitaErrore) || (modalitaFirma === "app" && !confermaFirma)}>
           {inInvio ? "Invio in corso…" : ricevuta ? "Domanda inviata" : "Invia alla parrocchia"}
         </button>
       </div>
@@ -738,20 +795,22 @@ function ModuloComunione({ parrocchiaId, utenteId, nomeParrocchia }) {
             {campiStampa.map(([etichetta, valore]) => <div key={etichetta}><strong>{etichetta}:</strong> {valore || "_________________"}</div>)}
           </div>
           <p>Chiedo l’iscrizione del minore sopra indicato al percorso di preparazione alla Prima Comunione.</p>
-          <p>Modalità di sottoscrizione: {modalitaFirma === "app" ? "Conferma semplice nell’app" : "Firma cartacea"}.</p>
+          <p>Modalità di conferma: {modalitaFirma === "app" ? "Presa visione e conferma nell’app" : "Firma su carta"}.</p>
           <p>Autorizzazione account: {modulo.autorizzaAccount ? "Sì" : "No"} — Autorizzazione dialogo del gruppo: {modulo.autorizzaAccount && modulo.autorizzaChat ? "Sì" : "No"}.</p>
           <p>Presa visione dell'informativa privacy versione {versionePrivacy}: {modulo.privacyVista ? "Confermata online" : "Da confermare"}.</p>
           <div className="ars-sac-firme-stampa">
             <p>Luogo e data: ____________________________________________</p>
-            <p>Firma genitore/tutore: {modalitaFirma === "app" && ricevuta?.firma_id ? `Confermata nell’app — ${nominativoFirma}` : "_____________________________________"}</p>
-            <p>Firma secondo genitore, se richiesta: _________________________</p>
+            <p>{modalitaFirma === "app" && ricevuta?.firma_id
+              ? `Presa visione e conferma nell’app: ${nominativoFirma}`
+              : "Firma del genitore/tutore: _____________________________________"}</p>
+            {modalitaFirma === "cartacea" && <p>Firma del secondo genitore, se richiesta: _________________________</p>}
           </div>
         </section>
         <section className="ars-sac-pagina-stampa ars-sac-privacy-stampa">
           <div className="ars-sac-stampa-privacy-testo">{privacy}</div>
           <p>Versione informativa: {versionePrivacy}</p>
           <p>Data e luogo: ____________________________________________</p>
-          <p>Firma genitore/tutore: {modalitaFirma === "app" && ricevuta?.firma_id ? "Presa visione confermata online" : "_____________________________________"}</p>
+          <p>Presa visione privacy: {modulo.privacyVista ? "Registrata nell’app" : "Da confermare"}.</p>
           <p>Firma secondo genitore, se richiesta: _________________________</p>
         </section>
       </div>
