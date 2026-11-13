@@ -1,12 +1,9 @@
-
 import React from "react";
 
 /**
- * Ars Liturgica · componente comune per presa visione / sottoscrizione semplice.
- * Riutilizzabile in Catechismo, GREST, deleghe e altre attività.
- * La persistenza NON avviene in questo componente: ogni attività salva la
- * dichiarazione con la propria RPC, tramite le tabelle ars_firme_*.
- * Non si tratta di firma digitale qualificata.
+ * Ars Liturgica — conferma di presa visione riutilizzabile.
+ * Questo componente mostra soltanto la scelta; il salvataggio compete alla RPC
+ * dell'attività (iscrizione, comunicazioni, ecc.).
  */
 export default function FirmaSemplice({
   modalitaDisponibili = "cartacea",
@@ -15,42 +12,43 @@ export default function FirmaSemplice({
   conferma = false,
   onConfermaChange,
   nominativo = "",
-  onNominativoChange,
   documento = "domanda",
   disabilitato = false,
 }) {
-  const consenteApp = modalitaDisponibili === "app" || modalitaDisponibili === "entrambe";
-  const consenteCarta = modalitaDisponibili === "cartacea" || modalitaDisponibili === "entrambe";
+  const consenteApp = ["app", "entrambe"].includes(modalitaDisponibili);
+  const consenteCarta = ["cartacea", "entrambe"].includes(modalitaDisponibili);
   const opzioni = [
-    ...(consenteApp ? [{ id: "app", testo: "Conferma nell'app" }] : []),
-    ...(consenteCarta ? [{ id: "cartacea", testo: "Firma su carta" }] : []),
+    ...(consenteApp ? [{id:"app",titolo:"Conferma nell'app",nota:"Leggi la domanda e confermala direttamente online."}] : []),
+    ...(consenteCarta ? [{id:"cartacea",titolo:"Firma su carta",nota:"Stampa la domanda, firmala e consegnala in parrocchia."}] : []),
   ];
+  const scelta = opzioni.some(o => o.id === modalita) ? modalita : opzioni[0]?.id;
+
   return <fieldset className="ars-firme-semplice" disabled={disabilitato}>
-    <legend>Firma della {documento}</legend>
-    <p>Scegli come sottoscrivere la domanda. La modalità viene stabilita dalla parrocchia.</p>
-    {opzioni.length > 1 ? <label className="ars-sac-campo">
-      <span>Modalità di firma</span>
-      <select value={modalita} onChange={e => {
-        onModalitaChange?.(e.target.value);
-        onConfermaChange?.(false);
-      }}>
-        {opzioni.map(o => <option value={o.id} key={o.id}>{o.testo}</option>)}
-      </select>
-    </label> : <p><strong>{opzioni[0]?.testo || "Firma su carta"}</strong></p>}
-    {modalita === "app" ? <>
-      <p>Leggi la domanda compilata prima dell'invio. Confermando nell'app,
-        registriamo il tuo nominativo, la data e il contenuto della domanda.</p>
-      <label className="ars-sac-campo">
-        <span>Nome e cognome di chi sottoscrive</span>
-        <input type="text" value={nominativo} onChange={e => onNominativoChange?.(e.target.value)}
-          placeholder="Nome e cognome del genitore o tutore" autoComplete="name" />
-      </label>
+    <legend>Conferma della {documento}</legend>
+    {opzioni.length > 1 && <p>Scegli come confermare la domanda:</p>}
+    {opzioni.length > 1 ? <div role="radiogroup" aria-label="Come confermare la domanda"
+      style={{display:"grid",gap:10,margin:"12px 0"}}>
+      {opzioni.map(o => <label key={o.id} style={{display:"flex",gap:12,alignItems:"flex-start",
+        padding:"13px 15px",border:`2px solid ${scelta===o.id ? "#a67a29" : "#e2d2b3"}`,
+        background:scelta===o.id ? "#fff8eb" : "#fffefa",borderRadius:10,cursor:"pointer"}}>
+        <input type="radio" name="modalita-conferma-comunione" value={o.id}
+          checked={scelta===o.id} onChange={() => {
+            onModalitaChange?.(o.id);
+            onConfermaChange?.(false);
+          }} style={{marginTop:5,accentColor:"#a67a29"}} />
+        <span><strong style={{display:"block"}}>{o.titolo}</strong>
+          <span style={{display:"block",fontSize:".93rem",marginTop:4}}>{o.nota}</span></span>
+      </label>)}
+    </div> : <p><strong>{opzioni[0]?.titolo || "Modalità non disponibile"}</strong></p>}
+
+    {scelta === "app" ? <div className="ars-firme-conferma-app">
+      {nominativo?.trim() && <p>Genitore o tutore: <strong>{nominativo.trim()}</strong></p>}
       <label className="ars-sac-spunta">
-        <input type="checkbox" checked={conferma} onChange={e => onConfermaChange?.(e.target.checked)} />
-        <span>Ho letto la domanda e confermo i dati e la richiesta di iscrizione.</span>
+        <input type="checkbox" checked={conferma}
+          onChange={e => onConfermaChange?.(e.target.checked)} />
+        <span>Dichiaro di aver preso visione della domanda di iscrizione e di confermarne il contenuto.</span>
       </label>
-      <p className="ars-sac-avvertenza">Questa è una conferma semplice nell'app, non una firma digitale certificata.</p>
-    </> : <p className="ars-sac-avvertenza">Potrai inviare subito la domanda anche senza fotografie.
-      Stampa, firma e successivamente carica una foto dei fogli firmati, oppure consegnali in parrocchia.</p>}
+    </div> : scelta === "cartacea" ? <p>Puoi inviare la domanda online e consegnare la copia firmata in parrocchia.</p>
+      : <p role="alert">La modalità di conferma non è disponibile.</p>}
   </fieldset>;
 }
