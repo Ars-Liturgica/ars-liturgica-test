@@ -1456,19 +1456,25 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
           <div className="ars-sac-privacy-pannello" aria-label="Modalità di firma Prima Comunione">
             <h3>Firma e conferma della domanda</h3>
             <p>Scegli come i genitori possono sottoscrivere la domanda. La segreteria usa sempre la firma cartacea quando il genitore non ha un account.</p>
-            <label className="ars-sac-privacy-etichetta">Modalità consentita
-              <select value={modalitaFirme} disabled={modalitaFirmeSalva}
-                onChange={e => {setModalitaFirme(e.target.value);setModalitaFirmeMessaggio("");}}>
-                <option value="app">Conferma nell'app</option>
-                <option value="cartacea">Firma cartacea</option>
-                <option value="entrambe">Entrambe: decide il genitore</option>
-              </select>
-            </label>
+            <div className="ars-com-scelta-firma" role="radiogroup" aria-label="Modalità di conferma consentita">
+              {[
+                {id:"app",titolo:"Conferma nell'app",nota:"Il genitore legge e conferma la domanda direttamente online."},
+                {id:"cartacea",titolo:"Firma su carta",nota:"Il genitore stampa e firma la domanda."},
+                {id:"entrambe",titolo:"Entrambe le modalità",nota:"Il genitore sceglie come confermare la domanda."},
+              ].map(opzione => <label key={opzione.id}
+                className={`ars-com-firma-opzione ${modalitaFirme === opzione.id ? "ars-com-firma-opzione-attiva" : ""}`}>
+                <input type="radio" name="modalita-firma-parroco" value={opzione.id}
+                  checked={modalitaFirme === opzione.id} disabled={modalitaFirmeSalva}
+                  onChange={() => {setModalitaFirme(opzione.id);setModalitaFirmeMessaggio("");}} />
+                <span><strong>{opzione.titolo}</strong><small>{opzione.nota}</small></span>
+              </label>)}
+            </div>
             <div className="ars-sac-privacy-azioni"><button type="button"
               className="ars-sac-conferma" disabled={modalitaFirmeSalva}
               onClick={salvaModalitaFirme}>{modalitaFirmeSalva ? "Salvataggio…" : "Salva modalità di firma"}</button></div>
             {modalitaFirmeMessaggio && <p role="status" className="ars-sac-privacy-stato">{modalitaFirmeMessaggio}</p>}
-            <p className="ars-sac-privacy-nota">La conferma nell'app non è una firma digitale certificata. La presa visione privacy rimane separata.</p>
+            <p className="ars-sac-privacy-nota">La conferma nell'app permette al genitore di sottoscrivere la domanda di iscrizione,
+              dichiarando di averne letto e accettato il contenuto. Il sistema registra la conferma e la conserva insieme alla domanda.</p>
           </div>
 
           <div className="ars-sac-privacy-pannello" aria-label="Informativa privacy Prima Comunione">
@@ -1697,6 +1703,16 @@ const STILE = `
  .ars-sac-privacy-etichetta textarea{width:100%;box-sizing:border-box;min-height:260px;border:1px solid #d8c9a8;border-radius:9px;padding:12px;line-height:1.6;font:inherit;background:white;color:#243c40;resize:vertical}
  .ars-sac-privacy-etichetta textarea:disabled{background:#fff;color:#243c40;opacity:1}
  .ars-sac-privacy-nota{font-size:.9rem;line-height:1.5}
+/* Conferma domanda: tre scelte semplici al posto della tendina. */
+.ars-com-scelta-firma{display:grid;grid-template-columns:1fr;gap:10px;margin:17px 0}
+.ars-com-firma-opzione{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;border:1px solid #dcc8a0;border-radius:11px;background:#fff;color:#243c40;cursor:pointer}
+.ars-com-firma-opzione input{margin:5px 2px 0 0;flex:0 0 auto;accent-color:#a67a29;width:18px;height:18px}
+.ars-com-firma-opzione strong{display:block;font:700 1.04rem Georgia,serif;color:#77551f;margin-bottom:5px}
+.ars-com-firma-opzione small{display:block;font-size:.93rem;line-height:1.45;color:#566863}
+.ars-com-firma-opzione:hover{background:#fffaf0;border-color:#b58d42}
+.ars-com-firma-opzione-attiva{background:#fff8e9;border:2px solid #a67a29;padding:13px 15px}
+.ars-com-firma-opzione:focus-within{outline:2px solid #c58928;outline-offset:2px}
+
  .ars-sac-privacy-stampa{background:#fff;color:#111;border:1px solid #bbb;padding:26px;margin:16px 0 0;font:14px/1.6 Arial,sans-serif}
  .ars-sac-privacy-marcatura{font-weight:bold;color:#6b5127;border-bottom:1px solid #ccc;padding-bottom:8px}
  .ars-sac-privacy-testo{white-space:pre-wrap;overflow-wrap:anywhere;color:#111}
