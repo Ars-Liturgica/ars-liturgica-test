@@ -208,8 +208,12 @@ function mancanzeDomanda(riga, internoObbligatorio = false) {
   return { dati, documenti, tutto: [...dati, ...documenti.map(doc => doc.nome)] };
 }
 
-function DomandaComunioneDettaglio({ riga, nomeParrocchia, perStampa = false }) {
+const DICHIARAZIONE_PRESA_VISIONE_DOMANDA = "Dichiaro di aver preso visione della domanda di iscrizione e di confermarne il contenuto.";
+
+function DomandaComunioneDettaglio({ riga, nomeParrocchia, perStampa = false, attestazioneDomanda = null }) {
   const d = riga.dati_modulo || {};
+  const confermaApp = attestazioneDomanda?.stato === "pronta" && attestazioneDomanda?.presente === true;
+  const nomeFirmatario = String(attestazioneDomanda?.firmatario || "").trim();
   const righeUtili = (campi) => campi.filter(([, chiave]) => String(d[chiave] ?? "").trim().length);
   return <div className={perStampa ? "ars-com-domanda-foglio" : "ars-com-domanda-dettaglio"}>
     <header className="ars-com-intestazione-domanda">
@@ -231,14 +235,38 @@ function DomandaComunioneDettaglio({ riga, nomeParrocchia, perStampa = false }) 
         )}</dl>
       </section>;
     })}
-    <section className="ars-com-sezione-domanda">
-      <h5>Privacy e autorizzazioni</h5>
-      <dl>
-        <div><dt>Account del ragazzo</dt><dd>{d.autorizzaAccount ? "Autorizzato" : "Non autorizzato"}</dd></div>
-        <div><dt>Chat del Catechismo</dt><dd>{d.autorizzaChat ? "Autorizzata" : "Non autorizzata"}</dd></div>
-        <div><dt>Informativa privacy</dt><dd>Versione {riga.privacy_versione || "—"}</dd></div>
-        <div><dt>Presa visione</dt><dd>{riga.privacy_presa_visione_il ? mostraDataComunione(riga.privacy_presa_visione_il, true) : "Non registrata"}</dd></div>
-      </dl>
+    <section className="ars-com-sezione-domanda ars-com-prese-visione">
+      <h5>Privacy e prese visione</h5>
+      <div className="ars-com-prese-blocco">
+        <h6>1. Presa visione dell'informativa privacy</h6>
+        <dl>
+          <div><dt>Informativa</dt><dd>Versione {riga.privacy_versione || "—"}</dd></div>
+          <div><dt>Presa visione</dt><dd>{riga.privacy_presa_visione_il ? "Confermata" : "Non registrata"}</dd></div>
+          {riga.privacy_presa_visione_il && <div><dt>Data e ora</dt><dd>{mostraDataComunione(riga.privacy_presa_visione_il, true)}</dd></div>}
+        </dl>
+      </div>
+      <div className="ars-com-prese-blocco">
+        <h6>2. Presa visione e conferma della domanda di iscrizione</h6>
+        <p className="ars-com-prese-dichiarazione">«{DICHIARAZIONE_PRESA_VISIONE_DOMANDA}»</p>
+        {confermaApp ? <dl>
+          <div><dt>Stato</dt><dd className="ars-com-stato-ok">Confermata nell'app</dd></div>
+          {nomeFirmatario && <div><dt>Genitore o tutore</dt><dd>{nomeFirmatario}</dd></div>}
+          {attestazioneDomanda?.confermata_il && <div><dt>Data e ora</dt><dd>{mostraDataComunione(attestazioneDomanda.confermata_il, true)}</dd></div>}
+        </dl> : <p className="ars-com-prese-stato" role="status">
+          {attestazioneDomanda?.stato === "errore"
+            ? "Non è stato possibile verificare la conferma nell'app. Riapri la domanda per riprovare."
+            : attestazioneDomanda?.stato === "pronta"
+              ? "Nessuna conferma nell'app registrata per questa domanda. Verifica l'eventuale firma cartacea."
+              : "Verifica della conferma nell'app in corso…"}
+        </p>}
+      </div>
+      <div className="ars-com-prese-blocco">
+        <h6>3. Autorizzazioni</h6>
+        <dl>
+          <div><dt>Account del ragazzo</dt><dd>{d.autorizzaAccount ? "Autorizzato" : "Non autorizzato"}</dd></div>
+          <div><dt>Chat del Catechismo</dt><dd>{d.autorizzaChat ? "Autorizzata" : "Non autorizzata"}</dd></div>
+        </dl>
+      </div>
     </section>
     <section className="ars-com-sezione-domanda">
       <h5>Documenti</h5>
@@ -533,6 +561,28 @@ function IscrizioniComunioneParroco({ parrocchiaId, nomeParrocchia, annoAttivo }
   const [correzioni, setCorrezioni] = useState({});
   const [ricevutaSegreteria, setRicevutaSegreteria] = useState(null);
   const [internoObbligatorio, setInternoObbligatorio] = useState(null);
+  // La conferma nell'app si legge dalla sottoscrizione effettivamente salvata,
+  // non si deduce dallo stato «Pratica completa».
+  const [attestazioniDomanda, setAttestazioniDomanda] = useState({});
+
+  useEffect(() => {
+    if (!apertaId || !parrocchiaId) return undefined;
+    let attivo = true;
+    const id = apertaId;
+    setAttestazioniDomanda(prev => ({ ...prev, [id]: { stato: "caricamento" } }));
+    (async () => {
+      const { data, error } = await supabase.rpc("ars_comunione_leggi_conferma_parroco", {
+        p_parrocchia_id: parrocchiaId,
+        p_iscrizione_id: id,
+      });
+      if (!attivo) return;
+      setAttestazioniDomanda(prev => ({ ...prev, [id]: error
+        ? { stato: "errore" }
+        : { stato: "pronta", presente: data?.presente === true,
+            firmatario: data?.firmatario || "", confermata_il: data?.confermata_il || null } }));
+    })();
+    return () => { attivo = false; };
+  }, [apertaId, parrocchiaId, aggiorna]);
 
   useEffect(() => {
     let attivo = true;
@@ -762,7 +812,7 @@ function IscrizioniComunioneParroco({ parrocchiaId, nomeParrocchia, annoAttivo }
               {apertaId === r.id ? "Chiudi" : "Apri domanda"}
             </button>
             {apertaId === r.id && <div className="ars-com-scheda-iscrizione">
-              <DomandaComunioneDettaglio riga={r} nomeParrocchia={nomeParrocchia} />
+              <DomandaComunioneDettaglio riga={r} nomeParrocchia={nomeParrocchia} attestazioneDomanda={attestazioniDomanda[r.id]} />
               {sezioneCard === "incomplete" && <>
                 <div className="ars-com-gestione-documenti">
                   <h4>Certificato di Battesimo</h4>
@@ -838,7 +888,22 @@ function IscrizioniComunioneParroco({ parrocchiaId, nomeParrocchia, annoAttivo }
                     </button>}
                 </div>)}
               </div>}
-              <button type="button" className="ars-sac-conferma" onClick={() => setStampaId(r.id)}>
+              <button type="button" className="ars-sac-conferma" onClick={async () => {
+                if (attestazioniDomanda[r.id]?.stato !== "pronta") {
+                  const { data, error } = await supabase.rpc("ars_comunione_leggi_conferma_parroco", {
+                    p_parrocchia_id: parrocchiaId, p_iscrizione_id: r.id,
+                  });
+                  if (error) {
+                    setMessaggio("Impossibile verificare la conferma della domanda per la stampa. Riprova.");
+                    return;
+                  }
+                  setAttestazioniDomanda(prev => ({ ...prev, [r.id]: {
+                    stato: "pronta", presente: data?.presente === true,
+                    firmatario: data?.firmatario || "", confermata_il: data?.confermata_il || null,
+                  } }));
+                }
+                setStampaId(r.id);
+              }}>
                 Stampa domanda e informativa</button>
             </div>}
           </article>;
@@ -859,7 +924,7 @@ function IscrizioniComunioneParroco({ parrocchiaId, nomeParrocchia, annoAttivo }
       </div>
     </>}
     {daStampare && <div className="ars-com-solo-stampa">
-      <DomandaComunioneDettaglio riga={daStampare} nomeParrocchia={nomeParrocchia} perStampa />
+      <DomandaComunioneDettaglio riga={daStampare} nomeParrocchia={nomeParrocchia} attestazioneDomanda={attestazioniDomanda[daStampare.id]} perStampa />
     </div>}
   </section>;
 }
@@ -1603,6 +1668,11 @@ const STILE = `
 .ars-com-sezione-domanda dl>div{border-bottom:1px solid #eee4d2;padding:5px 0;overflow-wrap:anywhere}
 .ars-com-sezione-domanda dt{font-size:.83rem;font-weight:600;color:#617072}
 .ars-com-sezione-domanda dd{margin:3px 0 0;color:#243c40}
+.ars-com-prese-blocco{padding:13px 0;border-top:1px solid #e7d9c2}
+.ars-com-prese-blocco:first-of-type{border-top:0;padding-top:0}
+.ars-com-prese-blocco h6{font:700 .99rem Georgia,serif;color:#795a24;margin:0 0 10px}
+.ars-com-prese-dichiarazione{margin:0 0 12px;color:#243c40;line-height:1.5}
+.ars-com-prese-stato{color:#795a24;margin:7px 0}
 .ars-com-gestione-documenti{margin:20px 0;border:1px solid #e6d5b4;background:#fffaf1;border-radius:11px;padding:15px}
 .ars-com-gestione-documenti h4{font:700 1.05rem Georgia,serif;margin:0 0 12px}
 .ars-com-riga-documento{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:10px 0;border-bottom:1px solid #eee1c9}
