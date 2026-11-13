@@ -117,6 +117,7 @@ const impostazioniIniziali = {
   anno: `${annoCorrente}/${annoCorrente + 1}`,
   durata: "2",
   informazioni: "",
+  certificatoBattesimoInternoObbligatorio: false,
   date: { 1: { apertura: "", chiusura: "" }, 2: { apertura: "", chiusura: "" }, 3: { apertura: "", chiusura: "" } },
 };
 
@@ -127,6 +128,7 @@ const SEZIONI_DOMANDA = [
     ["Nome", "nome"], ["Cognome", "cognome"], ["Data di nascita", "dataNascita"],
     ["Luogo di nascita", "luogoNascita"], ["Codice fiscale", "codiceFiscale"],
     ["Indirizzo di residenza", "indirizzo"], ["Comune", "comune"], ["CAP", "cap"],
+    ["Battesimo in questa parrocchia", "battesimoInQuestaParrocchia"],
     ["Parrocchia del Battesimo", "parrocchiaBattesimo"], ["Data del Battesimo", "dataBattesimo"],
   ]],
   ["Genitore o tutore richiedente", [
@@ -142,8 +144,7 @@ const SEZIONI_DOMANDA = [
 ];
 
 const DOCUMENTI_COMUNIONE = [
-  { tipo: "domanda_firmata", nome: "Domanda firmata" },
-  { tipo: "informativa_firmata", nome: "Informativa privacy firmata" },
+  { tipo: "certificato_battesimo", nome: "Certificato di Battesimo" },
 ];
 
 function mostraDataComunione(valore, dataOra = false) {
@@ -182,16 +183,29 @@ const CAMPI_INTEGRAZIONE = [
   ["genitore2Email", "Secondo genitore - email", "email"],
   ["tutore", "Qualità del tutore", "text"], ["delegati", "Persone delegate", "text"],
 ];
-function mancanzeDomanda(riga) {
+function necessitaCertificatoComunione(riga, internoObbligatorio) {
+  const scelta = riga?.dati_modulo?.battesimoInQuestaParrocchia;
+  if (scelta === false) return true;
+  if (scelta === true) return internoObbligatorio === true;
+  // Domande antecedenti la nuova domanda Sì/No: non indovinare dal nome scritto.
+  return false;
+}
+function mancanzeDomanda(riga, internoObbligatorio = false) {
   const d = riga.dati_modulo || {};
   const dati = DATI_OBBLIGATORI_COMUNIONE
     .filter(([chiave]) => !String(d[chiave] ?? "").trim())
     .map(([, etichetta]) => etichetta);
   if (!String(d.genitore1Telefono || "").trim() && !String(d.genitore1Email || "").trim())
     dati.push("Telefono o email del genitore");
-  if (!riga.privacy_presa_visione_il) dati.push("Presa visione dell'informativa");
-  const documenti = DOCUMENTI_COMUNIONE.filter(doc => !documentoRicevuto(riga, doc.tipo)).map(doc => doc.nome);
-  return { dati, documenti, tutto: [...dati, ...documenti] };
+  if (!riga.privacy_presa_visione_il) dati.push("Presa visione dell'informativa privacy");
+  if (d.modalitaPresentazione === "segreteria_con_account" && !documentoRicevuto(riga,"domanda_firmata"))
+    dati.push("Conferma semplice del genitore nell'app");
+  const certGiaRicevuto = documentoRicevuto(riga, "certificato_battesimo");
+  if (typeof d.battesimoInQuestaParrocchia !== "boolean" && !certGiaRicevuto)
+    dati.push("Domanda precedente: chiarire dove è avvenuto il Battesimo (oppure segnare il certificato come non necessario)");
+  const documenti = DOCUMENTI_COMUNIONE.filter(doc =>
+    necessitaCertificatoComunione(riga, internoObbligatorio) && !documentoRicevuto(riga, doc.tipo));
+  return { dati, documenti, tutto: [...dati, ...documenti.map(doc => doc.nome)] };
 }
 
 function DomandaComunioneDettaglio({ riga, nomeParrocchia, perStampa = false }) {
@@ -210,8 +224,10 @@ function DomandaComunioneDettaglio({ riga, nomeParrocchia, perStampa = false }) 
       return <section className="ars-com-sezione-domanda" key={titolo}>
         <h5>{titolo}</h5>
         <dl>{presenti.map(([etichetta, chiave]) =>
-          <div key={chiave}><dt>{etichetta}</dt><dd>{chiave.startsWith("data") || chiave === "dataBattesimo"
-            ? mostraDataComunione(d[chiave]) : String(d[chiave])}</dd></div>
+          <div key={chiave}><dt>{etichetta}</dt><dd>{chiave === "battesimoInQuestaParrocchia"
+            ? (d[chiave] === true ? "Sì" : d[chiave] === false ? "No" : "Da chiarire")
+            : (chiave.startsWith("data") || chiave === "dataBattesimo"
+              ? mostraDataComunione(d[chiave]) : String(d[chiave]))}</dd></div>
         )}</dl>
       </section>;
     })}
@@ -225,10 +241,11 @@ function DomandaComunioneDettaglio({ riga, nomeParrocchia, perStampa = false }) 
       </dl>
     </section>
     <section className="ars-com-sezione-domanda">
-      <h5>Documenti da riconsegnare</h5>
+      <h5>Documenti</h5>
+      <p>Non occorrono fotografie della domanda o dell'informativa privacy.</p>
       <dl>{DOCUMENTI_COMUNIONE.map(doc => <div key={doc.tipo}>
         <dt>{doc.nome}</dt>
-        <dd>{documentoRicevuto(riga, doc.tipo) ? "Ricevuto" : "Da consegnare"}</dd>
+        <dd>{documentoRicevuto(riga, doc.tipo) ? "Ricevuto" : "Consulta lo stato nella scheda"}</dd>
       </div>)}</dl>
     </section>
     {perStampa && <>
@@ -255,6 +272,7 @@ function DomandaComunioneDettaglio({ riga, nomeParrocchia, perStampa = false }) 
 const DATI_SEGRETERIA_INIZIALI = {
   nome: "", cognome: "", dataNascita: "", luogoNascita: "", codiceFiscale: "",
   indirizzo: "", comune: "", cap: "", parrocchiaBattesimo: "", dataBattesimo: "",
+  battesimoInQuestaParrocchia: null,
   genitore1Nome: "", genitore1Cognome: "", genitore1CF: "",
   genitore1Telefono: "", genitore1Email: "", tutore: "",
   genitore2Nome: "", genitore2Cognome: "", genitore2Telefono: "", genitore2Email: "",
@@ -293,6 +311,7 @@ const CAMPI_SEGRETERIA = [
 function NuovaIscrizioneComunioneSegreteria({ parrocchiaId, onSalvata, onAnnulla }) {
   const [valori, setValori] = useState({ ...DATI_SEGRETERIA_INIZIALI });
   const [privacyConfermata, setPrivacyConfermata] = useState(false);
+  const [firmaRaccolta, setFirmaRaccolta] = useState(false);
   const [modalita, setModalita] = useState("senza");
   const [candidati, setCandidati] = useState([]);
   const [genitoreSelezionato, setGenitoreSelezionato] = useState("");
@@ -332,6 +351,18 @@ function NuovaIscrizioneComunioneSegreteria({ parrocchiaId, onSalvata, onAnnulla
     if (modalita === "con" && !genitoreSelezionato) {
       setErrore("Cerca e seleziona l'account esatto del genitore prima di registrare."); return;
     }
+    if (modalita === "senza" && !firmaRaccolta) {
+      setErrore("Prima di registrare, conferma di aver raccolto la firma del genitore sulla domanda.");
+      return;
+    }
+    if (typeof valori.battesimoInQuestaParrocchia !== "boolean") {
+      setErrore("Indica se il Battesimo è avvenuto in questa parrocchia.");
+      return;
+    }
+    if (valori.battesimoInQuestaParrocchia === false && !valori.parrocchiaBattesimo.trim()) {
+      setErrore("Indica la parrocchia dove è avvenuto il Battesimo.");
+      return;
+    }
     if (!privacyConfermata) {
       setErrore("Conferma la consegna e la presa visione dell'informativa privacy.");
       return;
@@ -345,7 +376,8 @@ function NuovaIscrizioneComunioneSegreteria({ parrocchiaId, onSalvata, onAnnulla
     try {
       // Primo anno soltanto: il rinnovo senza account richiede un percorso distinto.
       const dati = Object.fromEntries(
-        Object.entries(valori).map(([chiave, valore]) => [chiave, valore.trim()])
+        Object.entries(valori).map(([chiave, valore]) =>
+          [chiave, typeof valore === "string" ? valore.trim() : valore])
       );
       const { data, error } = await supabase.rpc(
         modalita === "con" ? "ars_comunione_presenta_domanda_segreteria_con_account"
@@ -357,6 +389,23 @@ function NuovaIscrizioneComunioneSegreteria({ parrocchiaId, onSalvata, onAnnulla
       if (error) throw error;
       if (!data?.ok || !data.iscrizione_id) {
         throw new Error("Non è arrivata la conferma dell'iscrizione.");
+      }
+      // La firma cartacea raccolta viene attestata nel registro già esistente.
+      // Non è un documento fotografico: è una registrazione amministrativa.
+      const {error: firmaErrore} = modalita === "senza"
+        ? await supabase.rpc("ars_comunione_segna_documento_parroco", {
+        p_parrocchia_id: parrocchiaId,
+        p_iscrizione_id: data.iscrizione_id,
+        p_tipo: "domanda_firmata",
+        p_stato: "ricevuto",
+      }) : {error:null};
+      if (firmaErrore) {
+        setSalvataggio(false);
+        setErrore("La domanda è stata registrata, ma non è stato possibile conservare l'attestazione della firma. " +
+          "Non ripetere l'iscrizione: annota il nome e chiedi di verificare la pratica.");
+        // La pratica è già stata creata; nessun nuovo invio deve duplicarla.
+        onSalvata(data);
+        return;
       }
       onSalvata(data);
     } catch (err) {
@@ -380,15 +429,17 @@ function NuovaIscrizioneComunioneSegreteria({ parrocchiaId, onSalvata, onAnnulla
           Genitore senza account
         </button>
       </div>
-      {modalita === "senza" && <div className="ars-com-avviso-firma" role="note">
-        <strong>Firma in segreteria</strong>
-        <p>Stampa la domanda e l’informativa privacy. Fai firmare entrambi i documenti al genitore o tutore e registra la consegna nella pratica.</p>
-        <p><strong>Non può firmare ora?</strong> Puoi registrare ugualmente l’iscrizione. La scheda indicherà in rosso quali documenti firmati mancano ancora.</p>
-      </div>}
-      {modalita === "con" && <div className="ars-com-avviso-firma" role="note">
-        <strong>Firma del genitore</strong>
-        <p>Il genitore potrà confermare nell’app, se previsto dalla parrocchia, oppure firmare i documenti stampati. La segreteria registra soltanto i documenti effettivamente ricevuti.</p>
-      </div>}
+      <div className="ars-com-avviso-firma" role="note">
+        {modalita === "senza" ? <>
+          <strong>Firma e privacy: una sola registrazione</strong>
+          <p>Raccogli la firma del genitore sulla domanda cartacea e consegna l'informativa privacy.
+            Spunta le due attestazioni in fondo al modulo. Non servono fotografie delle firme.</p>
+        </> : <>
+          <strong>Conferma nell'app</strong>
+          <p>Registra la domanda e consegna l'informativa al genitore. Dopo l'invio,
+            il genitore confermerà la domanda con la firma semplice nella propria area personale.</p>
+        </>}
+      </div>
       {modalita === "con" && <div className="ars-com-ricerca-genitore">
         <p>Compila il nome e cognome del genitore nel modulo, poi cerca e conferma il suo account. Non viene creato un secondo profilo.</p>
         <button className="ars-sac-stampa" type="button" disabled={ricercaInCorso || salvataggio}
@@ -419,6 +470,19 @@ function NuovaIscrizioneComunioneSegreteria({ parrocchiaId, onSalvata, onAnnulla
         <p className="ars-com-segreteria-nota">Indica almeno un recapito: telefono oppure email.</p>}
     </fieldset>)}
     <fieldset>
+      <legend>Battesimo e certificato</legend>
+      <label className="ars-com-segreteria-deleghe">Il bambino è stato battezzato in questa parrocchia? *
+        <select value={valori.battesimoInQuestaParrocchia === null ? "" : String(valori.battesimoInQuestaParrocchia)}
+          disabled={salvataggio}
+          onChange={e => cambia("battesimoInQuestaParrocchia", e.target.value === "" ? null : e.target.value === "true")} required>
+          <option value="">Seleziona una risposta</option>
+          <option value="true">Sì</option>
+          <option value="false">No, in un'altra parrocchia</option>
+        </select>
+      </label>
+      <p>Se è stato battezzato altrove, il certificato può essere caricato dal genitore o consegnato qui. La pratica si completa automaticamente quando arriva.</p>
+    </fieldset>
+    <fieldset>
       <legend>Deleghe</legend>
       <label className="ars-com-segreteria-deleghe">Persone delegate al ritiro (se previste)
         <textarea value={valori.delegati} rows={3} disabled={salvataggio}
@@ -427,7 +491,13 @@ function NuovaIscrizioneComunioneSegreteria({ parrocchiaId, onSalvata, onAnnulla
     </fieldset>
     <fieldset className="ars-com-segreteria-privacy">
       <legend>Informativa privacy</legend>
-      <p>Consegna al genitore o tutore l'informativa pubblicata dalla parrocchia. La firma cartacea sarà raccolta e registrata tra i documenti riconsegnati.</p>
+      <p>Conferma la consegna dell'informativa. Senza account registra anche la firma cartacea; con account il genitore firmerà nell'app.</p>
+      {modalita === "senza" && <label className="ars-com-segreteria-spunta">
+        <input type="checkbox" checked={firmaRaccolta}
+          disabled={salvataggio} required
+          onChange={e => setFirmaRaccolta(e.target.checked)} />
+        <span>Confermo che il genitore o tutore ha firmato la domanda cartacea.</span>
+      </label>}
       <label className="ars-com-segreteria-spunta">
         <input type="checkbox" checked={privacyConfermata}
           disabled={salvataggio} required
@@ -438,7 +508,7 @@ function NuovaIscrizioneComunioneSegreteria({ parrocchiaId, onSalvata, onAnnulla
     {errore && <p role="alert" className="ars-com-errore-iscrizioni">{errore}</p>}
     <div className="ars-com-segreteria-azioni">
       <button type="button" className="ars-sac-stampa" disabled={salvataggio} onClick={onAnnulla}>Annulla</button>
-      <button type="submit" className="ars-sac-conferma" disabled={salvataggio || !privacyConfermata}>
+      <button type="submit" className="ars-sac-conferma" disabled={salvataggio || !privacyConfermata || (modalita === "senza" && !firmaRaccolta)}>
         {salvataggio ? "Registrazione in corso…" : "Registra la prima iscrizione"}
       </button>
     </div>
@@ -461,9 +531,8 @@ function IscrizioniComunioneParroco({ parrocchiaId, nomeParrocchia, annoAttivo }
   const [messaggio, setMessaggio] = useState("");
   const [modificaId, setModificaId] = useState(null);
   const [correzioni, setCorrezioni] = useState({});
-  const [verificaId, setVerificaId] = useState(null);
-  const [documentiConfermati, setDocumentiConfermati] = useState([]);
   const [ricevutaSegreteria, setRicevutaSegreteria] = useState(null);
+  const [internoObbligatorio, setInternoObbligatorio] = useState(null);
 
   useEffect(() => {
     let attivo = true;
@@ -473,11 +542,16 @@ function IscrizioniComunioneParroco({ parrocchiaId, nomeParrocchia, annoAttivo }
       setCaricamento(false); return undefined;
     }
     (async () => {
-      const { data, error } = await supabase.rpc("ars_comunione_elenco_domande_parroco_con_foto", {
-        p_parrocchia_id: parrocchiaId,
-      });
+      const [elenco, configurazione] = await Promise.all([
+        supabase.rpc("ars_comunione_elenco_domande_parroco_con_foto", { p_parrocchia_id: parrocchiaId }),
+        supabase.rpc("ars_comunione_configurazione_fedele", { p_parrocchia_id: parrocchiaId }),
+      ]);
+      const {data, error} = elenco;
       if (!attivo) return;
       setCaricamento(false);
+      if (!configurazione.error && configurazione.data)
+        setInternoObbligatorio(configurazione.data.certificato_battesimo_interno_obbligatorio === true);
+      else setInternoObbligatorio(null);
       if (error || !Array.isArray(data)) {
         setErrore(error?.message || "Impossibile caricare le domande della Card 03.");
         setDomande([]);
@@ -485,6 +559,11 @@ function IscrizioniComunioneParroco({ parrocchiaId, nomeParrocchia, annoAttivo }
     })();
     return () => { attivo = false; };
   }, [parrocchiaId, aggiorna]);
+  useEffect(() => {
+    const ricaricaAlRitorno = () => setAggiorna(v => v + 1);
+    window.addEventListener("focus", ricaricaAlRitorno);
+    return () => window.removeEventListener("focus", ricaricaAlRitorno);
+  }, []);
 
   useEffect(() => {
     if (!stampaId) return undefined;
@@ -505,8 +584,8 @@ function IscrizioniComunioneParroco({ parrocchiaId, nomeParrocchia, annoAttivo }
   const anni = [...new Set(domande.map(d => d.anno_pastorale).filter(Boolean))]
     .sort((a, b) => b.localeCompare(a));
   const annoCorrenteParrocchia = annoAttivo || anni[0] || "";
-  const incomplete = domande.filter(d => mancanzeDomanda(d).tutto.length > 0);
-  const complete = domande.filter(d => mancanzeDomanda(d).tutto.length === 0);
+  const incomplete = domande.filter(d => internoObbligatorio === null || mancanzeDomanda(d, internoObbligatorio).tutto.length > 0);
+  const complete = domande.filter(d => internoObbligatorio !== null && mancanzeDomanda(d, internoObbligatorio).tutto.length === 0);
   const base = sezioneCard === "incomplete" ? incomplete : complete;
   const filtrate = base.filter(r => {
     const d = r.dati_modulo || {};
@@ -521,14 +600,14 @@ function IscrizioniComunioneParroco({ parrocchiaId, nomeParrocchia, annoAttivo }
   const daStampare = domande.find(r => r.id === stampaId);
   const cambiaSezione = (nuova) => {
     setSezioneCard(nuova); setPagina(1); setApertaId(null);
-    setModificaId(null); setVerificaId(null); setDocumentiConfermati([]); setMessaggio("");
+    setModificaId(null); setMessaggio("");
   };
 
   function iscrizioneRegistrata(risultato) {
     setRicevutaSegreteria(risultato?.ricevuta ? String(risultato.ricevuta) : null);
     setSezioneCard("incomplete"); setAnnoFiltro("corrente");
     setRicerca(""); setPagina(1); setApertaId(risultato.iscrizione_id);
-    setMessaggio("Iscrizione registrata. Completa la pratica raccogliendo i documenti firmati.");
+    setMessaggio("Iscrizione registrata. La domanda diventa completa quando sono presenti gli elementi richiesti.");
     setAggiorna(n => n + 1);
   }
 
@@ -560,7 +639,7 @@ function IscrizioniComunioneParroco({ parrocchiaId, nomeParrocchia, annoAttivo }
     if (error || !data) { setMessaggio("Documento non aggiornato: " + (error?.message || "errore")); return; }
     const aggiornati = { ...riga, documenti: [...(riga.documenti || []).filter(x => x.tipo !== tipo), data] };
     setDomande(precedenti => precedenti.map(d => d.id === riga.id ? aggiornati : d));
-    if (!mancanzeDomanda(aggiornati).tutto.length) {
+    if (!mancanzeDomanda(aggiornati, internoObbligatorio).tutto.length) {
       setApertaId(null);
       setMessaggio("Pratica completa: ora è consultabile nella sottocard «Archivio iscrizioni».");
     } else setMessaggio("Stato del documento aggiornato.");
@@ -587,36 +666,13 @@ function IscrizioniComunioneParroco({ parrocchiaId, nomeParrocchia, annoAttivo }
     const aggiornata = { ...riga, dati_modulo: data.dati_modulo };
     setDomande(prev => prev.map(x => x.id === riga.id ? aggiornata : x));
     setModificaId(null);
-    if (!mancanzeDomanda(aggiornata).tutto.length) {
+    if (!mancanzeDomanda(aggiornata, internoObbligatorio).tutto.length) {
       setApertaId(null);
       setMessaggio("Pratica completata. È ora nell'Archivio iscrizioni.");
     } else setMessaggio("Dati integrati nella domanda originale, senza creare duplicati.");
   }
 
-  async function verificaEArchivia(riga) {
-    if (occupato) return;
-    const mancanze = mancanzeDomanda(riga);
-    if (mancanze.dati.length) {
-      setMessaggio("Completa prima i dati obbligatori indicati in rosso."); return;
-    }
-    const mancantiTipi = DOCUMENTI_COMUNIONE.filter(doc => !documentoRicevuto(riga,doc.tipo)).map(doc=>doc.tipo);
-    if (mancantiTipi.some(t => !documentiConfermati.includes(t))) {
-      setMessaggio("Conferma solo i documenti cartacei realmente ricevuti, prima di archiviare."); return;
-    }
-    setOccupato(riga.id); setMessaggio("");
-    const { data, error } = await supabase.rpc("ars_comunione_verifica_archivia_parroco", {
-      p_parrocchia_id:parrocchiaId, p_iscrizione_id:riga.id,
-      p_documenti_confermati: documentiConfermati,
-    });
-    setOccupato("");
-    if (error || !data?.ok) {
-      setMessaggio("Archiviazione non completata: " + (error?.message || "errore")); return;
-    }
-    setVerificaId(null); setDocumentiConfermati([]);
-    setSezioneCard("archivio"); setApertaId(riga.id);
-    setMessaggio("Consegna verificata: la stessa domanda è ora nell'archivio generale.");
-    setAggiorna(n=>n+1);
-  }
+  // Non esiste più una verifica manuale: ogni documento ricevuto aggiorna subito l'elenco.
 
   async function inviaSollecito(riga) {
     if (occupato) return;
@@ -632,7 +688,9 @@ function IscrizioniComunioneParroco({ parrocchiaId, nomeParrocchia, annoAttivo }
 
   return <section className="ars-sac-pannello ars-com-iscrizioni-pannello">
     <h3>Iscrizioni e rinnovi</h3>
-    <p>Le domande passano nell’archivio esistente quando sono complete, automaticamente o dopo la verifica in segreteria. I gruppi si formano soltanto nella card 05.</p>
+    <p>Ogni domanda passa automaticamente da «Incomplete» a «Complete» quando sono presenti tutti i dati e i documenti richiesti. Non occorre approvarla o archiviare manualmente. I gruppi si formano nella card 05.</p>
+    {internoObbligatorio === null && !caricamento && <p className="ars-com-errore-iscrizioni" role="alert">Impossibile leggere la regola dei certificati. Aggiorna l'elenco prima di considerare complete le domande.</p>}
+    <button type="button" className="ars-sac-stampa" onClick={() => setAggiorna(v => v + 1)} disabled={caricamento}>Aggiorna elenco</button>
     <div className="ars-com-sottocard-grid" role="group" aria-label="Sezioni delle iscrizioni">
       <button type="button" onClick={() => cambiaSezione("incomplete")}
         className={`ars-com-sottocard ${sezioneCard === "incomplete" ? "ars-com-sottocard-attiva" : ""}`}>
@@ -684,7 +742,7 @@ function IscrizioniComunioneParroco({ parrocchiaId, nomeParrocchia, annoAttivo }
         <p className="ars-com-errore-iscrizioni" role="alert">{errore}</p> :
         visualizzate.length ? <div className="ars-com-elenco-iscrizioni">
         {visualizzate.map(r => { const d = r.dati_modulo || {};
-          const mancanze = mancanzeDomanda(r);
+          const mancanze = mancanzeDomanda(r, internoObbligatorio);
           return <article className="ars-com-riga-iscrizione" key={r.id}>
             <div className="ars-com-anagrafica-iscrizione">
               <strong>{[d.nome, d.cognome].filter(Boolean).join(" ") || "Ragazzo"}</strong>
@@ -695,70 +753,40 @@ function IscrizioniComunioneParroco({ parrocchiaId, nomeParrocchia, annoAttivo }
                 <div className="ars-com-mancanze" role="status">
                   <strong>Pratica incompleta</strong>
                   {mancanze.dati.length > 0 && <><p>Dati da completare:</p><ul>{mancanze.dati.map(x => <li key={x}>{x}</li>)}</ul></>}
-                  {mancanze.documenti.length > 0 && <><p>Documenti non ancora ricevuti in parrocchia:</p>
-                    <ul>{DOCUMENTI_COMUNIONE.filter(doc => !documentoRicevuto(r,doc.tipo)).map(doc =>
-                      <li key={doc.tipo}>{doc.nome}{(r.foto || []).some(f=>f.tipo===doc.tipo) ? " — foto caricata, in attesa di verifica" : " — da consegnare"}</li>)}</ul></>}
+                  {mancanze.documenti.length > 0 && <><p>Documenti ancora da consegnare:</p>
+                    <ul>{mancanze.documenti.map(doc => <li key={doc.tipo}>{doc.nome}</li>)}</ul></>}
                 </div> : <small className="ars-com-stato-ok">Pratica completa</small>}
             </div>
             <button type="button" className="ars-sac-stampa"
-              onClick={() => { setApertaId(v => v === r.id ? null : r.id); setModificaId(null); setVerificaId(null); setDocumentiConfermati([]); setMessaggio(""); }}>
+              onClick={() => { setApertaId(v => v === r.id ? null : r.id); setModificaId(null); setMessaggio(""); }}>
               {apertaId === r.id ? "Chiudi" : "Apri domanda"}
             </button>
             {apertaId === r.id && <div className="ars-com-scheda-iscrizione">
               <DomandaComunioneDettaglio riga={r} nomeParrocchia={nomeParrocchia} />
               {sezioneCard === "incomplete" && <>
                 <div className="ars-com-gestione-documenti">
-                  <h4>Documenti da riconsegnare</h4>
+                  <h4>Certificato di Battesimo</h4>
+                  <p>Se consegnato di persona, basta un clic su «Segna ricevuto». Se inviato online, è già acquisito automaticamente.</p>
                   {DOCUMENTI_COMUNIONE.map(doc => { const ricevuto = documentoRicevuto(r, doc.tipo);
+                    const richiesto = necessitaCertificatoComunione(r, internoObbligatorio);
                     return <div className="ars-com-riga-documento" key={doc.tipo}>
                       <span>{doc.nome}</span>
                       <strong className={ricevuto ? "ars-com-stato-ok" : "ars-com-stato-attesa"}>
-                        {ricevuto ? (r.documenti?.some(d=>d.tipo===doc.tipo && d.stato==="non_necessario") ? "Confermato nell'app" : "Ricevuto") :
-                          (r.foto || []).some(f=>f.tipo===doc.tipo) ? "Foto caricata: da verificare" : "Non ricevuto"}</strong>
+                        {ricevuto ? "Ricevuto" : richiesto ? "Da consegnare" : "Non richiesto / da chiarire"}</strong>
                       {(r.foto || []).some(f => f.tipo===doc.tipo) && <button type="button"
                         className="ars-sac-stampa" disabled={Boolean(occupato)}
-                        onClick={() => apriFotoParroco(r,doc.tipo)}>Apri foto</button>}
-                      <button type="button" className="ars-sac-stampa" disabled={Boolean(occupato)}
-                        onClick={() => cambiaDocumento(r, doc.tipo, ricevuto ? "da_consegnare" : "ricevuto") }>
-                        {occupato === `${r.id}:${doc.tipo}` ? "Salvataggio…" : ricevuto ? "Segna da consegnare" : "Segna ricevuto"}
-                      </button>
+                        onClick={() => apriFotoParroco(r,doc.tipo)}>Apri documento</button>}
+                      {richiesto && !ricevuto && <button type="button" className="ars-sac-stampa"
+                        disabled={Boolean(occupato)} onClick={() => cambiaDocumento(r, doc.tipo, "ricevuto") }>
+                        {occupato === `${r.id}:${doc.tipo}` ? "Salvataggio…" : "Segna ricevuto in segreteria"}
+                      </button>}
+                      {internoObbligatorio === false && typeof r.dati_modulo?.battesimoInQuestaParrocchia !== "boolean" && !ricevuto &&
+                        <button type="button" className="ars-sac-stampa" disabled={Boolean(occupato)}
+                          onClick={() => cambiaDocumento(r,doc.tipo,"non_necessario")}>
+                          Confermo: Battesimo in questa parrocchia, certificato non richiesto
+                        </button>}
                     </div>;
                   })}
-                </div>
-                <div className="ars-com-verifica-manuale">
-                  <h4>Verifica e archivia in segreteria</h4>
-                  <p>Per i documenti consegnati di persona, anche da famiglie senza account.
-                    L'archiviazione usa la domanda originale, senza duplicarla.</p>
-                  {verificaId !== r.id ?
-                    <button type="button" className="ars-sac-stampa" disabled={Boolean(occupato)}
-                      onClick={() => {setVerificaId(r.id);setDocumentiConfermati([]);setMessaggio("");}}>
-                      Verifica e archivia
-                    </button> : <>
-                    {mancanze.dati.length ?
-                      <p className="ars-com-errore-iscrizioni">Prima completa i dati obbligatori indicati in rosso.</p>
-                    : <>
-                      <p>Seleziona soltanto i documenti cartacei che hai ricevuto e controllato.</p>
-                      {DOCUMENTI_COMUNIONE.filter(doc => !documentoRicevuto(r,doc.tipo)).map(doc =>
-                        <label key={doc.tipo} className="ars-com-verifica-spunta">
-                          <input type="checkbox" checked={documentiConfermati.includes(doc.tipo)}
-                            disabled={Boolean(occupato)}
-                            onChange={e => setDocumentiConfermati(p => e.target.checked
-                              ? [...p,doc.tipo] : p.filter(x=>x!==doc.tipo))} />
-                          <span>Confermo la ricezione: {doc.nome}</span>
-                        </label>)}
-                    </>}
-                    <div className="ars-com-segreteria-azioni">
-                      <button type="button" className="ars-sac-stampa" disabled={Boolean(occupato)}
-                        onClick={() => {setVerificaId(null);setDocumentiConfermati([]);}}>Annulla</button>
-                      <button type="button" className="ars-sac-conferma"
-                        disabled={Boolean(occupato)||mancanze.dati.length>0 || DOCUMENTI_COMUNIONE
-                          .filter(doc=>!documentoRicevuto(r,doc.tipo))
-                          .some(doc=>!documentiConfermati.includes(doc.tipo))}
-                        onClick={() => verificaEArchivia(r)}>
-                        Conferma ricezione e archivia
-                      </button>
-                    </div>
-                    </>}
                 </div>
                 {mancanze.dati.length > 0 && <div className="ars-com-correzioni">
                   <h4>Dati da integrare nella domanda esistente</h4>
@@ -782,7 +810,7 @@ function IscrizioniComunioneParroco({ parrocchiaId, nomeParrocchia, annoAttivo }
                     </>}
                 </div>}
                 {mancanze.documenti.length > 0 && <div className="ars-com-solleciti">
-                  <h4>Solleciti per i documenti mancanti</h4>
+                  <h4>Promemoria per il certificato mancante</h4>
                   {r.richiedente_utente_id ? <>
                     <p>Il sollecito resterà dentro la domanda del genitore, non nelle notifiche della dashboard.</p>
                     <button type="button" className="ars-sac-conferma" disabled={Boolean(occupato)}
@@ -797,19 +825,18 @@ function IscrizioniComunioneParroco({ parrocchiaId, nomeParrocchia, annoAttivo }
                 </div>}
               </>}
               {sezioneCard === "archivio" && <div className="ars-com-gestione-documenti">
-                <h4>Documentazione completa</h4>
+                <h4>Documentazione disponibile</h4>
+                <p>La domanda è completa. I certificati eventualmente ricevuti rimangono consultabili.</p>
                 {DOCUMENTI_COMUNIONE.map(doc => <div className="ars-com-riga-documento" key={doc.tipo}>
                   <span>{doc.nome}</span>
-                  <strong className="ars-com-stato-ok">{r.documenti?.some(d=>d.tipo===doc.tipo && d.stato==="non_necessario") ? "Confermato nell'app" : "Ricevuto"}</strong>
+                  <strong className="ars-com-stato-ok">{documentoRicevuto(r,doc.tipo) ? "Ricevuto" : "Non richiesto"}</strong>
                   {(r.foto || []).some(f => f.tipo===doc.tipo) && <button type="button"
-                    className="ars-sac-stampa" disabled={Boolean(occupato)}
-                    onClick={() => apriFotoParroco(r,doc.tipo)}>Apri foto</button>}
-                  <button type="button" className="ars-sac-stampa" disabled={Boolean(occupato)}
-                    onClick={() => cambiaDocumento(r,doc.tipo,"da_consegnare")}>
-                    {occupato === `${r.id}:${doc.tipo}` ? "Salvataggio…" : "Correggi: documento da consegnare"}
-                  </button>
+                    className="ars-sac-stampa" onClick={() => apriFotoParroco(r, doc.tipo)}>Apri documento</button>}
+                  {documentoRicevuto(r,doc.tipo) && <button type="button" className="ars-sac-stampa"
+                    disabled={Boolean(occupato)} onClick={() => cambiaDocumento(r,doc.tipo,"da_consegnare")}>
+                      Segnala documento da sostituire
+                    </button>}
                 </div>)}
-                <p>Se un documento risulta ricevuto per errore, correggilo: la pratica tornerà automaticamente nelle domande incomplete.</p>
               </div>}
               <button type="button" className="ars-sac-conferma" onClick={() => setStampaId(r.id)}>
                 Stampa domanda e informativa</button>
@@ -925,7 +952,7 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
     async function carica() {
       setCaricamento(true);
       const { data, error } = await supabase.from("ars_comunione_impostazioni")
-        .select("anno_pastorale, durata, date_iscrizioni, informazioni, orari_catechismo, informativa_privacy_testo, informativa_privacy_versione")
+        .select("anno_pastorale, durata, date_iscrizioni, informazioni, orari_catechismo, certificato_battesimo_interno_obbligatorio, informativa_privacy_testo, informativa_privacy_versione")
         .eq("parrocchia_id", parrocchiaId).maybeSingle();
       if (!attivo) return;
       setCaricamento(false);
@@ -935,6 +962,7 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
           ? data.orari_catechismo : {});
         setImpostazioni({ anno: data.anno_pastorale, durata: String(data.durata),
           informazioni: data.informazioni || "",
+          certificatoBattesimoInternoObbligatorio: data.certificato_battesimo_interno_obbligatorio === true,
           date: { 1: { apertura: "", chiusura: "", ...(data.date_iscrizioni?.[1] || {}) },
             2: { apertura: "", chiusura: "", ...(data.date_iscrizioni?.[2] || {}) },
             3: { apertura: "", chiusura: "", ...(data.date_iscrizioni?.[3] || {}) } } });
@@ -1090,6 +1118,7 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
       durata: Number(impostazioni.durata),
       date_iscrizioni: impostazioni.date,
       informazioni: impostazioni.informazioni,
+      certificato_battesimo_interno_obbligatorio: impostazioni.certificatoBattesimoInternoObbligatorio,
       orari_catechismo: orariCatechismo,
       aggiornato_il: new Date().toISOString(),
     }, { onConflict: "parrocchia_id" });
@@ -1364,6 +1393,16 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
                   </> : <p className="ars-sac-orari-avviso">I giorni e gli orari del Catechismo saranno comunicati dalla Parrocchia non appena definiti. Le famiglie potranno consultarli nel Calendario del Catechismo e riceveranno un avviso nelle Comunicazioni.</p>}
                 </div>;
               })}
+            </fieldset>
+            <fieldset className="ars-sac-anno" disabled={!modifica || caricamento || operazione}>
+              <legend>Certificato di Battesimo</legend>
+              <p>Se il bambino è stato battezzato in un'altra parrocchia, il certificato è sempre richiesto.</p>
+              <label className="ars-com-segreteria-spunta">
+                <input type="checkbox" checked={impostazioni.certificatoBattesimoInternoObbligatorio}
+                  onChange={e => aggiorna("certificatoBattesimoInternoObbligatorio", e.target.checked)} />
+                <span>Richiedi il certificato anche ai bambini battezzati in questa parrocchia.</span>
+              </label>
+              <p>Se non selezioni questa opzione, il certificato interno non è necessario.</p>
             </fieldset>
             <label className="ars-sac-intera">Informazioni e istruzioni per le famiglie
               <textarea rows="6" value={impostazioni.informazioni}
@@ -1730,6 +1769,10 @@ const STILE = `
 .ars-com-paginazione select{background:white;border:1px solid #d8c9a8;border-radius:7px;padding:9px}
 @media(max-width:750px){.ars-com-sottocard-grid{grid-template-columns:1fr}}
 
+.ars-com-domanda-dettaglio .ars-com-sezione-domanda dl{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:10px 16px;margin:12px 0}
+.ars-com-domanda-dettaglio .ars-com-sezione-domanda dl>div{padding:10px 12px;background:#fffdf8;border:1px solid #ece1cc;border-radius:8px;min-width:0}
+.ars-com-domanda-dettaglio .ars-com-sezione-domanda dt{font-size:.78rem;font-weight:600;color:#64716b;margin-bottom:4px}
+.ars-com-domanda-dettaglio .ars-com-sezione-domanda dd{font-size:.97rem;margin:0;line-height:1.45;overflow-wrap:anywhere;font-weight:500;color:#263d41}
 .ars-com-verifica-manuale{background:#fdfaf3;border:1px solid #c9b58d;border-radius:10px;margin:15px 0;padding:15px}
 .ars-com-verifica-manuale h4{font:700 1.03rem Georgia,serif;color:#79551f;margin:0 0 9px}
 .ars-com-verifica-manuale p{line-height:1.5}
