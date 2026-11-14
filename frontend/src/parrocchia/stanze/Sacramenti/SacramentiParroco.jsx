@@ -991,7 +991,124 @@ const METODI_RIMBORSO_COMUNIONE = [
   ["paypal", "PayPal"], ["link_pagamento", "Link di pagamento"],
 ];
 const euroComunione = (v) => new Intl.NumberFormat("it-IT", {style:"currency",currency:"EUR"}).format(Number(v || 0));
-function QuoteComunioneParroco({ parrocchiaId, annoAttivo, onGestisciPagamenti, tornaDashboard }) {
+// Consultazione delle posizioni annuali: usa la contabilità esistente, senza scritture.
+function SituazioneEconomicaComunione({ parrocchiaId, anno, nomeParrocchia, onGestisciPagamenti, tornaDashboard }) {
+  const [riepilogo, setRiepilogo] = useState(null);
+  const [caricamento, setCaricamento] = useState(true);
+  const [errore, setErrore] = useState("");
+  const [erroreStampa, setErroreStampa] = useState("");
+  const [tentativo, setTentativo] = useState(0);
+  useEffect(() => {
+    let vivo = true;
+    setRiepilogo(null); setCaricamento(true); setErrore(""); setErroreStampa("");
+    (async () => {
+      try {
+        if (!parrocchiaId || !anno) throw new Error("Anno catechistico o parrocchia non disponibile.");
+        const {data, error} = await supabase.rpc("ars_comunione_situazione_economica", {
+          p_parrocchia_id: parrocchiaId, p_anno_pastorale: anno,
+        });
+        if (error) throw error;
+        if (!data || !Array.isArray(data.iscritti) || data.numero_iscritti == null || data.totale_incassato == null)
+          throw new Error("Riepilogo economico non disponibile.");
+        if (vivo) setRiepilogo(data);
+      } catch (err) {
+        if (vivo) setErrore(err?.message || "Impossibile caricare la situazione economica.");
+      } finally { if (vivo) setCaricamento(false); }
+    })();
+    return () => {vivo = false;};
+  }, [parrocchiaId, anno, tentativo]);
+
+  const nomeIscritto = r => [r.nome, r.cognome].filter(Boolean).join(" ");
+  const quotaIscritto = r => r.esente ? "Esente" : r.quota == null ? "Da definire" : euroComunione(r.quota);
+  const residuoIscritto = r => r.residuo == null ? "—" : euroComunione(r.residuo);
+  const iscritti = riepilogo?.iscritti || [];
+
+  function stampaElenco() {
+    if (!riepilogo || caricamento) return;
+    setErroreStampa("");
+    // Finestra di stampa isolata: nessuna informazione personale nell'URL,
+    // nessun HTML costruito da dati non attendibili, nessuna scrittura contabile.
+    let finestra;
+    try {
+      finestra = window.open("about:blank", "_blank");
+      if (!finestra) throw new Error("Il browser ha bloccato la stampa. Consenti le finestre per questo sito e riprova.");
+      finestra.opener = null;
+      const doc = finestra.document;
+      doc.title = `Situazione economica Prima Comunione ${anno}`;
+      doc.documentElement.lang = "it";
+      const crea = (tag, testo, parent, classe) => {
+        const nodo = doc.createElement(tag);
+        if (testo != null) nodo.textContent = String(testo);
+        if (classe) nodo.className = classe;
+        parent.appendChild(nodo);
+        return nodo;
+      };
+      const stile = crea("style", null, doc.head);
+      stile.textContent = `@page{size:A4 portrait;margin:15mm}body{margin:24px;color:#202020;font:10.5pt/1.35 Arial,sans-serif}h1{font-size:17pt;margin:0 0 5px}h2{font-size:14pt;margin:0 0 5px}p{margin:5px 0}table{border-collapse:collapse;width:100%;margin-top:14px}th,td{padding:5px 7px;border-bottom:1px solid #bbb;text-align:left;vertical-align:top}th{border-top:1px solid #777;font-weight:700}th:not(:first-child),td:not(:first-child){text-align:right;white-space:nowrap}thead{display:table-header-group}tr{break-inside:avoid;page-break-inside:avoid}button{margin:18px 0;padding:8px 14px;cursor:pointer}@media print{body{margin:0}button{display:none}}`;
+      const corpo = doc.body;
+      corpo.replaceChildren();
+      crea("h1", nomeParrocchia || "Parrocchia", corpo);
+      crea("h2", `Prima Comunione ${anno} – Situazione economica degli iscritti`, corpo);
+      crea("p", `Elenco al ${mostraDataComunione(new Date().toISOString(), true)}`, corpo);
+      crea("p", `Numero iscritti: ${riepilogo.numero_iscritti}   ·   Totale quote incassate: ${euroComunione(riepilogo.totale_incassato)}`, corpo);
+      const tabella = crea("table", null, corpo);
+      const testa = crea("tr", null, crea("thead", null, tabella));
+      ["Nome e cognome", "Quota", "Versato", "Residuo"].forEach(t => crea("th", t, testa));
+      const righe = crea("tbody", null, tabella);
+      iscritti.forEach(r => {
+        const tr = crea("tr", null, righe);
+        [nomeIscritto(r), quotaIscritto(r), euroComunione(r.versato), residuoIscritto(r)].forEach(t => crea("td", t, tr));
+      });
+      if (!iscritti.length) crea("p", "Nessun iscritto per questo anno catechistico.", corpo);
+      const pulsante = crea("button", "Stampa elenco", corpo);
+      pulsante.addEventListener("click", () => finestra.print());
+      finestra.focus();
+      finestra.print();
+    } catch (err) {
+      setErroreStampa(err?.message || "Non è stato possibile avviare la stampa.");
+    }
+  }
+
+  return <section className="ars-com-situazione-economica">
+    <h4>Situazione economica degli iscritti</h4>
+    {caricamento ? <p role="status">Caricamento situazione economica…</p> : errore ? <>
+      <p className="ars-com-errore-iscrizioni" role="alert">{errore}</p>
+      <button type="button" className="ars-sac-stampa" onClick={() => setTentativo(n => n + 1)}>Riprova</button>
+    </> : riepilogo && <>
+      <div className="ars-com-economica-indicatori">
+        <div><span>Numero iscritti</span><strong>{riepilogo.numero_iscritti}</strong></div>
+        <div><span>Totale quote incassate</span><strong className="ars-com-stato-ok">{euroComunione(riepilogo.totale_incassato)}</strong></div>
+      </div>
+      <div className="ars-com-economica-testa-elenco">
+        <h5>Elenco degli iscritti</h5>
+        <button type="button" className="ars-sac-stampa" onClick={stampaElenco}>Stampa elenco</button>
+      </div>
+      {erroreStampa && <p role="alert" className="ars-com-errore-iscrizioni">{erroreStampa}</p>}
+      {iscritti.length ? <div className="ars-com-economica-scroll" tabIndex={0} role="region" aria-label="Elenco economico degli iscritti">
+        <table className="ars-com-economica-tabella">
+          <thead><tr><th scope="col">Nome e cognome</th><th scope="col">Quota</th><th scope="col">Versato</th><th scope="col">Residuo</th></tr></thead>
+          <tbody>{iscritti.map(r => <tr key={r.iscrizione_id}>
+            <td>{nomeIscritto(r)}</td>
+            <td>{quotaIscritto(r)}</td>
+            <td>{euroComunione(r.versato)}</td>
+            <td className={r.residuo == null ? "" : Number(r.residuo) > 0 ? "ars-com-residuo-aperto" : "ars-com-stato-ok"}>{residuoIscritto(r)}</td>
+          </tr>)}</tbody>
+        </table>
+      </div> : <p>Nessun iscritto per questo anno catechistico.</p>}
+    </>}
+    <div className="ars-com-economica-collegamento">
+      <p>Per registrare gli incassi e gestire i pagamenti, accedi alla Card <strong>«Attività»</strong> della dashboard del parroco e seleziona <strong>«Prima Comunione {anno}»</strong>.</p>
+      <p>Gli incassi, le spese e i rimborsi di questa attività confluiscono nel bilancio generale della parrocchia.</p>
+      {typeof onGestisciPagamenti === "function" ?
+        <button type="button" className="ars-sac-conferma" onClick={() => onGestisciPagamenti(anno)}>Gestisci i pagamenti</button>
+        : typeof tornaDashboard === "function" ?
+          <button type="button" className="ars-sac-conferma" onClick={() => tornaDashboard()}>Vai alla dashboard del parroco</button>
+          : null}
+    </div>
+  </section>;
+}
+
+function QuoteComunioneParroco({ parrocchiaId, annoAttivo, nomeParrocchia, onGestisciPagamenti, tornaDashboard }) {
   const [config, setConfig] = useState(null);
   const [quote, setQuote] = useState({});
   const [motivi, setMotivi] = useState({});
@@ -1133,17 +1250,9 @@ function QuoteComunioneParroco({ parrocchiaId, annoAttivo, onGestisciPagamenti, 
           <button type="button" className="ars-sac-conferma" disabled={importo===null||(precedente!=null&&Number(precedente)===importo)||Boolean(occupato)} onClick={()=>salvaQuota(n)}>{occupato===`quota:${n}`?"Salvataggio…":"Salva quota"}</button>
         </fieldset>;
       })}
-    </>:sezione==="situazione"?<section className="ars-com-situazione-economica">
-      <h4>Situazione economica degli iscritti</h4>
-      <p>Consulta le quote, gli acconti, i saldi, i versamenti e le posizioni ancora da saldare.</p>
-      <p>Per consultare i versamenti, registrare gli incassi e verificare le quote ancora da pagare, accedi alla Card <strong>«Attività»</strong> della dashboard del parroco e seleziona <strong>«Prima Comunione {config.anno_pastorale}»</strong>.</p>
-      <p>Gli incassi, le spese e i rimborsi di questa attività confluiscono nel bilancio generale della parrocchia.</p>
-      {typeof onGestisciPagamenti === "function" ?
-        <button type="button" className="ars-sac-conferma" onClick={()=>onGestisciPagamenti(config.anno_pastorale)}>Gestisci i pagamenti</button>
-        : typeof tornaDashboard === "function" ?
-          <button type="button" className="ars-sac-conferma" onClick={()=>tornaDashboard()}>Vai alla dashboard del parroco</button>
-          : null}
-    </section>:<>
+    </>:sezione==="situazione"?<SituazioneEconomicaComunione key={`${parrocchiaId}:${config.anno_pastorale}`}
+      parrocchiaId={parrocchiaId} anno={config.anno_pastorale} nomeParrocchia={nomeParrocchia}
+      onGestisciPagamenti={onGestisciPagamenti} tornaDashboard={tornaDashboard} />:<>
       <h4>Iscrizioni annullate e rimborsi</h4>
       <p>Al momento della restituzione del denaro, premi «Rimborsa e stampa ricevuta».</p>
       {erroreRimborsi?<p role="alert" className="ars-com-errore-iscrizioni">{erroreRimborsi}</p>:!rimborsi.length?<p>Nessuna iscrizione annullata per questo anno.</p>:
@@ -1870,7 +1979,7 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
           </div>
         </section>
       ) : sezione === "quote" ? (
-        <QuoteComunioneParroco key={parrocchiaId} parrocchiaId={parrocchiaId} annoAttivo={impostazioni.anno} onGestisciPagamenti={onGestisciPagamentiComunione} tornaDashboard={tornaDashboard} />
+        <QuoteComunioneParroco key={parrocchiaId} parrocchiaId={parrocchiaId} annoAttivo={impostazioni.anno} nomeParrocchia={nomeParrocchia} onGestisciPagamenti={onGestisciPagamentiComunione} tornaDashboard={tornaDashboard} />
       ) : sezione === "iscrizioni" ? (
         <IscrizioniComunioneParroco parrocchiaId={parrocchiaId}
           nomeParrocchia={nomeParrocchia} annoAttivo={impostazioni.anno} />
@@ -2157,4 +2266,23 @@ const STILE = `
  body.ars-com-stampa-rimborso .ars-com-documento-rimborso{break-inside:avoid;border-top:1px solid #777;padding:12px 0}
  body.ars-com-stampa-rimborso .ars-com-documento-rimborso p{margin:4px 0}
 }
+
+/* Card 02: consultazione compatta, una riga per iscritto. */
+.ars-com-economica-indicatori{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:15px 0 20px}
+.ars-com-economica-indicatori>div{display:flex;flex-direction:column;gap:6px;border:1px solid #dfcba6;border-radius:10px;padding:14px;background:#fffdf8;min-width:0}
+.ars-com-economica-indicatori span{font-size:.9rem;color:#596565;line-height:1.35}
+.ars-com-economica-indicatori strong{font-size:1.45rem;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.ars-com-economica-testa-elenco{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:14px 0 8px;flex-wrap:wrap}
+.ars-com-economica-testa-elenco h5{margin:0;font:700 1.05rem Georgia,serif;color:#77551f}
+.ars-com-situazione-economica .ars-com-economica-testa-elenco button{margin:0}
+.ars-com-economica-scroll{width:100%;overflow-x:auto;border:1px solid #e4d7bf;border-radius:8px;background:#fffdf9}
+.ars-com-economica-tabella{width:100%;min-width:510px;border-collapse:collapse;font-size:.92rem;line-height:1.4;font-variant-numeric:tabular-nums}
+.ars-com-economica-tabella th,.ars-com-economica-tabella td{padding:9px 11px;border-bottom:1px solid #e9dfce;text-align:left;white-space:nowrap}
+.ars-com-economica-tabella th{background:#f2e7d1;color:#77551f;font-weight:700}
+.ars-com-economica-tabella th:not(:first-child),.ars-com-economica-tabella td:not(:first-child){text-align:right}
+.ars-com-economica-tabella tr:last-child td{border-bottom:0}
+.ars-com-economica-tabella tbody tr:nth-child(even){background:#faf5ea}
+.ars-com-residuo-aperto{color:#982f28;font-weight:600}
+.ars-com-economica-collegamento{border-top:1px solid #dfcba6;margin-top:20px;padding-top:9px}
+@media(max-width:430px){.ars-com-economica-indicatori>div{padding:10px}.ars-com-economica-indicatori strong{font-size:1.15rem}.ars-com-economica-indicatori span{font-size:.82rem}}
 `;
