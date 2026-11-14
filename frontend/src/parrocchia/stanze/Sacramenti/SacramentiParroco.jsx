@@ -10,7 +10,7 @@ const sacramenti = [
 
 const sezioniComunione = [
   { id: "impostazioni", nome: "Impostazioni anno catechistico", descrizione: "Anno pastorale, durata e iscrizioni" },
-  { id: "quote", nome: "Quote e pagamenti", descrizione: "Quote annuali, metodi e agevolazioni" },
+  { id: "quote", nome: "Quote e iscrizioni", descrizione: "Quote annuali, iscritti e rimborsi" },
   { id: "iscrizioni", nome: "Iscrizioni e rinnovi", descrizione: "Nuove iscrizioni e rinnovi annuali" },
   { id: "catechisti", nome: "Catechisti", descrizione: "Responsabili e assegnazioni" },
   { id: "gruppi", nome: "Gruppi di catechismo", descrizione: "Classi e organizzazione" },
@@ -277,19 +277,14 @@ function DomandaComunioneDettaglio({ riga, nomeParrocchia, perStampa = false, at
       </div>)}</dl>
     </section>
     {perStampa && <>
-      <div className="ars-com-firme-domanda">
+      {!confermaApp && <div className="ars-com-firme-domanda">
         <p>Luogo e data: _______________________________________</p>
         <p>Firma del genitore/tutore: _____________________________</p>
         <p>Firma del secondo genitore, se richiesta: ________________</p>
-      </div>
-      {riga.privacy_testo && <section className="ars-com-informativa-stampa">
+      </div>}
+      {!riga.privacy_presa_visione_il && riga.privacy_testo && <section className="ars-com-informativa-stampa">
         <h4>Informativa privacy — versione {riga.privacy_versione || "—"}</h4>
         <div>{riga.privacy_testo}</div>
-        <div className="ars-com-firme-domanda">
-          <p>Luogo e data: _______________________________________</p>
-          <p>Firma del genitore/tutore: _____________________________</p>
-          <p>Firma del secondo genitore, se richiesta: ________________</p>
-        </div>
       </section>}
     </>}
   </div>;
@@ -564,6 +559,47 @@ function IscrizioniComunioneParroco({ parrocchiaId, nomeParrocchia, annoAttivo }
   // La conferma nell'app si legge dalla sottoscrizione effettivamente salvata,
   // non si deduce dallo stato «Pratica completa».
   const [attestazioniDomanda, setAttestazioniDomanda] = useState({});
+  const [annullamento, setAnnullamento] = useState(null);
+  const [motivoAnnullamento, setMotivoAnnullamento] = useState("");
+  const [erroreAnnullamento, setErroreAnnullamento] = useState("");
+  const annullaInCorso = useRef(false);
+  const dialogoAnnullamento = useRef(null);
+  useEffect(() => {
+    if (!annullamento || !dialogoAnnullamento.current) return;
+    const dialogo = dialogoAnnullamento.current;
+    if (!dialogo.open) dialogo.showModal();
+    return () => { if (dialogo.open) dialogo.close(); };
+  }, [annullamento]);
+
+  function apriAnnullamento(riga) {
+    if (occupato || annullaInCorso.current) return;
+    setMotivoAnnullamento(""); setErroreAnnullamento("");
+    setAnnullamento(riga);
+  }
+  function chiudiAnnullamento() {
+    if (!annullaInCorso.current) setAnnullamento(null);
+  }
+  async function confermaAnnullamento() {
+    if (!annullamento || occupato || annullaInCorso.current) return;
+    const id = annullamento.id;
+    annullaInCorso.current = true;
+    setOccupato(`annulla:${id}`); setErroreAnnullamento("");
+    try {
+      const { data, error } = await supabase.rpc("ars_comunione_annulla_iscrizione_parroco", {
+        p_parrocchia_id: parrocchiaId, p_iscrizione_id: id,
+        p_motivo: motivoAnnullamento.trim() || null,
+      });
+      if (error || !data?.ok) throw error || new Error("Annullamento non confermato dal sistema.");
+      setDomande(prev => prev.filter(r => r.id !== id));
+      setApertaId(null); setModificaId(null); setAnnullamento(null);
+      setMessaggio("Iscrizione annullata. Consulta «Iscrizioni annullate e rimborsi» in Quote e iscrizioni.");
+      setAggiorna(n => n + 1);
+    } catch (err) {
+      setErroreAnnullamento(err?.message || "Non è stato possibile annullare l'iscrizione.");
+    } finally {
+      annullaInCorso.current = false; setOccupato("");
+    }
+  }
 
   useEffect(() => {
     if (!apertaId || !parrocchiaId) return undefined;
@@ -807,10 +843,16 @@ function IscrizioniComunioneParroco({ parrocchiaId, nomeParrocchia, annoAttivo }
                     <ul>{mancanze.documenti.map(doc => <li key={doc.tipo}>{doc.nome}</li>)}</ul></>}
                 </div> : <small className="ars-com-stato-ok">Pratica completa</small>}
             </div>
-            <button type="button" className="ars-sac-stampa"
-              onClick={() => { setApertaId(v => v === r.id ? null : r.id); setModificaId(null); setMessaggio(""); }}>
-              {apertaId === r.id ? "Chiudi" : "Apri domanda"}
-            </button>
+            <div className="ars-com-azioni-domanda">
+              <button type="button" className="ars-sac-stampa"
+                onClick={() => { setApertaId(v => v === r.id ? null : r.id); setModificaId(null); setMessaggio(""); }}>
+                {apertaId === r.id ? "Chiudi" : "Apri domanda"}
+              </button>
+              {r.stato === "presentata" && <button type="button" className="ars-com-annulla-iscrizione"
+                onClick={() => apriAnnullamento(r)} disabled={Boolean(occupato)}>
+                Annulla iscrizione
+              </button>}
+            </div>
             {apertaId === r.id && <div className="ars-com-scheda-iscrizione">
               <DomandaComunioneDettaglio riga={r} nomeParrocchia={nomeParrocchia} attestazioneDomanda={attestazioniDomanda[r.id]} />
               {sezioneCard === "incomplete" && <>
@@ -904,7 +946,7 @@ function IscrizioniComunioneParroco({ parrocchiaId, nomeParrocchia, annoAttivo }
                 }
                 setStampaId(r.id);
               }}>
-                Stampa domanda e informativa</button>
+                {r.privacy_presa_visione_il ? "Stampa domanda" : "Stampa domanda e informativa"}</button>
             </div>}
           </article>;
         })}</div> : <p className="ars-com-vuoto-iscrizioni">Nessuna domanda per l'anno e la ricerca selezionati.</p>}
@@ -923,13 +965,227 @@ function IscrizioniComunioneParroco({ parrocchiaId, nomeParrocchia, annoAttivo }
           onClick={() => {setAggiorna(n=>n+1);setMessaggio("");}}>Aggiorna elenco</button>
       </div>
     </>}
+    {annullamento && <dialog ref={dialogoAnnullamento} className="ars-com-dialogo-annulla"
+      aria-labelledby="ars-com-annulla-titolo" onCancel={e => { e.preventDefault(); chiudiAnnullamento(); }}>
+      <h3 id="ars-com-annulla-titolo">Annullamento iscrizione</h3>
+      <p>Sei sicuro di voler annullare l'iscrizione di <strong>{[annullamento.dati_modulo?.nome, annullamento.dati_modulo?.cognome].filter(Boolean).join(" ") || "questo bambino"}</strong> alla Prima Comunione?</p>
+      <label className="ars-com-segreteria-deleghe">Motivo dell'annullamento (facoltativo)
+        <textarea rows={3} value={motivoAnnullamento} disabled={Boolean(occupato)} onChange={e => setMotivoAnnullamento(e.target.value)} />
+      </label>
+      <p>Le eventuali somme versate saranno gestite in «Iscrizioni annullate e rimborsi».</p>
+      {erroreAnnullamento && <p role="alert" className="ars-com-errore-iscrizioni">{erroreAnnullamento}</p>}
+      <div className="ars-sac-conferma-pulsanti">
+        <button type="button" autoFocus className="ars-sac-stampa" disabled={Boolean(occupato)} onClick={chiudiAnnullamento}>Torna indietro</button>
+        <button type="button" className="ars-com-annulla-iscrizione" disabled={Boolean(occupato)} onClick={confermaAnnullamento}>{occupato ? "Annullamento…" : "Conferma annullamento"}</button>
+      </div>
+    </dialog>}
     {daStampare && <div className="ars-com-solo-stampa">
       <DomandaComunioneDettaglio riga={daStampare} nomeParrocchia={nomeParrocchia} attestazioneDomanda={attestazioniDomanda[daStampare.id]} perStampa />
     </div>}
   </section>;
 }
 
-export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "", parrocchiaId }) {
+
+const METODI_RIMBORSO_COMUNIONE = [
+  ["consegna_diretta", "Consegna diretta"], ["bonifico", "Bonifico"],
+  ["paypal", "PayPal"], ["link_pagamento", "Link di pagamento"],
+];
+const euroComunione = (v) => new Intl.NumberFormat("it-IT", {style:"currency",currency:"EUR"}).format(Number(v || 0));
+function QuoteComunioneParroco({ parrocchiaId, annoAttivo, onGestisciPagamenti }) {
+  const [config, setConfig] = useState(null);
+  const [quote, setQuote] = useState({});
+  const [motivi, setMotivi] = useState({});
+  const [rimborsi, setRimborsi] = useState([]);
+  const [metodi, setMetodi] = useState({});
+  const [sezione, setSezione] = useState("quote");
+  const [caricamento, setCaricamento] = useState(true);
+  const [errore, setErrore] = useState("");
+  const [erroreRimborsi, setErroreRimborsi] = useState("");
+  const [messaggio, setMessaggio] = useState("");
+  const [occupato, setOccupato] = useState("");
+  const blocco = useRef(false);
+  const [aggiorna, setAggiorna] = useState(0);
+  const [daStampare, setDaStampare] = useState(null);
+  const [documentiRecenti, setDocumentiRecenti] = useState({});
+  useEffect(() => {
+    let vivo = true;
+    setCaricamento(true); setErrore(""); setErroreRimborsi("");
+    setConfig(null); setRimborsi([]);
+    (async () => {
+      try {
+        const {data, error} = await supabase.from("ars_comunione_impostazioni")
+          .select("anno_pastorale,durata,quota_anno_1,quota_anno_2,quota_anno_3")
+          .eq("parrocchia_id", parrocchiaId).maybeSingle();
+        if (!vivo) return;
+        if (error || !data) throw error || new Error("Salva prima le impostazioni dell'anno catechistico.");
+        setConfig(data);
+        setQuote(Object.fromEntries([1,2,3].map(n => [n, data[`quota_anno_${n}`] == null ? "" : String(data[`quota_anno_${n}`])])));
+        setMotivi({});
+        const elenco = await supabase.rpc("ars_comunione_elenco_rimborsi", {p_parrocchia_id:parrocchiaId,p_anno_pastorale:data.anno_pastorale});
+        if (!vivo) return;
+        if (elenco.error || !Array.isArray(elenco.data)) setErroreRimborsi(elenco.error?.message || "Elenco rimborsi non disponibile.");
+        else setRimborsi(elenco.data);
+      } catch (err) { if (vivo) setErrore(err?.message || "Dati non disponibili."); }
+      finally { if (vivo) setCaricamento(false); }
+    })();
+    return () => { vivo = false; };
+  }, [parrocchiaId, annoAttivo, aggiorna]);
+
+  function valoreQuota(n) {
+    const s = String(quote[n] ?? "").trim().replace(",", ".");
+    return /^\d+(\.\d{1,2})?$/.test(s) && Number.isFinite(Number(s)) ? Number(s) : null;
+  }
+  async function salvaQuota(n) {
+    if (blocco.current || !config) return;
+    const importo = valoreQuota(n);
+    if (importo === null) {setMessaggio("Inserisci un importo valido, anche 0 se non è prevista una quota.");return;}
+    blocco.current = true; setOccupato(`quota:${n}`); setMessaggio("");
+    try {
+      const {data,error} = await supabase.rpc("ars_comunione_imposta_quota", {
+        p_parrocchia_id:parrocchiaId, p_anno_pastorale:config.anno_pastorale,
+        p_anno_percorso:n, p_nuova_quota:importo, p_motivo:motivi[n]?.trim() || null,
+      });
+      if (error) throw error;
+      if (data?.ok === false) throw new Error(data?.messaggio || "Quota non salvata.");
+      setConfig(prev => ({...prev,[`quota_anno_${n}`]:importo}));
+      setQuote(prev => ({...prev,[n]:String(importo)})); setMotivi(prev=>({...prev,[n]:""}));
+      setMessaggio(`Quota del ${n}° anno salvata.`);
+    } catch (err) {setMessaggio("Quota non salvata: " + (err?.message || "riprova"));}
+    finally {blocco.current=false;setOccupato("");}
+  }
+  function avviaStampa(riga, documenti) {
+    if (!Array.isArray(documenti) || !documenti.length) {setMessaggio("Rimborso registrato, ma il documento non è disponibile per la stampa.");return;}
+    setDaStampare({riga, documenti});
+  }
+  useEffect(() => {
+    if (!daStampare) return;
+    const classe="ars-com-stampa-rimborso";
+    const fine=()=>{document.body.classList.remove(classe);setDaStampare(null);};
+    document.body.classList.add(classe);
+    window.addEventListener("afterprint",fine);
+    const timer=window.setTimeout(()=>{try{window.print();}catch{fine();setMessaggio("Stampa non avviata. Il rimborso resta registrato.");}},180);
+    return ()=>{window.clearTimeout(timer);window.removeEventListener("afterprint",fine);document.body.classList.remove(classe);};
+  },[daStampare]);
+  async function rimborsa(riga) {
+    if (blocco.current || !(Number(riga.da_restituire)>0)) return;
+    blocco.current=true;setOccupato(riga.iscrizione_id);setMessaggio("");
+    try {
+      const {data,error}=await supabase.rpc("ars_comunione_rimborsa_iscrizione",{
+        p_parrocchia_id:parrocchiaId,p_iscrizione_id:riga.iscrizione_id,
+        p_metodo:metodi[riga.iscrizione_id] || "consegna_diretta",
+      });
+      if(error || !data?.ok) throw error || new Error("Rimborso non confermato.");
+      const documenti=Array.isArray(data.documenti)?data.documenti:[];
+      setDocumentiRecenti(prev=>({...prev,[riga.iscrizione_id]:documenti}));
+      setRimborsi(prev=>prev.map(x=>x.iscrizione_id!==riga.iscrizione_id?x:{...x,
+        totale_rimborsato:Number(x.totale_rimborsato||0)+Number(data.rimborsato_ora||0),
+        da_restituire:data.da_restituire,pagamenti_in_attesa:data.pagamenti_in_attesa,
+        stato_rimborso:data.pratica_conclusa?"rimborsato":"incassi_da_verificare"}));
+      setMessaggio(Number(data.rimborsato_ora)>0 ? `Rimborso registrato: ${euroComunione(data.rimborsato_ora)}.` : "Nessuna nuova somma da rimborsare.");
+      if (Number(data.rimborsato_ora)>0) {
+        const precedenti = new Set([
+          ...(documentiRecenti[riga.iscrizione_id] || []).map(d=>d.id),
+          ...(riga.versamenti || []).flatMap(p=>(p.regolazioni || []).map(q=>q.documento_id).filter(Boolean)),
+        ]);
+        const nuovi = documenti.filter(d=>!precedenti.has(d.id));
+        const somma = nuovi.reduce((tot,d)=>tot+Math.round(Number(d.importo||0)*100),0);
+        if (somma === Math.round(Number(data.rimborsato_ora)*100)) avviaStampa(riga,nuovi);
+        else setMessaggio("Rimborso registrato. I documenti sono disponibili con «Ristampa ricevuta».");
+      }
+      // Rileggi lo stato effettivo anche se un altro operatore ha già registrato il rimborso.
+      setAggiorna(n=>n+1);
+    }catch(err){setMessaggio("Non è stato possibile confermare il rimborso: "+(err?.message||"riprova"));}
+    finally{blocco.current=false;setOccupato("");}
+  }
+  async function ristampa(riga) {
+    if (blocco.current) return;
+    // Una ristampa non deve MAI invocare una funzione che registra denaro.
+    const memorizzati=documentiRecenti[riga.iscrizione_id];
+    if(memorizzati?.length){avviaStampa(riga,memorizzati);return;}
+    const ids=[...new Set((riga.versamenti||[]).flatMap(p=>(p.regolazioni||[]).filter(q=>q.tipo==="rimborso" && q.documento_id).map(q=>q.documento_id)))];
+    if(!ids.length){setMessaggio("Nessuna ricevuta disponibile per la ristampa.");return;}
+    blocco.current=true;setOccupato(`stampa:${riga.iscrizione_id}`);
+    try{
+      const {data,error}=await supabase.from("ars_documenti_economici")
+        .select("id,anno,numero,data_documento,nominativo,causale,importo,valuta,dati_documento,tipo_documento")
+        .eq("parrocchia_id",parrocchiaId).eq("tipo_documento","rimborso").in("id",ids).order("anno").order("numero");
+      if(error||!Array.isArray(data)||data.length!==ids.length)throw error||new Error("Documenti non accessibili o incompleti.");
+      avviaStampa(riga,data);
+    }catch(err){setMessaggio("Ristampa non disponibile: "+(err?.message||"riprova"));}
+    finally{blocco.current=false;setOccupato("");}
+  }
+  return <section className="ars-sac-pannello ars-com-quote-pannello">
+    <h3>Quote e iscrizioni</h3>
+    <p>Prima Comunione {config?.anno_pastorale || annoAttivo}</p>
+    <div className="ars-com-sottocard-grid ars-com-quote-sottocard" role="group" aria-label="Gestione economica">
+      {[["quote","Quote annuali","Definisci la quota per ogni anno"],["rimborsi","Iscrizioni annullate e rimborsi","Restituzioni e ricevute"]].map(([id,titolo,descrizione])=><button key={id} type="button" disabled={Boolean(occupato)} className={`ars-com-sottocard ${sezione===id?"ars-com-sottocard-attiva":""}`} onClick={()=>{setSezione(id);setMessaggio("");}}><strong>{titolo}</strong><span>{descrizione}</span></button>)}
+    </div>
+    {messaggio&&<p role="status" className="ars-com-messaggio-documenti">{messaggio}</p>}
+    {caricamento?<p role="status">Caricamento…</p>:errore?<p role="alert" className="ars-com-errore-iscrizioni">{errore}</p>:sezione==="quote"?<>
+      {Array.from({length:Number(config.durata)||2},(_,i)=>i+1).map(n=>{
+        const precedente=config[`quota_anno_${n}`]; const importo=valoreQuota(n);
+        const variazione=precedente!=null&&importo!==null&&Number(precedente)!==importo;
+        return <fieldset className="ars-com-quota-anno" key={n} disabled={Boolean(occupato)}>
+          <legend>{n}° anno del percorso</legend>
+          <p>{precedente==null?"Quota da definire":`Quota attuale: ${euroComunione(precedente)}`}</p>
+          <label>Quota annuale (€)<input inputMode="decimal" value={quote[n]??""} onChange={e=>setQuote(p=>({...p,[n]:e.target.value}))} placeholder="Da definire"/></label>
+          {variazione&&<label>Motivo della variazione (facoltativo)<textarea rows={2} value={motivi[n]||""} onChange={e=>setMotivi(p=>({...p,[n]:e.target.value}))}/></label>}
+          <button type="button" className="ars-sac-conferma" disabled={importo===null||(precedente!=null&&Number(precedente)===importo)||Boolean(occupato)} onClick={()=>salvaQuota(n)}>{occupato===`quota:${n}`?"Salvataggio…":"Salva quota"}</button>
+        </fieldset>;
+      })}
+      {typeof onGestisciPagamenti==="function"?<button type="button" className="ars-sac-conferma" onClick={()=>onGestisciPagamenti(config.anno_pastorale)}>Gestisci i pagamenti</button>:<p>Per gli incassi e le posizioni individuali, utilizza la gestione economica dell'attività «Prima Comunione {config.anno_pastorale}».</p>}
+    </>:<>
+      <h4>Iscrizioni annullate e rimborsi</h4>
+      <p>Al momento della restituzione del denaro, premi «Rimborsa e stampa ricevuta».</p>
+      {erroreRimborsi?<p role="alert" className="ars-com-errore-iscrizioni">{erroreRimborsi}</p>:!rimborsi.length?<p>Nessuna iscrizione annullata per questo anno.</p>:
+        [...rimborsi].sort((a,b)=>Number(Number(b.da_restituire)>0)-Number(Number(a.da_restituire)>0)).map(r=>{
+          const residuo=Number(r.da_restituire||0), attesa=Number(r.pagamenti_in_attesa||0);
+          return <article className="ars-com-rimborso-riga" key={r.iscrizione_id}>
+            <h4>{r.nome} {r.cognome}</h4>
+            <p>{r.anno_percorso}° anno · {r.anno_pastorale}{r.genitore?` · Genitore: ${r.genitore}`:""}</p>
+            <p>Versato: <strong>{euroComunione(r.totale_versato)}</strong> · Rimborsato: <strong>{euroComunione(r.totale_rimborsato)}</strong></p>
+            {residuo>0?<><strong className="ars-com-rimborso-importo">Da restituire: {euroComunione(residuo)}</strong>
+              <label>Modalità di restituzione<select value={metodi[r.iscrizione_id]||"consegna_diretta"} disabled={Boolean(occupato)} onChange={e=>setMetodi(p=>({...p,[r.iscrizione_id]:e.target.value}))}>{METODI_RIMBORSO_COMUNIONE.map(([v,t])=><option key={v} value={v}>{t}</option>)}</select></label>
+              <button type="button" className="ars-sac-conferma" disabled={Boolean(occupato)} onClick={()=>rimborsa(r)}>{occupato===r.iscrizione_id?"Registrazione…":"Rimborsa e stampa ricevuta"}</button>
+            </>:attesa<=0?<p className="ars-com-stato-ok">{Number(r.totale_rimborsato)>0?"Rimborso completato":Number(r.totale_donato)>0?"Pratica regolata":"Nessun rimborso necessario"}</p>:null}
+            {attesa>0&&<p className="ars-com-stato-attesa">Incassi da verificare: {euroComunione(attesa)}</p>}
+            {Number(r.totale_rimborsato)>0&&<button type="button" className="ars-sac-stampa" disabled={Boolean(occupato)} onClick={()=>ristampa(r)}>Ristampa ricevuta</button>}
+          </article>;
+        })}
+    </>}
+    {erroreRimborsi&&sezione==="rimborsi"&&<button type="button" className="ars-sac-stampa" onClick={()=>setAggiorna(n=>n+1)}>Riprova</button>}
+    {daStampare&&<div className="ars-com-rimborso-stampa"><RicevutaRimborsoComunione riga={daStampare.riga} documenti={daStampare.documenti}/></div>}
+  </section>;
+}
+function RicevutaRimborsoComunione({riga,documenti}) {
+  // Ogni documento conserva la propria intestazione emessa (nessuna sostituzione con dati odierni).
+  return <article><h2>{documenti.length>1?"Prospetto delle ricevute di rimborso":"Ricevuta di rimborso"}</h2>
+    <p>Prima Comunione · {riga.anno_pastorale} · {riga.nome} {riga.cognome}</p>
+    {documenti.map(d=>{
+      const dati=d.dati_documento||{}, h=dati.intestazione_parrocchia||{};
+      const metodo=METODI_RIMBORSO_COMUNIONE.find(([v])=>v===dati.metodo_rimborso)?.[1]||dati.metodo_rimborso;
+      return <section className="ars-com-documento-rimborso" key={d.id}>
+        <header><h3>{h.nome||"Intestazione non disponibile nel documento storico"}</h3>
+          <p>{[h.indirizzo,[h.cap,h.comune,h.provincia].filter(Boolean).join(" ")].filter(Boolean).join(" · ")}</p>
+          {h.diocesi&&<p>Diocesi: {h.diocesi}</p>}{h.codice_fiscale&&<p>Codice fiscale: {h.codice_fiscale}</p>}
+          <p>{[h.telefono,h.email,h.sito_web].filter(Boolean).join(" · ")}</p>
+        </header>
+        <p><strong>Documento n. {d.numero}/{d.anno}</strong> · {mostraDataComunione(d.data_documento)}</p>
+        <p>Intestatario del documento: {d.nominativo||dati.genitore||"—"}</p>
+        <p>Iscritto: {dati.iscritto||[riga.nome,riga.cognome].filter(Boolean).join(" ")}</p>
+        <p>{d.causale||"Rimborso quota"}{metodo?` · ${metodo}`:""}</p>
+        <p>Importo: <strong>{euroComunione(d.importo)}</strong></p>
+      </section>;
+    })}
+    <h3>Totale dei rimborsi riportati: {euroComunione(documenti.reduce((s,d)=>s+Number(d.importo||0),0))}</h3>
+    <p>Il sottoscritto conferma di aver ricevuto le somme sopra indicate.</p>
+    <p>Nome e cognome di chi riceve: __________________________________</p>
+    <p>Luogo e data: _______________________</p>
+    <p>Firma del genitore o tutore: ____________________________________</p>
+  </article>;
+}
+
+export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "", parrocchiaId, onGestisciPagamentiComunione }) {
   const [scelto, setScelto] = useState(null);
   const [sezione, setSezione] = useState(null);
   const [impostazioni, setImpostazioni] = useState(impostazioniIniziali);
@@ -1604,6 +1860,8 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
             </div>}
           </div>
         </section>
+      ) : sezione === "quote" ? (
+        <QuoteComunioneParroco key={parrocchiaId} parrocchiaId={parrocchiaId} annoAttivo={impostazioni.anno} onGestisciPagamenti={onGestisciPagamentiComunione} />
       ) : sezione === "iscrizioni" ? (
         <IscrizioniComunioneParroco parrocchiaId={parrocchiaId}
           nomeParrocchia={nomeParrocchia} annoAttivo={impostazioni.anno} />
@@ -1869,4 +2127,25 @@ const STILE = `
 .ars-com-ricevuta-nuova h4{font:700 1.1rem Georgia,serif;margin:0;color:#55391b}
 .ars-com-ricevuta-nuova p{margin:0}
 .ars-com-ricevuta-nuova input{width:100%;max-width:450px;padding:10px;border:1px solid #c0a672;border-radius:7px;font:600 1rem monospace;background:white}
+
+/* Annullamento e gestione economica Prima Comunione */
+.ars-com-azioni-domanda{display:flex;flex-direction:column;align-items:stretch;gap:8px;min-width:0}
+@media(max-width:650px){.ars-com-azioni-domanda{flex-direction:row;flex-wrap:wrap}}
+.ars-com-annulla-iscrizione{border:1px solid #a13933;background:#fff7f6;color:#942e29;border-radius:9px;padding:10px 14px;font:inherit;font-weight:600;font-size:.94rem;cursor:pointer;min-height:42px}
+.ars-com-annulla-iscrizione:hover{background:#fce7e5}.ars-com-annulla-iscrizione:disabled{opacity:.55;cursor:default}
+.ars-com-dialogo-annulla{width:min(90vw,470px);max-height:85vh;box-sizing:border-box;border:1px solid #bd746f;border-top:4px solid #a13933;border-radius:14px;background:#fffdf8;color:#243c40;padding:24px;overflow:auto}
+.ars-com-dialogo-annulla::backdrop{background:rgba(25,30,30,.55)}.ars-com-dialogo-annulla h3{color:#942e29;margin-top:0}.ars-com-dialogo-annulla p{line-height:1.5}.ars-com-dialogo-annulla .ars-sac-conferma-pulsanti{margin-top:18px}
+.ars-com-quote-sottocard{grid-template-columns:repeat(2,minmax(0,1fr))}.ars-com-quota-anno,.ars-com-rimborso-riga{border:1px solid #dfcba6;border-radius:12px;background:#fffaf1;padding:16px;margin:12px 0;min-width:0}
+.ars-com-quota-anno legend,.ars-com-rimborso-riga h4{color:#77551f;font:700 1.15rem Georgia,serif}.ars-com-rimborso-riga h4{margin:0 0 8px}.ars-com-rimborso-riga p{margin:7px 0}
+.ars-com-quota-anno label,.ars-com-rimborso-riga label{display:flex;flex-direction:column;gap:6px;font-weight:600;margin:12px 0;max-width:430px}
+.ars-com-quota-anno input,.ars-com-quota-anno textarea,.ars-com-rimborso-riga select{width:100%;box-sizing:border-box;padding:10px;border:1px solid #d8c9a8;border-radius:8px;font:inherit;color:#243c40;background:white}
+.ars-com-rimborso-importo{display:block;font-size:1.2rem;color:#9c322b;margin-top:12px}.ars-com-rimborso-riga button{margin:8px 8px 0 0}.ars-com-rimborso-stampa{display:none}
+@media(max-width:650px){.ars-com-quote-sottocard{grid-template-columns:1fr}}
+@media print{
+ body.ars-com-stampa-rimborso *{visibility:hidden!important}
+ body.ars-com-stampa-rimborso .ars-com-rimborso-stampa,body.ars-com-stampa-rimborso .ars-com-rimborso-stampa *{visibility:visible!important}
+ body.ars-com-stampa-rimborso .ars-com-rimborso-stampa{display:block!important;position:absolute;top:0;left:0;width:100%;box-sizing:border-box;margin:0;padding:0;background:#fff;color:#111;font:11pt/1.45 Arial,sans-serif}
+ body.ars-com-stampa-rimborso .ars-com-documento-rimborso{break-inside:avoid;border-top:1px solid #777;padding:12px 0}
+ body.ars-com-stampa-rimborso .ars-com-documento-rimborso p{margin:4px 0}
+}
 `;
