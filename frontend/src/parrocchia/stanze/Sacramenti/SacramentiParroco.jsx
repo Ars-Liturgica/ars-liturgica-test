@@ -991,7 +991,7 @@ const METODI_RIMBORSO_COMUNIONE = [
   ["paypal", "PayPal"], ["link_pagamento", "Link di pagamento"],
 ];
 const euroComunione = (v) => new Intl.NumberFormat("it-IT", {style:"currency",currency:"EUR"}).format(Number(v || 0));
-function QuoteComunioneParroco({ parrocchiaId, annoAttivo, onGestisciPagamenti }) {
+function QuoteComunioneParroco({ parrocchiaId, annoAttivo, onGestisciPagamenti, tornaDashboard }) {
   const [config, setConfig] = useState(null);
   const [quote, setQuote] = useState({});
   const [motivi, setMotivi] = useState({});
@@ -1118,7 +1118,7 @@ function QuoteComunioneParroco({ parrocchiaId, annoAttivo, onGestisciPagamenti }
     <h3>Quote e iscrizioni</h3>
     <p>Prima Comunione {config?.anno_pastorale || annoAttivo}</p>
     <div className="ars-com-sottocard-grid ars-com-quote-sottocard" role="group" aria-label="Gestione economica">
-      {[["quote","Quote annuali","Definisci la quota per ogni anno"],["rimborsi","Iscrizioni annullate e rimborsi","Restituzioni e ricevute"]].map(([id,titolo,descrizione])=><button key={id} type="button" disabled={Boolean(occupato)} className={`ars-com-sottocard ${sezione===id?"ars-com-sottocard-attiva":""}`} onClick={()=>{setSezione(id);setMessaggio("");}}><strong>{titolo}</strong><span>{descrizione}</span></button>)}
+      {[["quote","Quote annuali","Definisci la quota per ogni anno"],["situazione","Situazione economica degli iscritti","Versamenti, acconti, saldi e quote da pagare"],["rimborsi","Iscrizioni annullate e rimborsi","Restituzioni e ricevute"]].map(([id,titolo,descrizione])=><button key={id} type="button" disabled={Boolean(occupato)} className={`ars-com-sottocard ${sezione===id?"ars-com-sottocard-attiva":""}`} onClick={()=>{setSezione(id);setMessaggio("");}}><strong>{titolo}</strong><span>{descrizione}</span></button>)}
     </div>
     {messaggio&&<p role="status" className="ars-com-messaggio-documenti">{messaggio}</p>}
     {caricamento?<p role="status">Caricamento…</p>:errore?<p role="alert" className="ars-com-errore-iscrizioni">{errore}</p>:sezione==="quote"?<>
@@ -1133,8 +1133,17 @@ function QuoteComunioneParroco({ parrocchiaId, annoAttivo, onGestisciPagamenti }
           <button type="button" className="ars-sac-conferma" disabled={importo===null||(precedente!=null&&Number(precedente)===importo)||Boolean(occupato)} onClick={()=>salvaQuota(n)}>{occupato===`quota:${n}`?"Salvataggio…":"Salva quota"}</button>
         </fieldset>;
       })}
-      {typeof onGestisciPagamenti==="function"?<button type="button" className="ars-sac-conferma" onClick={()=>onGestisciPagamenti(config.anno_pastorale)}>Gestisci i pagamenti</button>:<p>Per gli incassi e le posizioni individuali, utilizza la gestione economica dell'attività «Prima Comunione {config.anno_pastorale}».</p>}
-    </>:<>
+    </>:sezione==="situazione"?<section className="ars-com-situazione-economica">
+      <h4>Situazione economica degli iscritti</h4>
+      <p>Consulta le quote, gli acconti, i saldi, i versamenti e le posizioni ancora da saldare.</p>
+      <p>Per consultare i versamenti, registrare gli incassi e verificare le quote ancora da pagare, accedi alla Card <strong>«Attività»</strong> della dashboard del parroco e seleziona <strong>«Prima Comunione {config.anno_pastorale}»</strong>.</p>
+      <p>Gli incassi, le spese e i rimborsi di questa attività confluiscono nel bilancio generale della parrocchia.</p>
+      {typeof onGestisciPagamenti === "function" ?
+        <button type="button" className="ars-sac-conferma" onClick={()=>onGestisciPagamenti(config.anno_pastorale)}>Gestisci i pagamenti</button>
+        : typeof tornaDashboard === "function" ?
+          <button type="button" className="ars-sac-conferma" onClick={()=>tornaDashboard()}>Vai alla dashboard del parroco</button>
+          : null}
+    </section>:<>
       <h4>Iscrizioni annullate e rimborsi</h4>
       <p>Al momento della restituzione del denaro, premi «Rimborsa e stampa ricevuta».</p>
       {erroreRimborsi?<p role="alert" className="ars-com-errore-iscrizioni">{erroreRimborsi}</p>:!rimborsi.length?<p>Nessuna iscrizione annullata per questo anno.</p>:
@@ -1861,7 +1870,7 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
           </div>
         </section>
       ) : sezione === "quote" ? (
-        <QuoteComunioneParroco key={parrocchiaId} parrocchiaId={parrocchiaId} annoAttivo={impostazioni.anno} onGestisciPagamenti={onGestisciPagamentiComunione} />
+        <QuoteComunioneParroco key={parrocchiaId} parrocchiaId={parrocchiaId} annoAttivo={impostazioni.anno} onGestisciPagamenti={onGestisciPagamentiComunione} tornaDashboard={tornaDashboard} />
       ) : sezione === "iscrizioni" ? (
         <IscrizioniComunioneParroco parrocchiaId={parrocchiaId}
           nomeParrocchia={nomeParrocchia} annoAttivo={impostazioni.anno} />
@@ -2135,7 +2144,7 @@ const STILE = `
 .ars-com-annulla-iscrizione:hover{background:#fce7e5}.ars-com-annulla-iscrizione:disabled{opacity:.55;cursor:default}
 .ars-com-dialogo-annulla{width:min(90vw,470px);max-height:85vh;box-sizing:border-box;border:1px solid #bd746f;border-top:4px solid #a13933;border-radius:14px;background:#fffdf8;color:#243c40;padding:24px;overflow:auto}
 .ars-com-dialogo-annulla::backdrop{background:rgba(25,30,30,.55)}.ars-com-dialogo-annulla h3{color:#942e29;margin-top:0}.ars-com-dialogo-annulla p{line-height:1.5}.ars-com-dialogo-annulla .ars-sac-conferma-pulsanti{margin-top:18px}
-.ars-com-quote-sottocard{grid-template-columns:repeat(2,minmax(0,1fr))}.ars-com-quota-anno,.ars-com-rimborso-riga{border:1px solid #dfcba6;border-radius:12px;background:#fffaf1;padding:16px;margin:12px 0;min-width:0}
+.ars-com-quote-sottocard{grid-template-columns:repeat(3,minmax(0,1fr))}.ars-com-situazione-economica{border:1px solid #dfcba6;border-radius:12px;background:#fffaf1;padding:20px;margin:16px 0;min-width:0}.ars-com-situazione-economica h4{color:#77551f;font:700 1.15rem Georgia,serif;margin:0 0 10px}.ars-com-situazione-economica p{line-height:1.55;margin:10px 0}.ars-com-situazione-economica button{margin-top:10px}.ars-com-quota-anno,.ars-com-rimborso-riga{border:1px solid #dfcba6;border-radius:12px;background:#fffaf1;padding:16px;margin:12px 0;min-width:0}
 .ars-com-quota-anno legend,.ars-com-rimborso-riga h4{color:#77551f;font:700 1.15rem Georgia,serif}.ars-com-rimborso-riga h4{margin:0 0 8px}.ars-com-rimborso-riga p{margin:7px 0}
 .ars-com-quota-anno label,.ars-com-rimborso-riga label{display:flex;flex-direction:column;gap:6px;font-weight:600;margin:12px 0;max-width:430px}
 .ars-com-quota-anno input,.ars-com-quota-anno textarea,.ars-com-rimborso-riga select{width:100%;box-sizing:border-box;padding:10px;border:1px solid #d8c9a8;border-radius:8px;font:inherit;color:#243c40;background:white}
