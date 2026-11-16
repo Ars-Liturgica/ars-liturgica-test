@@ -222,7 +222,7 @@ function VerificaIncassi({ parrocchiaId, tornaDashboard, nomeParrocchia, onOccup
   </main>;
 }
 
-function QuoteAttivita({ parrocchiaId, tornaDashboard, nomeParrocchia, attivitaIniziale = "", onOccupato }) {
+function QuoteAttivita({ parrocchiaId, tornaDashboard, nomeParrocchia, attivitaIniziale = "", attivitaFissa = false, etichettaIndietro = "← Torna alla dashboard", onOccupato }) {
   const [attivita, setAttivita] = useState([]);
   const [attivitaId, setAttivitaId] = useState("");
   const [dati, setDati] = useState(null);
@@ -261,7 +261,7 @@ function QuoteAttivita({ parrocchiaId, tornaDashboard, nomeParrocchia, attivitaI
         const { data, error } = await supabase.rpc("ars_elenco_attivita_parroco", { p_parrocchia_id: parrocchiaId });
         if (error) throw error;
         if (!Array.isArray(data)) throw new Error("Impossibile leggere l’elenco delle attività.");
-        // La sezione Quote mostra soltanto attività pubblicate con quota fissa positiva.
+        // Quote fisse positive e quote variabili per iscritto (es. Prima Comunione).
         // La RPC può non includere tutti i campi economici: in tal caso li leggiamo
         // dalla tabella, limitandoci agli ID già autorizzati dalla RPC del parroco.
         let dettagli = data;
@@ -283,18 +283,23 @@ function QuoteAttivita({ parrocchiaId, tornaDashboard, nomeParrocchia, attivitaI
         }
         const attivitaConQuota = dettagli.filter(a =>
           a.stato === "pubblicata" &&
-          a.modello_quota === "quota_fissa" &&
-          Number(a.importo_quota) > 0
+          (a.modello_quota === "quota_variabile" ||
+            (a.modello_quota === "quota_fissa" && Number(a.importo_quota) > 0)) &&
+          (!attivitaFissa || a.id === attivitaIniziale)
         );
         if (!attuale) return;
         setAttivita(attivitaConQuota);
-        setAttivitaId(attivitaConQuota.find(a => a.id === attivitaIniziale)?.id || attivitaConQuota[0]?.id || "");
-        if (!attivitaConQuota.length) { setDati(null); setCaricamento(false); }
+        const selezionata = attivitaConQuota.find(a => a.id === attivitaIniziale);
+        setAttivitaId(selezionata?.id || (!attivitaFissa ? attivitaConQuota[0]?.id : "") || "");
+        if (!attivitaConQuota.length) {
+          setDati(null); setCaricamento(false);
+          if (attivitaFissa) setErrore("Le quote di questa attività non sono disponibili. Torna al bilancio e verifica l’attività.");
+        }
       } catch (e) { if (attuale) { setErrore(e.message || "Impossibile caricare le attività."); setCaricamento(false); } }
     }
     carica();
     return () => { attuale = false; };
-  }, [parrocchiaId]);
+  }, [parrocchiaId, attivitaIniziale, attivitaFissa]);
 
   useEffect(() => {
     let attuale = true;
@@ -444,10 +449,10 @@ function QuoteAttivita({ parrocchiaId, tornaDashboard, nomeParrocchia, attivitaI
   return <main className="quote-attivita">
     <AnteprimaConAnagrafica documento={documentoAnteprima} parrocchiaId={parrocchiaId} nomeParrocchia={nomeParrocchia} onChiudi={() => setDocumentoAnteprima(null)} />
     <style>{STILI_QUOTE}</style>
-    <button type="button" className="pulsante-torna-dashboard" onClick={tornaDashboard} disabled={salvataggio}>← Torna alla dashboard</button>
-    <h2>Quote delle attività</h2><p>Seleziona l’attività per vedere tutti gli iscritti, compresi quelli che non hanno ancora pagato.</p>
+    <button type="button" className="pulsante-torna-dashboard" onClick={tornaDashboard} disabled={salvataggio || (attivitaFissa && !!tentativoQuota)}>{etichettaIndietro}</button>
+    <h2>{attivitaFissa ? `Quote e iscritti · ${attivita[0]?.titolo || "Prima Comunione"}` : "Quote delle attività"}</h2><p>{attivitaFissa ? "Elenco degli iscritti, comprese le quote ancora da versare." : "Seleziona l’attività per vedere tutti gli iscritti, compresi quelli che non hanno ancora pagato."}</p>
     <div className="qa-filtri">
-      <label>Attività<select value={attivitaId} onChange={cambiaAttivita} disabled={salvataggio || !attivita.length}>{!attivita.length && <option value="">Nessuna attività</option>}{attivita.map((a) => <option key={a.id} value={a.id}>{a.titolo}</option>)}</select></label>
+      <label>Attività<select value={attivitaId} onChange={cambiaAttivita} disabled={attivitaFissa || salvataggio || !attivita.length}>{!attivita.length && <option value="">Nessuna attività</option>}{attivita.map((a) => <option key={a.id} value={a.id}>{a.titolo}</option>)}</select></label>
       <label>Gruppo<select value={gruppoId} onChange={(e) => setGruppoId(e.target.value)} disabled={caricamento}><option value="">Tutti i gruppi</option>{gruppi.map((g) => <option key={g.id} value={g.id}>{g.nome}</option>)}<option value="non_assegnati">Non assegnati</option></select></label>
       <label className="qa-check"><input type="checkbox" checked={soloSospesi} onChange={(e) => setSoloSospesi(e.target.checked)} /> Solo quote da completare</label>
       <button type="button" onClick={() => setRevisione((v) => v + 1)} disabled={caricamento || !attivitaId || salvataggio}>Aggiorna</button>
@@ -472,7 +477,7 @@ function QuoteAttivita({ parrocchiaId, tornaDashboard, nomeParrocchia, attivitaI
         <label>Metodo<select value={pagamento.metodo} onChange={(e) => setPagamento({ ...pagamento, metodo: e.target.value })}><option value="consegna_diretta">Versamento in parrocchia</option><option value="bonifico">Bonifico ricevuto</option></select></label>
         <label>Data<input type="date" required value={pagamento.data} onChange={(e) => setPagamento({ ...pagamento, data: e.target.value })} /></label>
         <label>Note private<input value={pagamento.note} onChange={(e) => setPagamento({ ...pagamento, note: e.target.value })} /></label>
-      </div>{errorePagamento && <p role="alert">{errorePagamento}</p>}<div className="qa-filtri"><button type="submit">{salvataggio ? "Registrazione…" : tentativoQuota ? "Riprova la registrazione" : "Registra versamento"}</button><button type="button" disabled={!!tentativoQuota} onClick={() => setPagamento(null)}>Annulla</button></div></fieldset></form>
+      </div></fieldset>{errorePagamento && <p role="alert">{errorePagamento}</p>}<div className="qa-filtri"><button type="submit" disabled={salvataggio}>{salvataggio ? "Registrazione…" : tentativoQuota ? "Riprova la registrazione" : "Registra versamento"}</button><button type="button" disabled={salvataggio || !!tentativoQuota} onClick={() => setPagamento(null)}>Annulla</button></div></form>
     </section>}
     {famigliaPromemoria && !caricamento && !errore && <section ref={pannelloPromemoria} className="qa-pannello"><h3>Promemoria riservato · {famiglieComplete.find((f) => f.id === famigliaPromemoria)?.nomi}</h3><p>Comprende tutti i figli della famiglia in questa attività, anche se sono in gruppi diversi. Puoi stampare oppure salvare in PDF e inviarlo personalmente.</p><label>Testo del promemoria<textarea rows={5} value={testoPromemoria} onChange={(e) => setTestoPromemoria(e.target.value)} /></label>{erroreMetodi && <p role="status">{erroreMetodi}</p>}<div className="qa-filtri"><button type="button" onClick={stampaPromemoria}>Anteprima / Salva PDF</button><button type="button" onClick={() => setFamigliaPromemoria("")}>Chiudi</button></div></section>}
   </main>;
@@ -751,11 +756,59 @@ function ModuloIncasso({ parrocchiaId, attivita = [], progetti = [], attivitaFis
   </section>;
 }
 
+// Accesso diretto dalla Prima Comunione. Non crea attività o movimenti.
+export function GestioneEconomicaComunione({ parrocchiaId, nomeParrocchia = "", anno, onIndietro }) {
+  const [attivita, setAttivita] = useState(null);
+  const [caricamento, setCaricamento] = useState(true);
+  const [errore, setErrore] = useState("");
+  const [tentativo, setTentativo] = useState(0);
+  const [quoteAperte, setQuoteAperte] = useState(false);
+  useEffect(() => {
+    let vivo = true;
+    setAttivita(null); setCaricamento(true); setErrore(""); setQuoteAperte(false);
+    (async () => {
+      try {
+        if (!parrocchiaId || !anno) throw new Error("Parrocchia o anno catechistico non disponibile.");
+        const { data, error } = await supabase.rpc("ars_elenco_attivita_parroco", { p_parrocchia_id: parrocchiaId });
+        if (error) throw error;
+        if (!Array.isArray(data)) throw new Error("Elenco delle attività non disponibile.");
+        const ids = data.map(a => a.id).filter(Boolean);
+        if (!ids.length) throw new Error("Non risulta un’attività economica collegata a questo anno catechistico.");
+        // Si cerca per anno e parrocchia, non per titolo né per posizione nell’elenco.
+        const { data: riga, error: erroreCollegamento } = await supabase.from("attivita_parrocchiali")
+          .select("id, titolo, stato, comunione_anno_pastorale")
+          .eq("parrocchia_id", parrocchiaId).eq("comunione_anno_pastorale", anno).maybeSingle();
+        if (erroreCollegamento) throw erroreCollegamento;
+        if (!riga || !ids.includes(riga.id)) throw new Error("L’attività economica di questo anno non è disponibile. Non verrà aperta un’altra iniziativa.");
+        if (vivo) setAttivita(riga);
+      } catch (e) { if (vivo) setErrore(e.message || "Impossibile aprire la gestione economica."); }
+      finally { if (vivo) setCaricamento(false); }
+    })();
+    return () => { vivo = false; };
+  }, [parrocchiaId, anno, tentativo]);
+  if (caricamento || errore || !attivita) return <main className="ars-bilancio">
+    <style>{STILI_ECONOMIA}</style>
+    <button type="button" onClick={onIndietro}>← Torna a Quote e iscrizioni</button>
+    <h2>Prima Comunione {anno}</h2>
+    {caricamento ? <p role="status">Apertura gestione economica…</p> : <>
+      <p role="alert">{errore || "Attività economica non disponibile."}</p>
+      <button type="button" onClick={() => setTentativo(n => n + 1)}>Riprova</button>
+    </>}
+  </main>;
+  if (quoteAperte) return <QuoteAttivita key={attivita.id} parrocchiaId={parrocchiaId}
+    nomeParrocchia={nomeParrocchia} attivitaIniziale={attivita.id} attivitaFissa
+    tornaDashboard={() => setQuoteAperte(false)} etichettaIndietro="← Torna al bilancio della Prima Comunione" />;
+  return <RegistroMovimenti key={attivita.id} parrocchiaId={parrocchiaId}
+    nomeParrocchia={nomeParrocchia} attivitaId={attivita.id} titoloAttivita={attivita.titolo}
+    tornaDashboard={onIndietro} etichettaIndietro="← Torna a Quote e iscrizioni"
+    onApriQuote={attivita.stato === "pubblicata" ? () => setQuoteAperte(true) : undefined} />;
+}
+
 export function BilancioAttivitaParroco({ parrocchiaId, attivita, onIndietro }) {
   return <RegistroMovimenti key={`${parrocchiaId}:${attivita.id}`} parrocchiaId={parrocchiaId} attivitaId={attivita.id} titoloAttivita={attivita.titolo} tornaDashboard={onIndietro} />;
 }
 
-function RegistroMovimenti({ parrocchiaId, tornaDashboard, nomeParrocchia, attivitaId = "", titoloAttivita = "" }) {
+function RegistroMovimenti({ parrocchiaId, tornaDashboard, nomeParrocchia, attivitaId = "", titoloAttivita = "", etichettaIndietro, onApriQuote }) {
   const dettaglio = Boolean(attivitaId);
   const [attivita, setAttivita] = useState([]);
   const [movimenti, setMovimenti] = useState([]);
@@ -903,9 +956,10 @@ function RegistroMovimenti({ parrocchiaId, tornaDashboard, nomeParrocchia, attiv
   return <main className="ars-bilancio">
     <AnteprimaConAnagrafica documento={documentoAnteprima} parrocchiaId={parrocchiaId} nomeParrocchia={nomeParrocchia} onChiudi={() => setDocumentoAnteprima(null)} />
     <style>{STILI_ECONOMIA}</style>
-    <button type="button" className="azioni-non-stampabili" onClick={tornaDashboard} disabled={salvataggio}>{dettaglio ? "← Torna all’attività" : "← Torna alla dashboard"}</button>
+    <button type="button" className="azioni-non-stampabili" onClick={tornaDashboard} disabled={salvataggio || (Boolean(onApriQuote) && (incassoAperto || !!spesa))}>{etichettaIndietro || (dettaglio ? "← Torna all’attività" : "← Torna alla dashboard")}</button>
     <h2>{dettaglio ? `Bilancio · ${titoloSelezione}` : "Bilancio generale delle attività"}</h2>
     <div className="ars-economia-azioni azioni-non-stampabili">
+      {onApriQuote && <button type="button" disabled={salvataggio || incassoAperto || !!spesa || caricamento || !!errore} onClick={onApriQuote}>Quote e iscritti</button>}
       {dettaglio && attivita.some(a => a.id === attivitaId && a.stato === "pubblicata") && <button type="button" disabled={salvataggio || incassoAperto || !!spesa || caricamento || !!errore} onClick={() => {setMessaggio("");setIncassoAperto(true);}}>Registra un incasso</button>}
       {dettaglio && <button type="button" onClick={nuovaSpesa} disabled={salvataggio || incassoAperto || caricamento || !!errore || !attivita.length || !!spesa}>Registra una spesa</button>}
       <button type="button" onClick={stampaBilancio} disabled={salvataggio || caricamento || !!errore}>Stampa / Salva PDF</button>
