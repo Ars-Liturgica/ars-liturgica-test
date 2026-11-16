@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { supabase } from "../../../supabaseClient";
-import { GestioneEconomicaComunione } from "../PagamentiParrocchia/PagamentiParrocchia";
+import { GestioneEconomicaComunione, intestazioneStampaArs, STILI_INTESTAZIONE_STAMPA_ARS } from "../PagamentiParrocchia/PagamentiParrocchia";
 
 const sacramenti = [
   { id: "battesimo", nome: "Battesimo", descrizione: "Richieste e celebrazioni" },
@@ -1028,7 +1028,7 @@ function SituazioneEconomicaComunione({ parrocchiaId, anno, nomeParrocchia, onGe
     if (!riepilogo || caricamento) return;
     setErroreStampa("");
     // Finestra di stampa isolata: nessuna informazione personale nell'URL,
-    // nessun HTML costruito da dati non attendibili, nessuna scrittura contabile.
+    // intestazione comune con dati escapati, righe create con textContent, nessuna scrittura contabile.
     let finestra;
     try {
       finestra = window.open("about:blank", "_blank");
@@ -1045,11 +1045,11 @@ function SituazioneEconomicaComunione({ parrocchiaId, anno, nomeParrocchia, onGe
         return nodo;
       };
       const stile = crea("style", null, doc.head);
-      stile.textContent = `@page{size:A4 portrait;margin:15mm}body{margin:24px;color:#202020;font:10.5pt/1.35 Arial,sans-serif}h1{font-size:17pt;margin:0 0 5px}h2{font-size:14pt;margin:0 0 5px}p{margin:5px 0}table{border-collapse:collapse;width:100%;margin-top:14px}th,td{padding:5px 7px;border-bottom:1px solid #bbb;text-align:left;vertical-align:top}th{border-top:1px solid #777;font-weight:700}th:not(:first-child),td:not(:first-child){text-align:right;white-space:nowrap}thead{display:table-header-group}tr{break-inside:avoid;page-break-inside:avoid}button{margin:18px 0;padding:8px 14px;cursor:pointer}@media print{body{margin:0}button{display:none}}`;
+      stile.textContent = `${STILI_INTESTAZIONE_STAMPA_ARS}@page{size:A4 portrait;margin:15mm}body{margin:24px;color:#222;font:10.5pt/1.35 Arial,sans-serif}h1{font:700 17pt Georgia,serif;text-align:center;margin:0 0 9px}h2{font:700 13pt Georgia,serif;text-align:center;margin:0 0 9px}p{margin:5px 0}table{border-collapse:collapse;width:100%;margin-top:14px}th,td{padding:5px 7px;border-bottom:1px solid #bbb;text-align:left;vertical-align:top}th{border-top:1px solid #888;background:#f2f2f2;font-weight:700}th:not(:first-child),td:not(:first-child){text-align:right;white-space:nowrap}thead{display:table-header-group}tr{break-inside:avoid;page-break-inside:avoid}button{margin:18px 0;padding:8px 14px;cursor:pointer}@media print{body{margin:0}button{display:none}}`;
       const corpo = doc.body;
       corpo.replaceChildren();
-      crea("h1", nomeParrocchia || "Parrocchia", corpo);
-      crea("h2", `Prima Comunione ${anno} – Situazione economica degli iscritti`, corpo);
+      corpo.insertAdjacentHTML("afterbegin", intestazioneStampaArs(nomeParrocchia));
+      crea("h1", `Prima Comunione ${anno} – Situazione economica degli iscritti`, corpo);
       crea("p", `Elenco al ${mostraDataComunione(new Date().toISOString(), true)}`, corpo);
       crea("p", `Numero iscritti: ${riepilogo.numero_iscritti}   ·   Totale quote incassate: ${euroComunione(riepilogo.totale_incassato)}`, corpo);
       const tabella = crea("table", null, corpo);
@@ -1278,17 +1278,17 @@ function QuoteComunioneParroco({ parrocchiaId, annoAttivo, nomeParrocchia, onGes
 }
 function RicevutaRimborsoComunione({riga,documenti}) {
   // Ogni documento conserva la propria intestazione emessa (nessuna sostituzione con dati odierni).
-  return <article><h2>{documenti.length>1?"Prospetto delle ricevute di rimborso":"Ricevuta di rimborso"}</h2>
+  return <article><style>{STILI_INTESTAZIONE_STAMPA_ARS}</style><h2>{documenti.length>1?"Prospetto delle ricevute di rimborso":"Ricevuta di rimborso"}</h2>
     <p>Prima Comunione · {riga.anno_pastorale} · {riga.nome} {riga.cognome}</p>
     {documenti.map(d=>{
       const dati=d.dati_documento||{}, h=dati.intestazione_parrocchia||{};
       const metodo=METODI_RIMBORSO_COMUNIONE.find(([v])=>v===dati.metodo_rimborso)?.[1]||dati.metodo_rimborso;
       return <section className="ars-com-documento-rimborso" key={d.id}>
-        <header><h3>{h.nome||"Intestazione non disponibile nel documento storico"}</h3>
-          <p>{[h.indirizzo,[h.cap,h.comune,h.provincia].filter(Boolean).join(" ")].filter(Boolean).join(" · ")}</p>
-          {h.diocesi&&<p>Diocesi: {h.diocesi}</p>}{h.codice_fiscale&&<p>Codice fiscale: {h.codice_fiscale}</p>}
-          <p>{[h.telefono,h.email,h.sito_web].filter(Boolean).join(" · ")}</p>
-        </header>
+        <div dangerouslySetInnerHTML={{__html:intestazioneStampaArs(h.nome || "Intestazione non disponibile nel documento storico", [
+          [h.indirizzo,[h.cap,h.comune,h.provincia].filter(Boolean).join(" ")].filter(Boolean).join(" · "),
+          h.diocesi ? `Diocesi: ${h.diocesi}` : "", h.codice_fiscale ? `Codice fiscale: ${h.codice_fiscale}` : "",
+          [h.telefono,h.email,h.sito_web].filter(Boolean).join(" · ")
+        ])}} />
         <p><strong>Documento n. {d.numero}/{d.anno}</strong> · {mostraDataComunione(d.data_documento)}</p>
         <p>Intestatario del documento: {d.nominativo||dati.genitore||"—"}</p>
         <p>Iscritto: {dati.iscritto||[riga.nome,riga.cognome].filter(Boolean).join(" ")}</p>
