@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { supabase } from "../../../supabaseClient";
+import { GestioneEconomicaComunione } from "../PagamentiParrocchia/PagamentiParrocchia";
 
 const sacramenti = [
   { id: "battesimo", nome: "Battesimo", descrizione: "Richieste e celebrazioni" },
@@ -1097,7 +1098,7 @@ function SituazioneEconomicaComunione({ parrocchiaId, anno, nomeParrocchia, onGe
       </div> : <p>Nessun iscritto per questo anno catechistico.</p>}
     </>}
     <div className="ars-com-economica-collegamento">
-      <p>Per registrare gli incassi e gestire i pagamenti, accedi alla Card <strong>«Attività»</strong> della dashboard del parroco e seleziona <strong>«Prima Comunione {anno}»</strong>.</p>
+      <p>Registra gli incassi e consulta il bilancio di <strong>«Prima Comunione {anno}»</strong> direttamente dalla gestione economica dell’attività.</p>
       <p>Gli incassi, le spese e i rimborsi di questa attività confluiscono nel bilancio generale della parrocchia.</p>
       {typeof onGestisciPagamenti === "function" ?
         <button type="button" className="ars-sac-conferma" onClick={() => onGestisciPagamenti(anno)}>Gestisci i pagamenti</button>
@@ -1108,13 +1109,13 @@ function SituazioneEconomicaComunione({ parrocchiaId, anno, nomeParrocchia, onGe
   </section>;
 }
 
-function QuoteComunioneParroco({ parrocchiaId, annoAttivo, nomeParrocchia, onGestisciPagamenti, tornaDashboard }) {
+function QuoteComunioneParroco({ parrocchiaId, annoAttivo, nomeParrocchia, onGestisciPagamenti, tornaDashboard, sezioneIniziale = "quote" }) {
   const [config, setConfig] = useState(null);
   const [quote, setQuote] = useState({});
   const [motivi, setMotivi] = useState({});
   const [rimborsi, setRimborsi] = useState([]);
   const [metodi, setMetodi] = useState({});
-  const [sezione, setSezione] = useState("quote");
+  const [sezione, setSezione] = useState(sezioneIniziale);
   const [caricamento, setCaricamento] = useState(true);
   const [errore, setErrore] = useState("");
   const [erroreRimborsi, setErroreRimborsi] = useState("");
@@ -1306,6 +1307,8 @@ function RicevutaRimborsoComunione({riga,documenti}) {
 export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "", parrocchiaId, onGestisciPagamentiComunione }) {
   const [scelto, setScelto] = useState(null);
   const [sezione, setSezione] = useState(null);
+  const [annoGestioneEconomica, setAnnoGestioneEconomica] = useState(null);
+  const [ripresaSituazioneEconomica, setRipresaSituazioneEconomica] = useState(false);
   const [impostazioni, setImpostazioni] = useState(impostazioniIniziali);
   // Orari per anno pastorale e anno di percorso: i gruppi si formano nella card 05.
   const [modalitaFirme, setModalitaFirme] = useState("cartacea");
@@ -1460,7 +1463,7 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
   const sezioneAttiva = sezioniComunione.find((s) => s.id === sezione);
 
   function indietro() {
-    if (sezione) { setSezione(null); setMessaggio(""); }
+    if (sezione) { setSezione(null); setMessaggio(""); setRipresaSituazioneEconomica(false); }
     else if (sacramento) setScelto(null);
     else tornaDashboard?.();
   }
@@ -1684,6 +1687,11 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
     const [anno, mese, giorno] = valore.split("-");
     return `${giorno}/${mese}/${anno}`;
   }
+
+  if (annoGestioneEconomica) return <GestioneEconomicaComunione
+    key={`${parrocchiaId}:${annoGestioneEconomica}`} parrocchiaId={parrocchiaId}
+    nomeParrocchia={nomeParrocchia} anno={annoGestioneEconomica}
+    onIndietro={() => { setRipresaSituazioneEconomica(true); setAnnoGestioneEconomica(null); }} />;
 
   return (
     <main className={`ars-sacramenti-parroco ${privacyStampa ? "ars-privacy-stampa-attiva" : ""}`}>
@@ -1979,7 +1987,7 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
           </div>
         </section>
       ) : sezione === "quote" ? (
-        <QuoteComunioneParroco key={parrocchiaId} parrocchiaId={parrocchiaId} annoAttivo={impostazioni.anno} nomeParrocchia={nomeParrocchia} onGestisciPagamenti={onGestisciPagamentiComunione} tornaDashboard={tornaDashboard} />
+        <QuoteComunioneParroco key={parrocchiaId} parrocchiaId={parrocchiaId} annoAttivo={impostazioni.anno} nomeParrocchia={nomeParrocchia} onGestisciPagamenti={onGestisciPagamentiComunione || setAnnoGestioneEconomica} tornaDashboard={tornaDashboard} sezioneIniziale={ripresaSituazioneEconomica ? "situazione" : "quote"} />
       ) : sezione === "iscrizioni" ? (
         <IscrizioniComunioneParroco parrocchiaId={parrocchiaId}
           nomeParrocchia={nomeParrocchia} annoAttivo={impostazioni.anno} />
@@ -2282,6 +2290,9 @@ const STILE = `
 .ars-com-economica-tabella th:not(:first-child),.ars-com-economica-tabella td:not(:first-child){text-align:right}
 .ars-com-economica-tabella tr:last-child td{border-bottom:0}
 .ars-com-economica-tabella tbody tr:nth-child(even){background:#faf5ea}
+.ars-sacramenti-parroco .ars-com-economica-tabella tbody td{color:#173955!important}
+.ars-sacramenti-parroco .ars-com-economica-tabella tbody td.ars-com-residuo-aperto{color:#982f28!important}
+.ars-sacramenti-parroco .ars-com-economica-tabella tbody td.ars-com-stato-ok{color:#276445!important}
 .ars-com-residuo-aperto{color:#982f28;font-weight:600}
 .ars-com-economica-collegamento{border-top:1px solid #dfcba6;margin-top:20px;padding-top:9px}
 @media(max-width:430px){.ars-com-economica-indicatori>div{padding:10px}.ars-com-economica-indicatori strong{font-size:1.15rem}.ars-com-economica-indicatori span{font-size:.82rem}}
