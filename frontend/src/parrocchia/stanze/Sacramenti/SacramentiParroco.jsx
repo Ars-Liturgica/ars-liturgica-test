@@ -1020,8 +1020,10 @@ function SituazioneEconomicaComunione({ parrocchiaId, anno, nomeParrocchia, onGe
   }, [parrocchiaId, anno, tentativo]);
 
   const nomeIscritto = r => [r.nome, r.cognome].filter(Boolean).join(" ");
-  const quotaIscritto = r => r.esente ? "Esente" : r.quota == null ? "Da definire" : euroComunione(r.quota);
-  const residuoIscritto = r => r.residuo == null ? "—" : euroComunione(r.residuo);
+  // La RPC comunica la modalità per anno pastorale nel riepilogo, non per ogni iscritto.
+  const offertaLibera = riepilogo?.modalita_contribuzione === "offerta_libera";
+  const quotaIscritto = r => offertaLibera ? "Offerta libera" : r.esente ? "Esente" : r.quota == null ? "Da definire" : euroComunione(r.quota);
+  const residuoIscritto = r => offertaLibera ? "Non previsto" : r.residuo == null ? "—" : euroComunione(r.residuo);
   const iscritti = riepilogo?.iscritti || [];
 
   function stampaElenco() {
@@ -1051,10 +1053,10 @@ function SituazioneEconomicaComunione({ parrocchiaId, anno, nomeParrocchia, onGe
       corpo.insertAdjacentHTML("afterbegin", intestazioneStampaArs(nomeParrocchia));
       crea("h1", `Prima Comunione ${anno} – Situazione economica degli iscritti`, corpo);
       crea("p", `Elenco al ${mostraDataComunione(new Date().toISOString(), true)}`, corpo);
-      crea("p", `Numero iscritti: ${riepilogo.numero_iscritti}   ·   Totale quote incassate: ${euroComunione(riepilogo.totale_incassato)}`, corpo);
+      crea("p", `Numero iscritti: ${riepilogo.numero_iscritti}   ·   ${riepilogo.modalita_contribuzione === "offerta_libera" ? "Offerte incassate" : "Totale quote incassate"}: ${euroComunione(riepilogo.totale_incassato)}`, corpo);
       const tabella = crea("table", null, corpo);
       const testa = crea("tr", null, crea("thead", null, tabella));
-      ["Nome e cognome", "Quota", "Versato", "Residuo"].forEach(t => crea("th", t, testa));
+      ["Nome e cognome", offertaLibera ? "Contributo" : "Quota", "Versato", offertaLibera ? "Obbligo residuo" : "Residuo"].forEach(t => crea("th", t, testa));
       const righe = crea("tbody", null, tabella);
       iscritti.forEach(r => {
         const tr = crea("tr", null, righe);
@@ -1072,13 +1074,19 @@ function SituazioneEconomicaComunione({ parrocchiaId, anno, nomeParrocchia, onGe
 
   return <section className="ars-com-situazione-economica">
     <h4>Situazione economica degli iscritti</h4>
+    <details className="ars-com-istruzioni-quote">
+      <summary>? Come utilizzare questa pagina</summary>
+      <p>Consulta i contributi registrati per ogni iscritto e per l'anno pastorale indicato.</p>
+      <p>Con «Quota stabilita» leggi quota, versato e residuo. Con «Offerta libera» non esistono importi obbligatori né morosità.</p>
+      <p>«Stampa elenco» prepara una copia per la parrocchia; «Gestisci i pagamenti» apre la contabilità dell'attività.</p>
+    </details>
     {caricamento ? <p role="status">Caricamento situazione economica…</p> : errore ? <>
       <p className="ars-com-errore-iscrizioni" role="alert">{errore}</p>
       <button type="button" className="ars-sac-stampa" onClick={() => setTentativo(n => n + 1)}>Riprova</button>
     </> : riepilogo && <>
       <div className="ars-com-economica-indicatori">
         <div><span>Numero iscritti</span><strong>{riepilogo.numero_iscritti}</strong></div>
-        <div><span>Totale quote incassate</span><strong className="ars-com-stato-ok">{euroComunione(riepilogo.totale_incassato)}</strong></div>
+        <div><span>{riepilogo.modalita_contribuzione === "offerta_libera" ? "Offerte incassate" : "Totale quote incassate"}</span><strong className="ars-com-stato-ok">{euroComunione(riepilogo.totale_incassato)}</strong></div>
       </div>
       <div className="ars-com-economica-testa-elenco">
         <h5>Elenco degli iscritti</h5>
@@ -1087,12 +1095,12 @@ function SituazioneEconomicaComunione({ parrocchiaId, anno, nomeParrocchia, onGe
       {erroreStampa && <p role="alert" className="ars-com-errore-iscrizioni">{erroreStampa}</p>}
       {iscritti.length ? <div className="ars-com-economica-scroll" tabIndex={0} role="region" aria-label="Elenco economico degli iscritti">
         <table className="ars-com-economica-tabella">
-          <thead><tr><th scope="col">Nome e cognome</th><th scope="col">Quota</th><th scope="col">Versato</th><th scope="col">Residuo</th></tr></thead>
+          <thead><tr><th scope="col">Nome e cognome</th><th scope="col">{offertaLibera ? "Contributo" : "Quota"}</th><th scope="col">Versato</th><th scope="col">{offertaLibera ? "Obbligo residuo" : "Residuo"}</th></tr></thead>
           <tbody>{iscritti.map(r => <tr key={r.iscrizione_id}>
             <td>{nomeIscritto(r)}</td>
             <td>{quotaIscritto(r)}</td>
             <td>{euroComunione(r.versato)}</td>
-            <td className={r.residuo == null ? "" : Number(r.residuo) > 0 ? "ars-com-residuo-aperto" : "ars-com-stato-ok"}>{residuoIscritto(r)}</td>
+            <td className={offertaLibera || r.residuo == null ? "" : Number(r.residuo) > 0 ? "ars-com-residuo-aperto" : "ars-com-stato-ok"}>{residuoIscritto(r)}</td>
           </tr>)}</tbody>
         </table>
       </div> : <p>Nessun iscritto per questo anno catechistico.</p>}
@@ -1112,6 +1120,7 @@ function SituazioneEconomicaComunione({ parrocchiaId, anno, nomeParrocchia, onGe
 function QuoteComunioneParroco({ parrocchiaId, annoAttivo, nomeParrocchia, onGestisciPagamenti, tornaDashboard, sezioneIniziale = "quote" }) {
   const [config, setConfig] = useState(null);
   const [quote, setQuote] = useState({});
+  const [modalitaScelta, setModalitaScelta] = useState("quota_stabilita");
   const [motivi, setMotivi] = useState({});
   const [rimborsi, setRimborsi] = useState([]);
   const [metodi, setMetodi] = useState({});
@@ -1132,11 +1141,12 @@ function QuoteComunioneParroco({ parrocchiaId, annoAttivo, nomeParrocchia, onGes
     (async () => {
       try {
         const {data, error} = await supabase.from("ars_comunione_impostazioni")
-          .select("anno_pastorale,durata,quota_anno_1,quota_anno_2,quota_anno_3")
+          .select("anno_pastorale,durata,quota_anno_1,quota_anno_2,quota_anno_3,modalita_contribuzione")
           .eq("parrocchia_id", parrocchiaId).maybeSingle();
         if (!vivo) return;
         if (error || !data) throw error || new Error("Salva prima le impostazioni dell'anno catechistico.");
         setConfig(data);
+        setModalitaScelta(data.modalita_contribuzione || "quota_stabilita");
         setQuote(Object.fromEntries([1,2,3].map(n => [n, data[`quota_anno_${n}`] == null ? "" : String(data[`quota_anno_${n}`])])));
         setMotivi({});
         const elenco = await supabase.rpc("ars_comunione_elenco_rimborsi", {p_parrocchia_id:parrocchiaId,p_anno_pastorale:data.anno_pastorale});
@@ -1148,6 +1158,26 @@ function QuoteComunioneParroco({ parrocchiaId, annoAttivo, nomeParrocchia, onGes
     })();
     return () => { vivo = false; };
   }, [parrocchiaId, annoAttivo, aggiorna]);
+
+  async function salvaModalitaContribuzione() {
+    if (blocco.current || !config ||
+       modalitaScelta === (config.modalita_contribuzione || "quota_stabilita")) return;
+    blocco.current = true; setOccupato("modalita"); setMessaggio("");
+    try {
+      const {data,error} = await supabase.rpc("ars_comunione_imposta_modalita_contribuzione", {
+        p_parrocchia_id:parrocchiaId,
+        p_anno_pastorale:config.anno_pastorale,
+        p_modalita:modalitaScelta,
+      });
+      if(error || data?.ok !== true) throw error || new Error("Modalità non aggiornata.");
+      setConfig(prev => ({...prev,modalita_contribuzione:modalitaScelta}));
+      setMessaggio(modalitaScelta === "offerta_libera"
+        ? "Offerta libera attivata. Le famiglie non hanno alcuna quota obbligatoria da saldare."
+        : "Quota stabilita attivata per l’anno pastorale selezionato.");
+      setAggiorna(n=>n+1);
+    }catch(err){setMessaggio("Impossibile salvare la modalità: "+(err?.message||"riprova"));}
+    finally{blocco.current=false;setOccupato("");}
+  }
 
   function valoreQuota(n) {
     const s = String(quote[n] ?? "").trim().replace(",", ".");
@@ -1240,7 +1270,31 @@ function QuoteComunioneParroco({ parrocchiaId, annoAttivo, nomeParrocchia, onGes
     </div>
     {messaggio&&<p role="status" className="ars-com-messaggio-documenti">{messaggio}</p>}
     {caricamento?<p role="status">Caricamento…</p>:errore?<p role="alert" className="ars-com-errore-iscrizioni">{errore}</p>:sezione==="quote"?<>
-      {Array.from({length:Number(config.durata)||2},(_,i)=>i+1).map(n=>{
+      <details className="ars-com-istruzioni-quote">
+        <summary>? Come utilizzare questa pagina</summary>
+        <p>Seleziona la modalità di contribuzione per l’anno pastorale visualizzato.</p>
+        <p>Con «Quota stabilita» puoi definire importi differenti per anno di Catechismo. Con «Offerta libera» ogni famiglia sceglie se e quanto contribuire, senza risultare morosa.</p>
+        <p>La scelta non cancella i versamenti o le ricevute già registrati.</p>
+      </details>
+      <fieldset className="ars-com-quota-anno" disabled={Boolean(occupato)}>
+        <legend>Modalità di contribuzione</legend>
+        <label>Contributo richiesto alle famiglie
+          <select value={modalitaScelta} onChange={e=>setModalitaScelta(e.target.value)}>
+            <option value="quota_stabilita">Quota stabilita dalla parrocchia</option>
+            <option value="offerta_libera">Offerta libera</option>
+          </select>
+        </label>
+        <p>Questa scelta riguarda la Prima Comunione dell’anno {config.anno_pastorale}.</p>
+        <button type="button" className="ars-sac-conferma" onClick={salvaModalitaContribuzione}
+          disabled={Boolean(occupato) || modalitaScelta === (config.modalita_contribuzione || "quota_stabilita")}>
+          {occupato==="modalita" ? "Salvataggio…" : "Salva modalità"}
+        </button>
+      </fieldset>
+      {modalitaScelta !== (config.modalita_contribuzione || "quota_stabilita") &&
+        <p className="ars-com-quote-libera">La nuova scelta non è ancora attiva: premi «Salva modalità» per applicarla.</p>}
+      {(config.modalita_contribuzione || "quota_stabilita") === "offerta_libera" ?
+        <p className="ars-com-quote-libera">Offerta libera attiva: nessuna quota obbligatoria. Le famiglie potranno decidere autonomamente quanto versare nella sezione «Quote e pagamenti».</p>
+        : Array.from({length:Number(config.durata)||2},(_,i)=>i+1).map(n=>{
         const precedente=config[`quota_anno_${n}`]; const importo=valoreQuota(n);
         const variazione=precedente!=null&&importo!==null&&Number(precedente)!==importo;
         return <fieldset className="ars-com-quota-anno" key={n} disabled={Boolean(occupato)}>
@@ -1322,6 +1376,7 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
   const [caricamento, setCaricamento] = useState(false);
   const [operazione, setOperazione] = useState(false);
   const modificaRichiesta = useRef(false);
+  const annoConfiguratoPrecedente = useRef("");
   // Privacy Prima Comunione: gestione distinta dalle impostazioni già operative.
   const [privacyTesto, setPrivacyTesto] = useState("");
   const [privacyScelta, setPrivacyScelta] = useState(""); // "modello" oppure "personale"
@@ -1374,6 +1429,7 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
   useEffect(() => {
     let attivo = true;
     modificaRichiesta.current = false;
+    annoConfiguratoPrecedente.current = "";
     setSalvato(false);
     setModifica(true);
     setAnteprima(false);
@@ -1400,6 +1456,7 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
       setCaricamento(false);
       if (error) { setMessaggio("Impossibile caricare le impostazioni: " + error.message); return; }
       if (data && !modificaRichiesta.current) {
+        annoConfiguratoPrecedente.current = data.anno_pastorale;
         setOrariCatechismo(data.orari_catechismo && typeof data.orari_catechismo === "object"
           ? data.orari_catechismo : {});
         setImpostazioni({ anno: data.anno_pastorale, durata: String(data.durata),
@@ -1553,6 +1610,8 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
     const errore = controllaImpostazioni();
     if (errore) { setMessaggio(errore); return; }
     if (!parrocchiaId) { setMessaggio("Parrocchia non disponibile: torna alla dashboard e riprova."); return; }
+    const nuovoAnno = Boolean(annoConfiguratoPrecedente.current &&
+      annoConfiguratoPrecedente.current !== impostazioni.anno);
     setOperazione(true);
     const { error } = await supabase.from("ars_comunione_impostazioni").upsert({
       parrocchia_id: parrocchiaId,
@@ -1563,10 +1622,15 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
       certificato_battesimo_interno_obbligatorio: impostazioni.certificatoBattesimoInternoObbligatorio,
       orari_catechismo: orariCatechismo,
       aggiornato_il: new Date().toISOString(),
+      // L'inizio di un nuovo anno pastorale non eredita automaticamente la
+      // modalita' e le quote dell'anno precedente.
+      ...(nuovoAnno ? {modalita_contribuzione:"quota_stabilita",
+        quota_anno_1:null,quota_anno_2:null,quota_anno_3:null} : {}),
     }, { onConflict: "parrocchia_id" });
     setOperazione(false);
     if (error) { setMessaggio("Salvataggio non riuscito: " + error.message); return; }
     modificaRichiesta.current = false;
+    annoConfiguratoPrecedente.current = impostazioni.anno;
     setSalvato(true);
     setModifica(false);
     setMessaggio("Impostazioni salvate correttamente.");
@@ -2003,6 +2067,11 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
 
 const STILE = `
 
+/* Aiuto alle quote: discreto e specifico della pagina. */
+.ars-com-istruzioni-quote{padding:12px 16px;margin:12px 0;background:#fffaf1;border:1px solid #dfcba6;border-radius:10px}
+.ars-com-istruzioni-quote summary{cursor:pointer;color:#173955;font-weight:700}
+.ars-com-istruzioni-quote p{line-height:1.5;margin:8px 0 0}
+.ars-com-quote-libera{padding:12px 16px;border-radius:10px;background:#f7f5ec;color:#173955;line-height:1.55}
 /* Card 03 — Iscrizioni e rinnovi. Stili confinati alla card. */
 /* Avvisi brevi per le iscrizioni assistite: leggibili anche da telefono */
 .ars-com-avviso-firma{margin:12px 0;padding:12px 14px;background:#fff9ea;border:1px solid #e5cf9b;border-left:4px solid #9f772e;border-radius:9px;color:#493a1e;line-height:1.48;font-size:.92rem}
