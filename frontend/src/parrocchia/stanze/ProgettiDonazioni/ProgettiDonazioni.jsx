@@ -14,6 +14,8 @@ const nuovoMetodo = (tipo = "bonifico") => ({
   attivo: true, ordine: 0,
 });
 const ORDINE_METODI = ["paypal", "link_pagamento", "bonifico", "consegna_diretta"];
+const NOMI_GESTORI_ONLINE = { paypal: "PayPal", link_pagamento: "Stripe" };
+const metodoOnline = (tipo) => tipo === "paypal" || tipo === "link_pagamento";
 const DESCRIZIONI_METODI = {
   paypal: "Pagamenti tramite PayPal",
   link_pagamento: "Carte di credito e debito tramite Stripe",
@@ -49,6 +51,9 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
   const [caricamento, setCaricamento] = useState(true);
   const [errore, setErrore] = useState("");
   const [modulo, setModulo] = useState(null);
+  // Guida condivisa: il collegamento automatico verrà attivato solo dopo
+  // l'abilitazione della piattaforma presso PayPal e Stripe.
+  const [guidaConto, setGuidaConto] = useState(null);
   // Porta a vista il modulo che si trova sotto le schede dei metodi di incasso.
   const riferimentoModuloMetodo = useRef(null);
   const [aperturaModuloMetodo, setAperturaModuloMetodo] = useState(0);
@@ -205,7 +210,7 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
   }, [parrocchiaId]);
 
   useEffect(() => {
-    setModulo(null); setErroreModulo(""); setMessaggio(""); setSezione(sezioneIniziale);
+    setModulo(null); setGuidaConto(null); setErroreModulo(""); setMessaggio(""); setSezione(sezioneIniziale);
     caricaDati();
   }, [caricaDati, sezioneIniziale]);
 
@@ -239,8 +244,18 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
     setErroreModulo(""); setMessaggio("");
   }
   function scegliTipo(tipo) {
-    const esistente = metodiIncasso.find((m) => m.tipo === tipo);
-    apriMetodo(esistente || nuovoMetodo(tipo));
+    setErroreModulo("");
+    setMessaggio("");
+    if (metodoOnline(tipo)) {
+      // Non attiviamo pagamenti tramite link o conti non verificati.
+      // Il tasto apre la guida, senza simulare un'autorizzazione del gestore.
+      setModulo(null);
+      setGuidaConto(tipo);
+    } else {
+      const esistente = metodiIncasso.find((m) => m.tipo === tipo);
+      setGuidaConto(null);
+      apriMetodo(esistente || nuovoMetodo(tipo));
+    }
     setAperturaModuloMetodo((n) => n + 1);
   }
   useEffect(() => {
@@ -316,7 +331,7 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
   return <div className="progetti-donazioni">
     <button type="button" style={stilePulsanteSecondario} onClick={() => {
       if (sezioneIniziale !== "indice" || sezione === "indice") tornaDashboard();
-      else { setSezione("indice"); setModulo(null); setErroreModulo(""); }
+      else { setSezione("indice"); setModulo(null); setGuidaConto(null); setErroreModulo(""); }
     }} disabled={salvataggio}>← {sezioneIniziale !== "indice" ? "Torna ad Attività e Progetti" : sezione === "indice" ? "Torna alla dashboard" : "Torna a Progetti, raccolte fondi e donazioni"}</button>
     <div className="progetti-donazioni-intestazione">
       <h2>{sezione === "metodi" ? "Metodi di incasso" : sezione === "progetti" ? "Progetti" : sezione === "raccolte" ? "Raccolte fondi" : sezione === "donazioni" ? "Donazioni" : "Progetti, raccolte fondi e donazioni"}</h2>
@@ -338,27 +353,69 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
     {caricamento ? <p>Caricamento in corso...</p> : <>
       {sezione === "metodi" && <section className="sezione-metodi-incasso">
         <div className="intestazione-sezione-donazioni">
-          <p>Configura i metodi di incasso della parrocchia. I fedeli vedranno soltanto quelli attivi.</p>
+          <p>La parrocchia sceglie come ricevere i contributi. I fedeli vedranno soltanto i metodi disponibili.</p>
         </div>
+        <details style={{ ...stileScheda, background: "#fffdf9", margin: "12px 0" }}>
+          <summary style={{ cursor: "pointer", fontWeight: 700 }}>❔ Come utilizzare questa pagina</summary>
+          <p><strong>PayPal e Stripe:</strong> premi «Collega» per leggere i passaggi da seguire. Il collegamento guidato sarà attivato quando Ars Liturgica avrà completato la predisposizione dei servizi.</p>
+          <p><strong>Bonifico e consegna in parrocchia:</strong> premi «Configura», inserisci le informazioni della parrocchia e salva.</p>
+          <p>Ogni parrocchia ha le proprie impostazioni. I pagamenti saranno sempre gestiti dalla contabilità unica di Ars Liturgica.</p>
+        </details>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(100%, 280px), 1fr))", gap: 14, margin: "18px 0" }}>
           {ORDINE_METODI.map((tipo) => {
             const esistente = metodiIncasso.find((m) => m.tipo === tipo);
             const attivo = Boolean(esistente?.attivo);
+            // Un link precedente non equivale a un conto collegato tramite PayPal/Stripe.
+            const statoMetodo = metodoOnline(tipo)
+              ? (attivo ? "Link precedente attivo" : "Da collegare")
+              : (attivo ? "Attivo" : "Non attivo");
             return <article key={tipo} style={{ ...stileScheda, margin: 0, background: "#fffdf9" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8, flexWrap: "wrap" }}>
                 <LogoMetodo tipo={tipo} />
                 <span style={{ fontSize: 12, fontWeight: 700, color: attivo ? "#24613a" : "#765c37", background: attivo ? "#e6f4e9" : "#f5ecdb", padding: "5px 9px", borderRadius: 16 }}>
-                  {attivo ? "Attivo" : "Non attivo"}
+                  {statoMetodo}
                 </span>
               </div>
               <p style={{ minHeight: 38, color: "#40566a", margin: "14px 0" }}>{DESCRIZIONI_METODI[tipo]}</p>
               <button type="button" style={stilePulsanteSecondario} disabled={!parrocchiaId || salvataggio}
-                onClick={() => scegliTipo(tipo)} aria-label={`${esistente ? "Modifica" : "Configura"} ${TIPI[tipo]}`}>
-                {esistente ? "Modifica" : "Configura"}
+                onClick={() => scegliTipo(tipo)} aria-label={metodoOnline(tipo) ? `Collega ${NOMI_GESTORI_ONLINE[tipo]}` : `${esistente ? "Modifica" : "Configura"} ${TIPI[tipo]}`}>
+                {metodoOnline(tipo) ? `Collega ${NOMI_GESTORI_ONLINE[tipo]}` : esistente ? "Modifica" : "Configura"}
               </button>
             </article>;
           })}
         </div>
+        {guidaConto && <section ref={riferimentoModuloMetodo} style={{ ...stileScheda, background: "#fffaf1", scrollMarginTop: "24px" }} aria-label={`Collegamento ${NOMI_GESTORI_ONLINE[guidaConto]}`}>
+          <h3>Collega {NOMI_GESTORI_ONLINE[guidaConto]}</h3>
+          <p>Ogni parrocchia collega il proprio conto. I contributi verranno versati direttamente sul conto della parrocchia.</p>
+          <h4 style={{ marginBottom: 8 }}>Come funzionerà</h4>
+          <ol style={{ lineHeight: 1.7, paddingLeft: 24 }}>
+            <li>Premi «Avvia collegamento».</li>
+            <li>Accedi al conto {NOMI_GESTORI_ONLINE[guidaConto]} della parrocchia oppure creane uno.</li>
+            <li>Segui le indicazioni di {NOMI_GESTORI_ONLINE[guidaConto]} e autorizza il collegamento.</li>
+            <li>Ritorna ad Ars Liturgica e verifica che compaia «Collegato».</li>
+          </ol>
+          <p style={{ padding: "12px 14px", background: "#f2eee4", borderRadius: 9 }}>
+            <strong>Collegamento in preparazione.</strong> La procedura sarà disponibile quando Ars Liturgica avrà attivato il servizio con {NOMI_GESTORI_ONLINE[guidaConto]}. Non devi inserire link, password o dati bancari in questa pagina.
+          </p>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 16 }}>
+            <button type="button" style={{ ...stilePulsante, opacity: 0.55, cursor: "not-allowed" }} disabled title="Disponibile dopo l'attivazione del servizio">
+              Avvia collegamento
+            </button>
+            <button type="button" style={stilePulsanteSecondario} onClick={() => setGuidaConto(null)}>Chiudi</button>
+          </div>
+          {Boolean(metodiIncasso.find(m => m.tipo === guidaConto)?.link_pagamento) && <details style={{ marginTop: 18 }}>
+            <summary style={{ cursor: "pointer", fontWeight: 700 }}>Hai già un link di pagamento salvato?</summary>
+            <p>Il collegamento precedente rimane invariato. Puoi ancora modificarlo o disattivarlo senza influire sugli incassi già registrati.</p>
+            <button type="button" style={stilePulsanteSecondario} onClick={() => {
+              const precedente = metodiIncasso.find(m => m.tipo === guidaConto);
+              if (precedente) {
+                setGuidaConto(null);
+                apriMetodo(precedente);
+                setAperturaModuloMetodo(n => n + 1);
+              }
+            }}>Gestisci link precedente</button>
+          </details>}
+        </section>}
         {modulo && <form ref={riferimentoModuloMetodo} onSubmit={salvaMetodo} style={{ ...stileScheda, scrollMarginTop: "24px" }}>
           <h4>{modulo.id ? "Modifica metodo" : "Configura metodo"}: {TIPI[modulo.tipo]}</h4>
           {erroreModulo && <p role="alert">{erroreModulo}</p>}
@@ -414,11 +471,6 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
             </div>
           </fieldset>
         </form>}
-        <article style={{ ...stileScheda, background: "#fffaf1" }}>
-          <h4>Vuoi automatizzare la gestione dei pagamenti?</h4>
-          <p>Ars Liturgica offre la possibilità di collegare i servizi di pagamento online per ricevere automaticamente le conferme degli incassi, riducendo le verifiche manuali e semplificando la gestione delle ricevute.</p>
-          <p>Per maggiori informazioni e una valutazione tecnica, contatta l'assistenza di Ars Liturgica.</p>
-        </article>
       </section>}
       {(["progetti", "raccolte"].includes(sezione)) && <section>
         <div style={{ display: "flex", justifyContent: "space-between", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
