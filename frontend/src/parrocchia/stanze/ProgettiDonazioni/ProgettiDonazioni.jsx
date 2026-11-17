@@ -1,7 +1,6 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { supabase } from "../../../supabaseClient";
-import AnteprimaDocumentoEconomico from "../PagamentiParrocchia/AnteprimaDocumentoEconomico";
 
 const TIPI = {
   bonifico: "Bonifico",
@@ -50,6 +49,9 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
   const [caricamento, setCaricamento] = useState(true);
   const [errore, setErrore] = useState("");
   const [modulo, setModulo] = useState(null);
+  // Porta a vista il modulo che si trova sotto le schede dei metodi di incasso.
+  const riferimentoModuloMetodo = useRef(null);
+  const [aperturaModuloMetodo, setAperturaModuloMetodo] = useState(0);
   const [erroreModulo, setErroreModulo] = useState("");
   const [salvataggio, setSalvataggio] = useState(false);
   const [messaggio, setMessaggio] = useState("");
@@ -59,8 +61,6 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
   const [caricamentoDonazioni, setCaricamentoDonazioni] = useState(false);
   const [iniziativa, setIniziativa] = useState(null);
   const [incasso, setIncasso] = useState(null);
-  const [ricevutaAnteprima, setRicevutaAnteprima] = useState(null);
-  const [nomeParrocchiaRicevuta, setNomeParrocchiaRicevuta] = useState("");
   const [operazione, setOperazione] = useState(false);
   const [filtro, setFiltro] = useState("tutti");
   const [erroreOperazione, setErroreOperazione] = useState("");
@@ -116,7 +116,7 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
   const dataIt = (s) => s ? new Date(s).toLocaleDateString("it-IT") : "Senza scadenza";
   const nuovoProgetto = (tipo) => ({ id: null, tipo_iniziativa: tipo, titolo: "", descrizione: "", obiettivo: "", valuta: "EUR", data_inizio: new Date().toISOString().slice(0, 10), data_fine: "", stato: "bozza", immagine_url: "", mostra_contatore: false });
   const nuovoIncasso = (progetto = null) => ({ progetto, causale_descrizione: progetto ? `Offerta per ${progetto.titolo}` : "Donazione libera alla parrocchia", importo: "", metodo: "consegna_diretta", data: new Date().toISOString().slice(0, 10), riferimento_esterno: "", note_private: "", pagante_nominativo: "" });
-  function apriIncasso(progetto = null) { setIncasso(nuovoIncasso(progetto)); setErroreOperazione(""); setMessaggio(""); setRicevutaAnteprima(null); }
+  function apriIncasso(progetto = null) { setIncasso(nuovoIncasso(progetto)); setErroreOperazione(""); setMessaggio(""); }
   function apriIniziativa(tipo, progetto = null) {
     setIniziativa(progetto ? { ...progetto, tipo_iniziativa: progetto.tipo_iniziativa || "progetto" } : nuovoProgetto(tipo));
     setFileInAttesa([]); setErroreOperazione(""); setMessaggio("");
@@ -158,7 +158,6 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
       const importo = Number(incasso.importo);
       if (!Number.isFinite(importo) || importo <= 0 || Math.round(importo * 100) !== importo * 100) throw new Error("Inserisci un importo positivo con massimo due decimali.");
       if (["paypal", "link_pagamento"].includes(incasso.metodo) && !incasso.riferimento_esterno.trim()) throw new Error("Per un incasso online già ricevuto serve il riferimento dell'operazione.");
-      const idIncasso = crypto.randomUUID();
       const { error } = await supabase.rpc("ars_registra_incasso_iniziativa_v2", {
         p_parrocchia_id: parrocchiaId,
         p_progetto_donazione_id: incasso.progetto?.id || null,
@@ -168,32 +167,10 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
         p_riferimento_esterno: incasso.riferimento_esterno.trim() || null,
         p_note_private: incasso.note_private.trim() || null,
         p_pagante_nominativo: incasso.pagante_nominativo.trim() || null,
-        p_incasso_id: idIncasso,
+        p_incasso_id: crypto.randomUUID(),
       });
       if (error) throw error;
-      setIncasso(null);
-      setMessaggio("Incasso registrato. Recupero della ricevuta...");
-      // La ricevuta è stata creata dal trigger: leggerla, mai crearla o modificarla qui.
-      try {
-        const { data: documenti, error: erroreDocumenti } = await supabase.rpc("ars_elenco_documenti_economici", {
-          p_parrocchia_id: parrocchiaId,
-          p_attivita_id: null,
-        });
-        if (erroreDocumenti) throw erroreDocumenti;
-        const documento = (Array.isArray(documenti) ? documenti : [])
-          .find(d => d.origine_tipo === "pagamento" && d.origine_id === idIncasso && d.tipo_documento === "ricevuta");
-        if (!documento) {
-          setMessaggio("Incasso registrato. Ricevuta non disponibile nella consultazione: controlla l'Archivio documenti. Non ripetere il pagamento.");
-        } else {
-          const { data: anagrafica } = await supabase.from("parrocchie")
-            .select("nome").eq("id", parrocchiaId).maybeSingle();
-          setNomeParrocchiaRicevuta(anagrafica?.nome || "Parrocchia");
-          setRicevutaAnteprima(documento);
-          setMessaggio("Incasso registrato. Ricevuta pronta per la stampa.");
-        }
-      } catch (lettura) {
-        setMessaggio(`Incasso registrato. Ricevuta non visualizzabile: ${lettura.message || "errore di lettura"}. Non ripetere il pagamento.`);
-      }
+      setIncasso(null); setMessaggio("Incasso registrato. La ricevuta viene emessa dal sistema economico condiviso.");
       await caricaDati(); await caricaDonazioniLibere();
     } catch (e) { setErroreOperazione(e.message || "Errore durante la registrazione."); }
     finally { setOperazione(false); }
@@ -264,7 +241,19 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
   function scegliTipo(tipo) {
     const esistente = metodiIncasso.find((m) => m.tipo === tipo);
     apriMetodo(esistente || nuovoMetodo(tipo));
+    setAperturaModuloMetodo((n) => n + 1);
   }
+  useEffect(() => {
+    if (!aperturaModuloMetodo) return;
+    // Scorre solo dopo che React ha mostrato il modulo, mai durante la digitazione.
+    const frame = window.requestAnimationFrame(() => {
+      riferimentoModuloMetodo.current?.scrollIntoView({
+        behavior: "smooth",
+        block: "start",
+      });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [aperturaModuloMetodo]);
   function aggiorna(campo, valore) {
     setModulo((precedente) => ({ ...precedente, [campo]: valore }));
   }
@@ -281,6 +270,12 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
         setErroreModulo("Inserisci un link completo che inizi con https://.");
         return;
       }
+    }
+    if (modulo.tipo === "paypal" && Boolean(modulo.attivo) && !link) {
+      setErroreModulo("Per attivare PayPal è necessario un link di pagamento utilizzabile dai fedeli."); return;
+    }
+    if (modulo.tipo === "link_pagamento" && Boolean(modulo.attivo) && !link) {
+      setErroreModulo("Per attivare Stripe inserisci il link di pagamento della parrocchia."); return;
     }
     if (modulo.tipo === "paypal" && !(modulo.email_paypal || "").trim() && !link) {
       setErroreModulo("Per PayPal inserisci un’email oppure un link di pagamento."); return;
@@ -319,11 +314,6 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
   }
 
   return <div className="progetti-donazioni">
-    {ricevutaAnteprima && <AnteprimaDocumentoEconomico
-      documento={ricevutaAnteprima}
-      nomeParrocchia={nomeParrocchiaRicevuta}
-      onChiudi={() => setRicevutaAnteprima(null)}
-    />}
     <button type="button" style={stilePulsanteSecondario} onClick={() => {
       if (sezioneIniziale !== "indice" || sezione === "indice") tornaDashboard();
       else { setSezione("indice"); setModulo(null); setErroreModulo(""); }
@@ -369,7 +359,7 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
             </article>;
           })}
         </div>
-        {modulo && <form onSubmit={salvaMetodo} style={stileScheda}>
+        {modulo && <form ref={riferimentoModuloMetodo} onSubmit={salvaMetodo} style={{ ...stileScheda, scrollMarginTop: "24px" }}>
           <h4>{modulo.id ? "Modifica metodo" : "Configura metodo"}: {TIPI[modulo.tipo]}</h4>
           {erroreModulo && <p role="alert">{erroreModulo}</p>}
           <fieldset disabled={salvataggio} style={{ border: 0, padding: 0, margin: 0 }}>
@@ -380,7 +370,7 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
               {campo("bic_swift", "BIC / SWIFT (facoltativo)")}
             </>}
             {modulo.tipo === "paypal" && <>
-              <p>Inserisci il link PayPal della parrocchia oppure la sua email PayPal.</p>
+              <p>Inserisci il link PayPal della parrocchia. L’email è facoltativa, ma per attivare il metodo serve un link con cui il fedele possa aprire il pagamento.</p>
               <details style={{ margin: "12px 0", padding: "12px", background: "#fffaf1", borderRadius: 8 }}>
                 <summary style={{ cursor: "pointer", fontWeight: 700 }}>Come ottenere il link PayPal?</summary>
                 <ol style={{ lineHeight: 1.6, paddingLeft: 22 }}>
@@ -394,7 +384,7 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
               {campo("email_paypal", "Email PayPal", { tipo: "email" })}
             </>}
             {modulo.tipo === "link_pagamento" && <>
-              <p>Inserisci il link di pagamento Stripe della parrocchia. Ars Liturgica non incassa denaro e non verifica automaticamente l’esito del pagamento.</p>
+              <p>Inserisci il link Stripe della parrocchia per i pagamenti con carta. L’attivazione del link e il collegamento automatico delle conferme sono due operazioni distinte.</p>
               <details style={{ margin: "12px 0", padding: "12px", background: "#fffaf1", borderRadius: 8 }}>
                 <summary style={{ cursor: "pointer", fontWeight: 700 }}>Come ottenere il link Stripe?</summary>
                 <ol style={{ lineHeight: 1.6, paddingLeft: 22 }}>
@@ -406,7 +396,7 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
                 <small>Verifica che il link consenta gli importi necessari, anche per eventuali acconti, e controlla le condizioni e le commissioni del servizio.</small>
               </details>
             </>}
-            {["paypal", "link_pagamento"].includes(modulo.tipo) && campo("link_pagamento", modulo.tipo === "link_pagamento" ? "Link Stripe della parrocchia" : "Link PayPal della parrocchia", { tipo: "url", obbligatorio: modulo.tipo === "link_pagamento" })}
+            {["paypal", "link_pagamento"].includes(modulo.tipo) && campo("link_pagamento", modulo.tipo === "link_pagamento" ? "Link Stripe della parrocchia" : "Link PayPal della parrocchia", { tipo: "url", obbligatorio: modulo.tipo === "link_pagamento" || Boolean(modulo.attivo) })}
             <label style={{ display: "block", margin: "12px 0" }}>Istruzioni per chi paga
               <textarea style={stileCampo} rows={3} value={modulo.istruzioni || ""} onChange={(e) => aggiorna("istruzioni", e.target.value)} />
             </label>
@@ -439,12 +429,12 @@ export default function ProgettiDonazioni({ parrocchiaId, tornaDashboard, sezion
           {[['tutti','Tutti'],['bozza','Bozze'],['pubblicato','Pubblicati'],['chiuso','Chiusi'],['annullato','Annullati']].map(([v,l]) => <button key={v} type="button" style={filtro === v ? stilePulsante : stilePulsanteSecondario} onClick={() => setFiltro(v)}>{l}</button>)}
         </div>
         {elencoFiltrato(sezione === "progetti" ? "progetto" : "raccolta").length === 0 && <p>Nessuna iniziativa in questa categoria.</p>}
-        {elencoFiltrato(sezione === "progetti" ? "progetto" : "raccolta").map(p => <article key={p.id} style={{ ...stileScheda, background: "#fffdf9", minWidth: 0, overflowWrap: "anywhere" }}>
+        {elencoFiltrato(sezione === "progetti" ? "progetto" : "raccolta").map(p => <article key={p.id} style={{ ...stileScheda, background: "#fffdf9" }}>
           <div style={{ display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
             {p.immagine_url && <img src={p.immagine_url} alt="" style={{ width: 120, height: 95, objectFit: "cover", borderRadius: 8 }} />}
-            <div style={{ flex: "1 1 250px", minWidth: 0, overflowWrap: "anywhere" }}>
+            <div style={{ flex: "1 1 250px" }}>
               <strong style={{ fontSize: 19, color: "#24394a" }}>{p.titolo}</strong>
-              <p style={{ margin: "5px 0", overflowWrap: "anywhere" }}>{p.descrizione}</p>
+              <p style={{ margin: "5px 0" }}>{p.descrizione}</p>
               <p><strong>Stato:</strong> {p.stato} · <strong>Offerte:</strong> {p.numero_offerte || 0}</p>
               <p><strong>Raccolto:</strong> {euro(p.raccolto, p.valuta)} {p.obiettivo ? `su ${euro(p.obiettivo, p.valuta)}` : ""}</p>
               {p.obiettivo > 0 && <p><strong>Residuo:</strong> {euro(p.residuo, p.valuta)} · <strong>Avanzamento:</strong> {Number(p.percentuale || 0).toLocaleString("it-IT")}%</p>}
