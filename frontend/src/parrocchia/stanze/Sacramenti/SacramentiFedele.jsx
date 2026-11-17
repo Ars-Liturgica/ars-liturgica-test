@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { supabase } from "../../../supabaseClient";
 import FirmaSemplice from "../../componenti/FirmaSemplice";
 import AnteprimaDocumentoEconomico from "../PagamentiParrocchia/AnteprimaDocumentoEconomico";
@@ -864,12 +864,208 @@ const euroPagamentiComunione = (importo, valuta = "EUR") => {
   } catch { return `${Number(importo || 0).toFixed(2)} ${valuta || "EUR"}`; }
 };
 
+// Riutilizza i metodi pubblici impostati dalla parrocchia per tutte le attività.
+// L'apertura di un link esterno NON è una registrazione contabile:
+// incassi, conferme e ricevute restano sempre nel sistema economico comune.
+function collegamentoPagamentoComunione(valore) {
+  if (typeof valore !== "string" || !valore.trim()) return null;
+  try {
+    const url = new URL(valore.trim());
+    return url.protocol === "https:" ? url.href : null;
+  } catch { return null; }
+}
+
+function RiepilogoVersamentoComunione({ posizione, metodi, erroreMetodi, metodiInCaricamento, onAggiorna, onNuovaRicevuta, parrocchiaId, utenteId, identificativo }) {
+  const libera = posizione.modalita_contribuzione === "offerta_libera";
+  const residuo = Number(posizione.residuo || 0);
+  const annullata = posizione.stato_iscrizione === "annullata";
+  const puoVersare = !annullata && (libera || (posizione.quota_dovuta != null && residuo > 0));
+  const [aperto, setAperto] = useState(false);
+  const [importo, setImporto] = useState("");
+  const [erroreImporto, setErroreImporto] = useState("");
+  const [metodoScelto, setMetodoScelto] = useState(null);
+  const [riferimentoBonifico, setRiferimentoBonifico] = useState("");
+  const [bonificoInCorso, setBonificoInCorso] = useState(false);
+  const [erroreBonifico, setErroreBonifico] = useState("");
+  const [esitoBonifico, setEsitoBonifico] = useState("");
+  const idTentativoBonifico = useRef(null);
+
+  async function dichiaraBonifico() {
+    if (bonificoInCorso || esitoBonifico) return;
+    if (!importoValido) {
+      setErroreBonifico("Indica un importo valido prima di confermare il bonifico.");
+      return;
+    }
+    if (!identificativo || !utenteId || !parrocchiaId || !posizione.iscrizione_id) {
+      setErroreBonifico("Accesso non riconosciuto: rientra nell'area personale.");
+      return;
+    }
+    // Un tentativo conserva sempre lo stesso UUID anche dopo un errore di rete.
+    // Il server non potra' registrare due volte lo stesso versamento.
+    if (!idTentativoBonifico.current) idTentativoBonifico.current = crypto.randomUUID();
+    setBonificoInCorso(true);
+    setErroreBonifico("");
+    try {
+      const { data, error } = await supabase.rpc("ars_comunione_dichiara_bonifico", {
+        p_parrocchia_id: parrocchiaId,
+        p_utente_id: utenteId,
+        p_identificativo: identificativo,
+        p_iscrizione_attivita_id: posizione.iscrizione_id,
+        p_importo: importoNumero,
+        p_incasso_id: idTentativoBonifico.current,
+        p_riferimento: riferimentoBonifico.trim() || null,
+      });
+      if (error) throw error;
+      if (!data?.ok || !data?.ricevuta?.id) throw new Error("La registrazione non ha restituito la ricevuta. Contatta la segreteria prima di riprovare.");
+      setEsitoBonifico("Bonifico dichiarato e registrato. Ricevuta emessa subito, salvo buon fine dell'accredito.");
+      onAggiorna?.();
+      onNuovaRicevuta?.(posizione, {
+        documento_id: data.ricevuta.id,
+        numero: data.ricevuta.numero,
+        anno: data.ricevuta.anno,
+        data: data.ricevuta.data_documento,
+        importo: data.ricevuta.importo,
+        causale: data.ricevuta.causale,
+        nominativo: data.ricevuta.nominativo,
+        dati_documento: data.ricevuta.dati_documento,
+        metodo: "bonifico",
+      });
+    } catch (err) {
+      setErroreBonifico(err?.message || "Non e' stato possibile registrare il bonifico. Verifica la situazione prima di riprovare.");
+    } finally { setBonificoInCorso(false); }
+  }
+
+  const nome = posizione.partecipante || "partecipante";
+  const causale = `${libera ? "Offerta libera" : "Quota Catechismo"} – ${posizione.attivita || "Prima Comunione"} – ${nome}`;
+  const importoNumero = Number(String(importo).replace(",", "."));
+  const importoValido = Number.isFinite(importoNumero) && importoNumero > 0 &&
+    Math.abs(Math.round(importoNumero * 100) - importoNumero * 100) < 0.0000001 &&
+    (libera || importoNumero <= residuo);
+
+  function apri() {
+    setAperto(!aperto);
+    if (!aperto) {
+      setImporto(!libera && residuo > 0 ? residuo.toFixed(2) : "");
+      setErroreImporto("");
+      setMetodoScelto(null);
+      setErroreBonifico("");
+      setEsitoBonifico("");
+      idTentativoBonifico.current = null;
+    }
+  }
+  function selezionaMetodo(metodo) {
+    if (!importoValido) {
+      setErroreImporto(!libera && importoNumero > residuo
+        ? "L'importo non può superare il residuo." : "Indica prima un importo positivo con massimo due decimali.");
+      return;
+    }
+    setErroreImporto("");
+    setMetodoScelto(metodo.id || metodo.tipo);
+  }
+  function metodoAttivo(metodo) {
+    return metodoScelto === (metodo.id || metodo.tipo);
+  }
+  if (!puoVersare) return null;
+  return <section className="ars-com-versamento">
+    <button type="button" className="ars-sac-azione ars-com-versamento-azione" aria-expanded={aperto}
+      onClick={apri}>{aperto ? "Chiudi modalità di pagamento" : libera ? "Fai un'offerta" : "Effettua un versamento"}</button>
+    {aperto && <div className="ars-com-versamento-contenuto">
+      <h5>Riepilogo e pagamento</h5>
+      <p>{libera ? "Scegli liberamente l'importo che desideri offrire. Non esiste una quota minima obbligatoria."
+        : `Puoi versare il saldo di ${euroPagamentiComunione(residuo, posizione.valuta)}, oppure un acconto inferiore.`}</p>
+      <label className="ars-com-versamento-importo">Importo da versare (€)
+        <input type="number" min="0.01" step="0.01" inputMode="decimal" value={importo}
+          onChange={e => { setImporto(e.target.value); setErroreImporto(""); setMetodoScelto(null); setErroreBonifico(""); idTentativoBonifico.current = null; }}
+          placeholder={libera ? "Scegli l'importo" : "Importo in euro"} />
+      </label>
+      {erroreImporto && <p role="alert" className="ars-sac-errore">{erroreImporto}</p>}
+      <p className="ars-com-versamento-causale"><strong>Causale da indicare:</strong> {causale}</p>
+      <h5>Come desideri pagare?</h5>
+      {metodiInCaricamento ? <p role="status">Caricamento delle modalità di pagamento…</p>
+        : erroreMetodi ? <p role="alert" className="ars-sac-errore">{erroreMetodi}</p>
+        : metodi.length === 0 ? <p>La parrocchia non ha ancora pubblicato modalità di pagamento. Contatta la segreteria.</p>
+        : <div className="ars-com-versamento-metodi">
+          {metodi.map((m, idx) => {
+            const tipo = m.tipo;
+            const titolo = tipo === "bonifico" ? "Bonifico bancario"
+              : tipo === "paypal" ? "PayPal"
+              : ["link_pagamento", "stripe"].includes(tipo) ? "Carta di credito/debito"
+              : tipo === "consegna_diretta" ? "Consegna in parrocchia" : m.titolo || "Modalità di pagamento";
+            const attivo = metodoAttivo(m);
+            const link = collegamentoPagamentoComunione(m.link_pagamento);
+            return <div className="ars-com-versamento-metodo" key={m.id || `${tipo}-${idx}`}>
+              <button type="button" aria-expanded={attivo} className="ars-com-versamento-scelta"
+                onClick={() => selezionaMetodo(m)}>{titolo}</button>
+              {attivo && <div className="ars-com-versamento-dettagli">
+                <p><strong>Importo:</strong> {euroPagamentiComunione(importoNumero, posizione.valuta)}</p>
+                {m.intestatario && <p><strong>Intestatario:</strong> {m.intestatario}</p>}
+                {tipo === "bonifico" && <>
+                  {m.iban ? <p><strong>IBAN:</strong> <span className="ars-com-versamento-copiabile">{m.iban}</span></p>
+                    : <p>Per l'IBAN contatta la segreteria.</p>}
+                  {m.bic_swift && <p><strong>BIC/SWIFT:</strong> {m.bic_swift}</p>}
+                  <p>Effettua prima il bonifico tramite la tua banca, indicando la causale sopra. Dopo averlo disposto, registralo qui: la ricevuta sarà immediata, <strong>salvo buon fine</strong>.</p>
+                  <label className="ars-com-versamento-importo">Riferimento bancario (se disponibile)
+                    <input type="text" maxLength={500} value={riferimentoBonifico}
+                      onChange={e => {setRiferimentoBonifico(e.target.value); idTentativoBonifico.current = null;}}
+                      placeholder="CRO / TRN (facoltativo)" />
+                  </label>
+                  <button type="button" className="ars-sac-azione ars-com-versamento-azione"
+                    disabled={bonificoInCorso || !!esitoBonifico}
+                    onClick={dichiaraBonifico}>
+                    {bonificoInCorso ? "Registrazione in corso…" : "Ho effettuato il bonifico — Registra e ricevi la ricevuta"}
+                  </button>
+                  {erroreBonifico && <p role="alert" className="ars-sac-errore">{erroreBonifico}</p>}
+                  {esitoBonifico && <p role="status" className="ars-com-versamento-esito">{esitoBonifico}</p>}
+                  <p className="ars-com-versamento-nota">Il bonifico comparirà anche in «Verifica incassi». Se non arriva, la parrocchia potrà stornarlo per mancato incasso.</p>
+                </>}
+                {tipo === "consegna_diretta" && <p>Consegna l'importo alla segreteria, indicando il nome del partecipante. La parrocchia registrerà il versamento.</p>}
+                {tipo === "paypal" && m.email_paypal && <p><strong>PayPal:</strong> {m.email_paypal}</p>}
+                {m.istruzioni && <p className="ars-com-versamento-istruzioni">{m.istruzioni}</p>}
+                {(["paypal", "link_pagamento", "stripe"].includes(tipo)) && (link
+                  ? <><a className="ars-sac-azione ars-com-versamento-link" href={link} target="_blank" rel="noopener noreferrer">
+                      {tipo === "paypal" ? "Apri PayPal" : "Apri pagamento con carta"}
+                    </a><p className="ars-com-versamento-nota">Prima di confermare sul sito di pagamento, verifica importo, destinatario e causale: il collegamento esterno potrebbe non precompilarli.</p></>
+                  : <p>La parrocchia non ha ancora configurato un collegamento diretto: contatta la segreteria per pagare con questo metodo.</p>)}
+              </div>}
+            </div>;
+          })}
+        </div>}
+      <p className="ars-com-versamento-nota">Per i bonifici la registrazione e la ricevuta avvengono quando premi «Ho effettuato il bonifico». Per PayPal e carta, aprire un link non equivale a un incasso confermato.</p>
+      <button type="button" className="ars-sac-azione ars-sac-azione-chiara" onClick={onAggiorna}>Controlla i versamenti registrati</button>
+    </div>}
+  </section>;
+}
+
 function QuotePagamentiComunioneFedele({ parrocchiaId, utenteId, nomeParrocchia }) {
   const [posizioni, setPosizioni] = useState([]);
   const [caricamento, setCaricamento] = useState(true);
   const [errore, setErrore] = useState("");
   const [ricarica, setRicarica] = useState(0);
   const [anteprima, setAnteprima] = useState(null);
+  const [metodi, setMetodi] = useState([]);
+  const [erroreMetodi, setErroreMetodi] = useState("");
+  const [metodiInCaricamento, setMetodiInCaricamento] = useState(true);
+
+  useEffect(() => {
+    let attivo = true;
+    setMetodiInCaricamento(true);
+    setErroreMetodi("");
+    (async () => {
+      try {
+        if (!parrocchiaId) throw new Error("Parrocchia non identificata.");
+        const { data, error } = await supabase.rpc("ars_elenco_metodi_incasso_pubblici", {
+          p_parrocchia_id: parrocchiaId,
+        });
+        if (error) throw error;
+        if (!Array.isArray(data)) throw new Error("Modalità di pagamento non disponibili.");
+        if (attivo) setMetodi(data);
+      } catch (err) {
+        if (attivo) setErroreMetodi("Non è possibile caricare i metodi di pagamento. Contatta la segreteria.");
+      } finally { if (attivo) setMetodiInCaricamento(false); }
+    })();
+    return () => { attivo = false; };
+  }, [parrocchiaId]);
+
 
   useEffect(() => {
     let attivo = true;
@@ -918,7 +1114,7 @@ function QuotePagamentiComunioneFedele({ parrocchiaId, utenteId, nomeParrocchia 
       <summary>? Come utilizzare questa pagina</summary>
       <p>Qui trovi le quote del Catechismo, gli importi versati e le ricevute già emesse dalla parrocchia.</p>
       <p>Se la parrocchia ha scelto «Offerta libera», nessuna somma è obbligatoria e non risulterai moroso.</p>
-      <p>Per consultare o ristampare una ricevuta, premi «Apri ricevuta». Per effettuare nuovi versamenti usa «Le mie iscrizioni e pagamenti» nella dashboard del fedele.</p>
+      <p>Premi «Effettua un versamento» (oppure «Fai un’offerta») per scegliere importo e modalità di pagamento. Per le ricevute già emesse, premi «Apri ricevuta».</p>
     </details>
     {caricamento ? <p role="status">Caricamento dei tuoi pagamenti…</p> : errore ? <>
       <p role="alert" className="ars-sac-errore">{errore}</p>
@@ -939,6 +1135,11 @@ function QuotePagamentiComunioneFedele({ parrocchiaId, utenteId, nomeParrocchia 
             <div><span>{libera ? "Offerte versate" : "Totale versato"}</span><strong>{euroPagamentiComunione(r.totale_versato,r.valuta)}</strong></div>
             <div><span>Residuo</span><strong>{libera ? "Non previsto" : quotaIndefinita ? "—" : euroPagamentiComunione(r.residuo,r.valuta)}</strong></div>
           </div>
+          <RiepilogoVersamentoComunione posizione={r} metodi={metodi} erroreMetodi={erroreMetodi}
+            metodiInCaricamento={metodiInCaricamento}
+            parrocchiaId={parrocchiaId} utenteId={utenteId}
+            identificativo={typeof window !== "undefined" ? window.localStorage.getItem("ars_identificativo") : ""}
+            onAggiorna={() => setRicarica(n => n + 1)} onNuovaRicevuta={apriRicevuta} />
           <h5>Ricevute</h5>
           {ricevute.length ? <ul className="ars-com-fedele-ricevute">{ricevute.map(d =>
             <li key={d.documento_id || `${d.anno}-${d.numero}`}>
@@ -1033,6 +1234,27 @@ export default function SacramentiFedele({ tornaDashboard, utenteId = null, parr
 }
 const STILE = `
 .ars-com-fedele-pagamenti{margin:12px 0;color:#243c40}
+.ars-com-versamento{border-top:1px solid #e5ddd1;margin:18px 0 15px;padding-top:15px}
+.ars-com-versamento-azione{background:#ae812c!important;color:#fff!important;border:1px solid #ae812c!important;border-radius:9px;padding:11px 17px;font-weight:700;cursor:pointer}
+.ars-com-versamento-contenuto{margin-top:14px;padding:16px;background:#faf6ed;border:1px solid #dfcfac;border-radius:12px}
+.ars-com-versamento-contenuto h5{margin:6px 0 10px}
+.ars-com-versamento-contenuto p{line-height:1.5}
+.ars-com-versamento-importo{display:flex;flex-direction:column;gap:7px;font-weight:700;max-width:350px;margin:12px 0}
+.ars-com-versamento-importo input{padding:11px;border-radius:7px;border:1px solid #cdbda9;background:#fff;color:#173955;font:inherit}
+.ars-com-versamento-causale{padding:11px;border-radius:8px;background:#fff;border:1px solid #e1d7c7;overflow-wrap:anywhere}
+.ars-com-versamento-metodi{display:grid;gap:9px;margin:13px 0}
+.ars-com-versamento-metodo{background:#fff;border:1px solid #e0d5c3;border-radius:9px;overflow:hidden}
+.ars-com-versamento-scelta{display:block;width:100%;text-align:left;padding:13px 15px;border:0;background:transparent;cursor:pointer;font:700 1rem Georgia,serif;color:#173955}
+.ars-com-versamento-scelta[aria-expanded=true]{background:#f6ead4}
+.ars-com-versamento-dettagli{padding:5px 15px 14px;overflow-wrap:anywhere}
+.ars-com-versamento-dettagli p{margin:9px 0}
+.ars-com-versamento-copiabile{user-select:all;font-weight:700}
+.ars-com-versamento-link{display:inline-block;margin-top:9px;background:#ae812c!important;color:white!important;padding:11px 16px;border-radius:8px;text-decoration:none}
+.ars-com-versamento-nota{font-size:.88rem;color:#526269;line-height:1.45}
+.ars-com-versamento-esito{padding:12px 14px;background:#e7f4eb;border:1px solid #88b79a;border-radius:8px;color:#244d34;font-weight:700}
+.ars-com-versamento-azione:disabled{opacity:.7;cursor:wait}
+.ars-com-versamento-istruzioni{white-space:pre-wrap}
+
 .ars-com-fedele-pagamenti-guida{margin:10px 0 18px;padding:12px 14px;background:#f7f5ec;border:1px solid #dfcfac;border-radius:10px}
 .ars-com-fedele-pagamenti-guida summary{font-weight:700;color:#173955;cursor:pointer}
 .ars-com-fedele-pagamenti-guida p{margin:9px 0 0;font-size:.93rem;line-height:1.48}
