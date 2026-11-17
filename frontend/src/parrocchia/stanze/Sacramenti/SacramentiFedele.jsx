@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "../../../supabaseClient";
 import FirmaSemplice from "../../componenti/FirmaSemplice";
+import AnteprimaDocumentoEconomico from "../PagamentiParrocchia/AnteprimaDocumentoEconomico";
 
 // Ars Liturgica — Sacramenti lato fedele.
 // Struttura delle sottocard della Prima Comunione approvata il 6 novembre 2026.
@@ -851,6 +852,103 @@ function ModuloComunione({ parrocchiaId, utenteId, nomeParrocchia }) {
   </div>;
 }
 
+// Card 05 fedele: lettura delle posizioni economiche e ristampa dei documenti già archiviati.
+// I nuovi pagamenti restano affidati al modulo comune «Riepilogo e pagamento» della dashboard.
+const euroPagamentiComunione = (importo, valuta = "EUR") => {
+  try {
+    return new Intl.NumberFormat("it-IT", { style: "currency", currency: valuta || "EUR" }).format(Number(importo || 0));
+  } catch { return `${Number(importo || 0).toFixed(2)} ${valuta || "EUR"}`; }
+};
+
+function QuotePagamentiComunioneFedele({ parrocchiaId, utenteId, nomeParrocchia }) {
+  const [posizioni, setPosizioni] = useState([]);
+  const [caricamento, setCaricamento] = useState(true);
+  const [errore, setErrore] = useState("");
+  const [ricarica, setRicarica] = useState(0);
+  const [anteprima, setAnteprima] = useState(null);
+
+  useEffect(() => {
+    let attivo = true;
+    setCaricamento(true); setErrore(""); setPosizioni([]);
+    (async () => {
+      try {
+        if (!parrocchiaId || !utenteId) throw new Error("Non è possibile identificare la parrocchia o l'utente. Rientra dall'area personale.");
+        const { data, error } = await supabase.rpc("ars_mie_iscrizioni_pagamenti", {
+          p_parrocchia_id: parrocchiaId,
+          p_utente_id: utenteId,
+        });
+        if (error) throw error;
+        if (!Array.isArray(data)) throw new Error("Riepilogo dei pagamenti non disponibile.");
+        // La modalità è valorizzata dalla RPC esclusivamente per le iscrizioni alla Comunione.
+        // Evitiamo di visualizzare qui i pagamenti di GREST o di altre attività.
+        const comunioni = data.filter(r =>
+          r.modalita_contribuzione === "quota_stabilita" || r.modalita_contribuzione === "offerta_libera"
+        );
+        if (attivo) setPosizioni(comunioni);
+      } catch (err) {
+        if (attivo) setErrore(err?.message || "Impossibile leggere quote e pagamenti.");
+      } finally { if (attivo) setCaricamento(false); }
+    })();
+    return () => { attivo = false; };
+  }, [parrocchiaId, utenteId, ricarica]);
+
+  function apriRicevuta(r, documento) {
+    if (!documento?.documento_id) return;
+    setAnteprima({
+      id: documento.documento_id,
+      tipo_documento: "ricevuta",
+      numero: documento.numero,
+      anno: documento.anno,
+      data_documento: documento.data,
+      importo: documento.importo,
+      causale: documento.causale,
+      nominativo: documento.nominativo,
+      valuta: r.valuta || "EUR",
+      dati_documento: documento.dati_documento && typeof documento.dati_documento === "object"
+        ? documento.dati_documento : {},
+    });
+  }
+
+  return <section className="ars-com-fedele-pagamenti" aria-label="Quote e pagamenti Prima Comunione">
+    <details className="ars-com-fedele-pagamenti-guida">
+      <summary>? Come utilizzare questa pagina</summary>
+      <p>Qui trovi le quote del Catechismo, gli importi versati e le ricevute già emesse dalla parrocchia.</p>
+      <p>Se la parrocchia ha scelto «Offerta libera», nessuna somma è obbligatoria e non risulterai moroso.</p>
+      <p>Per consultare o ristampare una ricevuta, premi «Apri ricevuta». Per effettuare nuovi versamenti usa «Le mie iscrizioni e pagamenti» nella dashboard del fedele.</p>
+    </details>
+    {caricamento ? <p role="status">Caricamento dei tuoi pagamenti…</p> : errore ? <>
+      <p role="alert" className="ars-sac-errore">{errore}</p>
+      <button type="button" className="ars-sac-azione ars-sac-azione-chiara" onClick={() => setRicarica(n => n + 1)}>Riprova</button>
+    </> : posizioni.length === 0 ?
+      <p>Non risultano ancora posizioni economiche di Prima Comunione associate alla tua area personale.</p>
+      : <div className="ars-com-fedele-pagamenti-elenco">{posizioni.map(r => {
+        const libera = r.modalita_contribuzione === "offerta_libera";
+        const annullata = r.stato_iscrizione === "annullata";
+        const ricevute = Array.isArray(r.ricevute) ? r.ricevute : [];
+        const quotaIndefinita = !libera && r.quota_dovuta == null;
+        return <article className="ars-com-fedele-posizione" key={r.iscrizione_id}>
+          <h4>{r.attivita || "Prima Comunione"}</h4>
+          <p className="ars-com-fedele-partecipante">Partecipante: <strong>{r.partecipante || "—"}</strong>{annullata ? " · Iscrizione annullata" : ""}</p>
+          <p className="ars-com-fedele-modalita">{libera ? "Offerta libera — nessuna quota obbligatoria" : "Quota stabilita dalla parrocchia"}</p>
+          <div className="ars-com-fedele-totali">
+            <div><span>{libera ? "Contributo richiesto" : "Quota dovuta"}</span><strong>{libera ? "Nessuno" : quotaIndefinita ? "Da definire" : euroPagamentiComunione(r.quota_dovuta,r.valuta)}</strong></div>
+            <div><span>{libera ? "Offerte versate" : "Totale versato"}</span><strong>{euroPagamentiComunione(r.totale_versato,r.valuta)}</strong></div>
+            <div><span>Residuo</span><strong>{libera ? "Non previsto" : quotaIndefinita ? "—" : euroPagamentiComunione(r.residuo,r.valuta)}</strong></div>
+          </div>
+          <h5>Ricevute</h5>
+          {ricevute.length ? <ul className="ars-com-fedele-ricevute">{ricevute.map(d =>
+            <li key={d.documento_id || `${d.anno}-${d.numero}`}>
+              <span>Ricevuta n. {d.numero}/{d.anno} · {d.data ? new Date(d.data).toLocaleDateString("it-IT") : "data non disponibile"} · {euroPagamentiComunione(d.importo,r.valuta)}</span>
+              <button type="button" className="ars-sac-azione ars-sac-azione-chiara" onClick={() => apriRicevuta(r,d)}>Apri ricevuta</button>
+            </li>
+          )}</ul> : <p>Nessuna ricevuta ancora registrata.</p>}
+        </article>;
+      })}</div>}
+    {anteprima && <AnteprimaDocumentoEconomico documento={anteprima}
+      nomeParrocchia={nomeParrocchia} onChiudi={() => setAnteprima(null)} />}
+  </section>;
+}
+
 function DettaglioSottocard({ sezione, parrocchiaId, utenteId, nomeParrocchia }) {
   switch (sezione) {
     case "iscrizioni":
@@ -862,7 +960,7 @@ function DettaglioSottocard({ sezione, parrocchiaId, utenteId, nomeParrocchia })
     case "comunicazioni":
       return <><p>Avvisi e informazioni del Catechismo per le famiglie e i ragazzi del gruppo, pubblicati dai responsabili autorizzati.</p><p className="ars-sac-prossimamente">Le comunicazioni saranno visualizzate qui non appena disponibili.</p></>;
     case "pagamenti":
-      return <><p>Qui il genitore potrà consultare le eventuali quote del Catechismo, lo stato dei pagamenti e le relative ricevute.</p><p>I ragazzi non avranno accesso alle funzioni di pagamento.</p><p className="ars-sac-prossimamente">La sezione sarà collegata al sistema dei pagamenti già esistente, senza duplicarlo.</p></>;
+      return <QuotePagamentiComunioneFedele parrocchiaId={parrocchiaId} utenteId={utenteId} nomeParrocchia={nomeParrocchia} />;
     case "celebrazioni":
       return <><p>Informazioni sulla preparazione alla Prima Comunione, le celebrazioni e gli appuntamenti collegati.</p><p className="ars-sac-prossimamente">Le informazioni saranno pubblicate dalla parrocchia.</p></>;
     default: return null;
@@ -929,6 +1027,24 @@ export default function SacramentiFedele({ tornaDashboard, utenteId = null, parr
   );
 }
 const STILE = `
+.ars-com-fedele-pagamenti{margin:12px 0;color:#243c40}
+.ars-com-fedele-pagamenti-guida{margin:10px 0 18px;padding:12px 14px;background:#f7f5ec;border:1px solid #dfcfac;border-radius:10px}
+.ars-com-fedele-pagamenti-guida summary{font-weight:700;color:#173955;cursor:pointer}
+.ars-com-fedele-pagamenti-guida p{margin:9px 0 0;font-size:.93rem;line-height:1.48}
+.ars-com-fedele-pagamenti-elenco{display:grid;gap:15px}
+.ars-com-fedele-posizione{padding:18px;background:#fffdfa;border:1px solid #decdae;border-radius:12px}
+.ars-com-fedele-posizione h4{font:700 1.17rem Georgia,serif;margin:0 0 10px;color:#173955}
+.ars-com-fedele-posizione h5{font:700 1rem Georgia,serif;color:#173955;margin:17px 0 8px}
+.ars-com-fedele-partecipante,.ars-com-fedele-modalita{margin:0 0 9px!important}
+.ars-com-fedele-modalita{font-weight:600;color:#173955!important}
+.ars-com-fedele-totali{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:14px 0}
+.ars-com-fedele-totali>div{padding:11px 10px;border:1px solid #dcd6c8;background:#f5f6f7;border-radius:8px;min-width:0}
+.ars-com-fedele-totali span{display:block;font-size:.84rem;color:#485e66;margin-bottom:7px}
+.ars-com-fedele-totali strong{font-size:1.05rem;color:#173955;overflow-wrap:anywhere}
+.ars-com-fedele-ricevute{list-style:none;margin:6px 0;padding:0}
+.ars-com-fedele-ricevute li{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 0;border-top:1px solid #e5ddd1;flex-wrap:wrap}
+.ars-com-fedele-ricevute li span{overflow-wrap:anywhere;font-size:.94rem}
+@media(max-width:650px){.ars-com-fedele-totali{grid-template-columns:1fr}.ars-com-fedele-posizione{padding:13px}}
 .ars-sacramenti-fedele{box-sizing:border-box;width:100%;min-height:100vh;max-width:none;margin:0;padding:32px max(18px,calc((100% - 960px)/2));background:#f7f3ed;color:#243c40}
 .ars-sacramenti-fedele *{box-sizing:border-box}
 .ars-sac-header{text-align:center;margin:14px 0 25px}
