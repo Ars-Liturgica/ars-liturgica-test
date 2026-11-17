@@ -856,23 +856,26 @@ function ModuloComunione({ parrocchiaId, utenteId, nomeParrocchia, onApriQuote }
   </div>;
 }
 
-// Card 05 fedele: lettura delle posizioni economiche e ristampa dei documenti già archiviati.
-// I nuovi pagamenti restano affidati al modulo comune «Riepilogo e pagamento» della dashboard.
+// Card 05 fedele: quote, offerte libere, metodi disponibili e ricevute.
+// Il sistema contabile è quello comune a tutte le attività della parrocchia.
 const euroPagamentiComunione = (importo, valuta = "EUR") => {
   try {
     return new Intl.NumberFormat("it-IT", { style: "currency", currency: valuta || "EUR" }).format(Number(importo || 0));
   } catch { return `${Number(importo || 0).toFixed(2)} ${valuta || "EUR"}`; }
 };
 
-// Riutilizza i metodi pubblici impostati dalla parrocchia per tutte le attività.
-// L'apertura di un link esterno NON è una registrazione contabile:
-// incassi, conferme e ricevute restano sempre nel sistema economico comune.
-function collegamentoPagamentoComunione(valore) {
-  if (typeof valore !== "string" || !valore.trim()) return null;
-  try {
-    const url = new URL(valore.trim());
-    return url.protocol === "https:" ? url.href : null;
-  } catch { return null; }
+// I metodi di pagamento sono comuni a tutte le attività della parrocchia.
+// I link manuali PayPal/Stripe NON consentono di associare in sicurezza
+// la conferma del gestore a un'iscrizione, né di emettere ricevute automatiche.
+// Fino all'attivazione del collegamento ufficiale verificato sul server,
+// non presentarli alle famiglie come pagamenti disponibili.
+// In futuro i metodi online saranno mostrati solo se il server confermerà:
+// 1) conto della parrocchia collegato, 2) pagamento integrato e attivo.
+function metodoVersamentoComunioneDisponibile(metodo) {
+  if (!metodo || typeof metodo.tipo !== "string") return false;
+  if (metodo.tipo === "consegna_diretta") return true;
+  if (metodo.tipo === "bonifico") return typeof metodo.iban === "string" && metodo.iban.trim().length > 0;
+  return false;
 }
 
 function RiepilogoVersamentoComunione({ posizione, metodi, erroreMetodi, metodiInCaricamento, onAggiorna, onNuovaRicevuta, parrocchiaId, utenteId, identificativo }) {
@@ -983,16 +986,12 @@ function RiepilogoVersamentoComunione({ posizione, metodi, erroreMetodi, metodiI
       <h5>Come desideri pagare?</h5>
       {metodiInCaricamento ? <p role="status">Caricamento delle modalità di pagamento…</p>
         : erroreMetodi ? <p role="alert" className="ars-sac-errore">{erroreMetodi}</p>
-        : metodi.length === 0 ? <p>La parrocchia non ha ancora pubblicato modalità di pagamento. Contatta la segreteria.</p>
+        : metodi.length === 0 ? <p>La parrocchia non ha ancora indicato modalità di versamento disponibili. Per informazioni rivolgiti alla segreteria.</p>
         : <div className="ars-com-versamento-metodi">
           {metodi.map((m, idx) => {
             const tipo = m.tipo;
-            const titolo = tipo === "bonifico" ? "Bonifico bancario"
-              : tipo === "paypal" ? "PayPal"
-              : ["link_pagamento", "stripe"].includes(tipo) ? "Carta di credito/debito"
-              : tipo === "consegna_diretta" ? "Consegna in parrocchia" : m.titolo || "Modalità di pagamento";
+            const titolo = tipo === "bonifico" ? "Bonifico bancario" : "Consegna in parrocchia";
             const attivo = metodoAttivo(m);
-            const link = collegamentoPagamentoComunione(m.link_pagamento);
             return <div className="ars-com-versamento-metodo" key={m.id || `${tipo}-${idx}`}>
               <button type="button" aria-expanded={attivo} className="ars-com-versamento-scelta"
                 onClick={() => selezionaMetodo(m)}>{titolo}</button>
@@ -1006,7 +1005,7 @@ function RiepilogoVersamentoComunione({ posizione, metodi, erroreMetodi, metodiI
                   <p>Effettua il bonifico tramite la tua banca, indicando la causale riportata sopra. Quando hai terminato, premi il pulsante qui sotto per ricevere subito la ricevuta.</p>
                   <label className="ars-com-versamento-importo">Riferimento bancario (se disponibile)
                     <input type="text" maxLength={500} value={riferimentoBonifico}
-                      onChange={e => {setRiferimentoBonifico(e.target.value); idTentativoBonifico.current = null;}}
+                      onChange={e => setRiferimentoBonifico(e.target.value)}
                       placeholder="CRO / TRN (facoltativo)" />
                   </label>
                   <button type="button" className="ars-sac-azione ars-com-versamento-azione"
@@ -1018,13 +1017,7 @@ function RiepilogoVersamentoComunione({ posizione, metodi, erroreMetodi, metodiI
                   {esitoBonifico && <p role="status" className="ars-com-versamento-esito">{esitoBonifico}</p>}
                 </>}
                 {tipo === "consegna_diretta" && <p>Consegna l'importo alla segreteria, indicando il nome del partecipante. La parrocchia registrerà il versamento.</p>}
-                {tipo === "paypal" && m.email_paypal && <p><strong>PayPal:</strong> {m.email_paypal}</p>}
                 {m.istruzioni && <p className="ars-com-versamento-istruzioni">{m.istruzioni}</p>}
-                {(["paypal", "link_pagamento", "stripe"].includes(tipo)) && (link
-                  ? <><a className="ars-sac-azione ars-com-versamento-link" href={link} target="_blank" rel="noopener noreferrer">
-                      {tipo === "paypal" ? "Apri PayPal" : "Apri pagamento con carta"}
-                    </a></>
-                  : <p>La parrocchia non ha ancora configurato un collegamento diretto: contatta la segreteria per pagare con questo metodo.</p>)}
               </div>}
             </div>;
           })}
@@ -1047,6 +1040,7 @@ function QuotePagamentiComunioneFedele({ parrocchiaId, utenteId, nomeParrocchia 
   useEffect(() => {
     let attivo = true;
     setMetodiInCaricamento(true);
+    setMetodi([]);
     setErroreMetodi("");
     (async () => {
       try {
@@ -1056,7 +1050,8 @@ function QuotePagamentiComunioneFedele({ parrocchiaId, utenteId, nomeParrocchia 
         });
         if (error) throw error;
         if (!Array.isArray(data)) throw new Error("Modalità di pagamento non disponibili.");
-        if (attivo) setMetodi(data);
+        // Non esporre link online precedenti senza conferma automatica dell'incasso.
+        if (attivo) setMetodi(data.filter(metodoVersamentoComunioneDisponibile));
       } catch (err) {
         if (attivo) setErroreMetodi("Non è possibile caricare i metodi di pagamento. Contatta la segreteria.");
       } finally { if (attivo) setMetodiInCaricamento(false); }
@@ -1112,7 +1107,8 @@ function QuotePagamentiComunioneFedele({ parrocchiaId, utenteId, nomeParrocchia 
       <summary>? Come utilizzare questa pagina</summary>
       <p>Qui trovi le quote del Catechismo, gli importi versati e le ricevute già emesse dalla parrocchia.</p>
       <p>Se è prevista l’«Offerta libera», puoi scegliere in autonomia l’importo del tuo contributo.</p>
-      <p>Premi «Effettua un versamento» (oppure «Fai un’offerta») per scegliere importo e modalità di pagamento. Per le ricevute già emesse, premi «Apri ricevuta».</p>
+      <p>Per contribuire, premi «Effettua un versamento» (oppure «Fai un’offerta»), indica l'importo e scegli una delle modalità disponibili.</p>
+      <p>Se paghi con bonifico, inserisci la causale indicata e registra qui il versamento dopo averlo disposto. Puoi consultare le ricevute con «Apri ricevuta».</p>
     </details>
     {caricamento ? <p role="status">Caricamento dei tuoi pagamenti…</p> : errore ? <>
       <p role="alert" className="ars-sac-errore">{errore}</p>
@@ -1247,7 +1243,6 @@ const STILE = `
 .ars-com-versamento-dettagli{padding:5px 15px 14px;overflow-wrap:anywhere}
 .ars-com-versamento-dettagli p{margin:9px 0}
 .ars-com-versamento-copiabile{user-select:all;font-weight:700}
-.ars-com-versamento-link{display:inline-block;margin-top:9px;background:#ae812c!important;color:white!important;padding:11px 16px;border-radius:8px;text-decoration:none}
 .ars-com-versamento-nota{font-size:.88rem;color:#526269;line-height:1.45}
 .ars-com-versamento-esito{padding:12px 14px;background:#e7f4eb;border:1px solid #88b79a;border-radius:8px;color:#244d34;font-weight:700}
 .ars-com-versamento-azione:disabled{opacity:.7;cursor:wait}
