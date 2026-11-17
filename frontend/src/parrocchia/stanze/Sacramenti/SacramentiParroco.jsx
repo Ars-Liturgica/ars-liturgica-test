@@ -2112,6 +2112,10 @@ const STILE = `
 .ars-sac-form{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
 .ars-sac-form input:disabled,.ars-sac-form select:disabled,.ars-sac-form textarea:disabled{background:#fff;color:#243c40;opacity:1;cursor:default}
 .ars-sac-form label{display:flex;flex-direction:column;gap:7px;font-weight:600;font-size:.95rem}
+/* Caselle di spunta: testo e checkbox affiancati nelle impostazioni. */
+.ars-sac-form label.ars-com-segreteria-spunta{flex-direction:row;align-items:center;gap:10px}
+.ars-sac-form label.ars-com-segreteria-spunta input[type="checkbox"]{width:18px;height:18px;min-height:18px;flex:0 0 18px;margin:0;padding:0}
+
 .ars-sac-form input,.ars-sac-form select,.ars-sac-form textarea{box-sizing:border-box;width:100%;min-height:44px;border:1px solid #d8c9a8;border-radius:9px;background:white;color:#243c40;padding:10px;font:inherit}
 .ars-sac-form textarea{resize:vertical;line-height:1.5}
 .ars-sac-intera{grid-column:1/-1}
