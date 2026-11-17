@@ -1278,12 +1278,27 @@ function QuoteComunioneParroco({ parrocchiaId, annoAttivo, nomeParrocchia, onGes
       </details>
       <fieldset className="ars-com-quota-anno" disabled={Boolean(occupato)}>
         <legend>Modalità di contribuzione</legend>
-        <label>Contributo richiesto alle famiglie
-          <select value={modalitaScelta} onChange={e=>setModalitaScelta(e.target.value)}>
-            <option value="quota_stabilita">Quota stabilita dalla parrocchia</option>
-            <option value="offerta_libera">Offerta libera</option>
-          </select>
-        </label>
+        <p className="ars-com-modalita-intro">Contributo richiesto alle famiglie</p>
+        <div className="ars-com-modalita-scelte" role="radiogroup" aria-label="Contributo richiesto alle famiglie">
+          <label className={`ars-com-modalita-opzione ${modalitaScelta === "quota_stabilita" ? "ars-com-modalita-selezionata" : ""}`}>
+            <input type="radio" name="ars-com-modalita-contribuzione" value="quota_stabilita"
+              checked={modalitaScelta === "quota_stabilita"}
+              onChange={() => setModalitaScelta("quota_stabilita")} />
+            <span className="ars-com-modalita-testo">
+              <strong>Quota stabilita dalla parrocchia</strong>
+              <small>La parrocchia definisce l'importo annuale.</small>
+            </span>
+          </label>
+          <label className={`ars-com-modalita-opzione ${modalitaScelta === "offerta_libera" ? "ars-com-modalita-selezionata" : ""}`}>
+            <input type="radio" name="ars-com-modalita-contribuzione" value="offerta_libera"
+              checked={modalitaScelta === "offerta_libera"}
+              onChange={() => setModalitaScelta("offerta_libera")} />
+            <span className="ars-com-modalita-testo">
+              <strong>Offerta libera</strong>
+              <small>Ogni famiglia decide liberamente quanto versare.</small>
+            </span>
+          </label>
+        </div>
         <p>Questa scelta riguarda la Prima Comunione dell’anno {config.anno_pastorale}.</p>
         <button type="button" className="ars-sac-conferma" onClick={salvaModalitaContribuzione}
           disabled={Boolean(occupato) || modalitaScelta === (config.modalita_contribuzione || "quota_stabilita")}>
@@ -2338,6 +2353,18 @@ const STILE = `
 .ars-com-quota-anno legend,.ars-com-rimborso-riga h4{color:#77551f;font:700 1.15rem Georgia,serif}.ars-com-rimborso-riga h4{margin:0 0 8px}.ars-com-rimborso-riga p{margin:7px 0}
 .ars-com-quota-anno label,.ars-com-rimborso-riga label{display:flex;flex-direction:column;gap:6px;font-weight:600;margin:12px 0;max-width:430px}
 .ars-com-quota-anno input,.ars-com-quota-anno textarea,.ars-com-rimborso-riga select{width:100%;box-sizing:border-box;padding:10px;border:1px solid #d8c9a8;border-radius:8px;font:inherit;color:#243c40;background:white}
+/* Scelta immediata fra quota stabilita e offerta libera: due opzioni sempre visibili. */
+.ars-com-quota-anno .ars-com-modalita-intro{font-weight:700;color:#173955;margin:14px 0 10px}
+.ars-com-modalita-scelte{display:grid;grid-template-columns:1fr;gap:10px;max-width:620px;margin-bottom:14px}
+.ars-com-quota-anno .ars-com-modalita-opzione{display:flex;flex-direction:row;align-items:center;max-width:none;gap:13px;margin:0;padding:14px 15px;box-sizing:border-box;border:1px solid #d8c9a8;border-radius:11px;background:#fffdf8;color:#173955;cursor:pointer;transition:border-color .14s ease,background-color .14s ease}
+.ars-com-quota-anno .ars-com-modalita-opzione:hover{border-color:#af842f;background:#fff9ea}
+.ars-com-quota-anno .ars-com-modalita-opzione.ars-com-modalita-selezionata{border:2px solid #aa7a27;background:#f8edda;padding:13px 14px}
+.ars-com-quota-anno .ars-com-modalita-opzione input[type="radio"]{width:20px;height:20px;min-width:20px;flex:0 0 20px;margin:0;padding:0;border:0;accent-color:#a47b2d;cursor:pointer}
+.ars-com-modalita-testo{display:flex;flex-direction:column;gap:3px;min-width:0}
+.ars-com-modalita-testo strong{font-size:1rem;line-height:1.3}
+.ars-com-modalita-testo small{font-size:.9rem;line-height:1.4;font-weight:400;color:#455d65}
+.ars-com-quota-anno .ars-com-modalita-opzione:focus-within{outline:2px solid #244e68;outline-offset:2px}
+.ars-com-quota-anno:disabled .ars-com-modalita-opzione{cursor:default;opacity:.7}
 .ars-com-rimborso-importo{display:block;font-size:1.2rem;color:#9c322b;margin-top:12px}.ars-com-rimborso-riga button{margin:8px 8px 0 0}.ars-com-rimborso-stampa{display:none}
 @media(max-width:650px){.ars-com-quote-sottocard{grid-template-columns:1fr}}
 @media print{
