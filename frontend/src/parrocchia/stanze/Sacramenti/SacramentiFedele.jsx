@@ -917,7 +917,7 @@ function RiepilogoVersamentoComunione({ posizione, metodi, erroreMetodi, metodiI
       });
       if (error) throw error;
       if (!data?.ok || !data?.ricevuta?.id) throw new Error("La registrazione non ha restituito la ricevuta. Contatta la segreteria prima di riprovare.");
-      setEsitoBonifico("Bonifico dichiarato e registrato. Ricevuta emessa subito, salvo buon fine dell'accredito.");
+      setEsitoBonifico("Grazie! Il tuo bonifico è stato registrato. La ricevuta è disponibile.");
       onAggiorna?.();
       onNuovaRicevuta?.(posizione, {
         documento_id: data.ricevuta.id,
@@ -1003,7 +1003,7 @@ function RiepilogoVersamentoComunione({ posizione, metodi, erroreMetodi, metodiI
                   {m.iban ? <p><strong>IBAN:</strong> <span className="ars-com-versamento-copiabile">{m.iban}</span></p>
                     : <p>Per l'IBAN contatta la segreteria.</p>}
                   {m.bic_swift && <p><strong>BIC/SWIFT:</strong> {m.bic_swift}</p>}
-                  <p>Effettua prima il bonifico tramite la tua banca, indicando la causale sopra. Dopo averlo disposto, registralo qui: la ricevuta sarà immediata, <strong>salvo buon fine</strong>.</p>
+                  <p>Effettua il bonifico tramite la tua banca, indicando la causale riportata sopra. Quando hai terminato, premi il pulsante qui sotto per ricevere subito la ricevuta.</p>
                   <label className="ars-com-versamento-importo">Riferimento bancario (se disponibile)
                     <input type="text" maxLength={500} value={riferimentoBonifico}
                       onChange={e => {setRiferimentoBonifico(e.target.value); idTentativoBonifico.current = null;}}
@@ -1012,11 +1012,10 @@ function RiepilogoVersamentoComunione({ posizione, metodi, erroreMetodi, metodiI
                   <button type="button" className="ars-sac-azione ars-com-versamento-azione"
                     disabled={bonificoInCorso || !!esitoBonifico}
                     onClick={dichiaraBonifico}>
-                    {bonificoInCorso ? "Registrazione in corso…" : "Ho effettuato il bonifico — Registra e ricevi la ricevuta"}
+                    {bonificoInCorso ? "Registrazione in corso…" : "Ho effettuato il bonifico — Ricevi la ricevuta"}
                   </button>
                   {erroreBonifico && <p role="alert" className="ars-sac-errore">{erroreBonifico}</p>}
                   {esitoBonifico && <p role="status" className="ars-com-versamento-esito">{esitoBonifico}</p>}
-                  <p className="ars-com-versamento-nota">Il bonifico comparirà anche in «Verifica incassi». Se non arriva, la parrocchia potrà stornarlo per mancato incasso.</p>
                 </>}
                 {tipo === "consegna_diretta" && <p>Consegna l'importo alla segreteria, indicando il nome del partecipante. La parrocchia registrerà il versamento.</p>}
                 {tipo === "paypal" && m.email_paypal && <p><strong>PayPal:</strong> {m.email_paypal}</p>}
@@ -1024,14 +1023,13 @@ function RiepilogoVersamentoComunione({ posizione, metodi, erroreMetodi, metodiI
                 {(["paypal", "link_pagamento", "stripe"].includes(tipo)) && (link
                   ? <><a className="ars-sac-azione ars-com-versamento-link" href={link} target="_blank" rel="noopener noreferrer">
                       {tipo === "paypal" ? "Apri PayPal" : "Apri pagamento con carta"}
-                    </a><p className="ars-com-versamento-nota">Prima di confermare sul sito di pagamento, verifica importo, destinatario e causale: il collegamento esterno potrebbe non precompilarli.</p></>
+                    </a></>
                   : <p>La parrocchia non ha ancora configurato un collegamento diretto: contatta la segreteria per pagare con questo metodo.</p>)}
               </div>}
             </div>;
           })}
         </div>}
-      <p className="ars-com-versamento-nota">Per i bonifici la registrazione e la ricevuta avvengono quando premi «Ho effettuato il bonifico». Per PayPal e carta, aprire un link non equivale a un incasso confermato.</p>
-      <button type="button" className="ars-sac-azione ars-sac-azione-chiara" onClick={onAggiorna}>Controlla i versamenti registrati</button>
+      <button type="button" className="ars-sac-azione ars-sac-azione-chiara" onClick={onAggiorna}>Aggiorna il riepilogo</button>
     </div>}
   </section>;
 }
@@ -1113,7 +1111,7 @@ function QuotePagamentiComunioneFedele({ parrocchiaId, utenteId, nomeParrocchia 
     <details className="ars-com-fedele-pagamenti-guida">
       <summary>? Come utilizzare questa pagina</summary>
       <p>Qui trovi le quote del Catechismo, gli importi versati e le ricevute già emesse dalla parrocchia.</p>
-      <p>Se la parrocchia ha scelto «Offerta libera», nessuna somma è obbligatoria e non risulterai moroso.</p>
+      <p>Se è prevista l’«Offerta libera», puoi scegliere in autonomia l’importo del tuo contributo.</p>
       <p>Premi «Effettua un versamento» (oppure «Fai un’offerta») per scegliere importo e modalità di pagamento. Per le ricevute già emesse, premi «Apri ricevuta».</p>
     </details>
     {caricamento ? <p role="status">Caricamento dei tuoi pagamenti…</p> : errore ? <>
