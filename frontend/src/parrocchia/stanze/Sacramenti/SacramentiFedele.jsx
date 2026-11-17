@@ -372,7 +372,7 @@ function StatoDomandeComunioneGenitore({ parrocchiaId, utenteId, nuovaIscrizione
   </section>;
 }
 
-function ModuloComunione({ parrocchiaId, utenteId, nomeParrocchia }) {
+function ModuloComunione({ parrocchiaId, utenteId, nomeParrocchia, onApriQuote }) {
   const [config, setConfig] = useState(null);
   const [caricamento, setCaricamento] = useState(true);
   const [erroreConfig, setErroreConfig] = useState("");
@@ -638,6 +638,10 @@ function ModuloComunione({ parrocchiaId, utenteId, nomeParrocchia }) {
         <button className="ars-sac-azione" type="button" onClick={() => setMostraModulo(v => !v)}>
           {mostraModulo ? "Chiudi il modulo" : "Compila iscrizione o rinnovo"}
         </button>
+        {!mostraModulo && <button className="ars-sac-azione ars-sac-azione-chiara" type="button"
+          onClick={onApriQuote}>
+          Vai a Quote e pagamenti
+        </button>}
       </div>
     </>}
 
@@ -949,10 +953,10 @@ function QuotePagamentiComunioneFedele({ parrocchiaId, utenteId, nomeParrocchia 
   </section>;
 }
 
-function DettaglioSottocard({ sezione, parrocchiaId, utenteId, nomeParrocchia }) {
+function DettaglioSottocard({ sezione, parrocchiaId, utenteId, nomeParrocchia, onApriQuote }) {
   switch (sezione) {
     case "iscrizioni":
-      return <ModuloComunione parrocchiaId={parrocchiaId} utenteId={utenteId} nomeParrocchia={nomeParrocchia} />;
+      return <ModuloComunione parrocchiaId={parrocchiaId} utenteId={utenteId} nomeParrocchia={nomeParrocchia} onApriQuote={onApriQuote} />;
     case "gruppo":
       return <><p>Qui troverai il gruppo di Catechismo assegnato e lo spazio di dialogo condiviso con i catechisti e il parroco.</p><p>Ai ragazzi sarà consentito scrivere nel gruppo, ma non inviare messaggi privati ad altri ragazzi.</p><p className="ars-sac-prossimamente">Le conversazioni saranno attivate dopo la predisposizione dei gruppi e delle autorizzazioni.</p></>;
     case "calendario":
@@ -1014,7 +1018,8 @@ export default function SacramentiFedele({ tornaDashboard, utenteId = null, parr
         <section className="ars-sac-pannello" aria-label={sottocard.nome}>
           <h3>{sottocard.nome}</h3>
           <DettaglioSottocard sezione={sottocard.id} parrocchiaId={parrocchiaAttuale}
-            utenteId={utenteAttuale} nomeParrocchia={nomeAttuale} />
+            utenteId={utenteAttuale} nomeParrocchia={nomeAttuale}
+            onApriQuote={() => setSottocardScelta("pagamenti")} />
         </section>
       ) : (
         <section className="ars-sac-dettaglio">
