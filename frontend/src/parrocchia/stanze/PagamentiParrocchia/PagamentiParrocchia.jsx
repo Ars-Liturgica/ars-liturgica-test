@@ -1070,6 +1070,7 @@ const STILI_ECONOMIA = `
 .ars-bilancio button{font:inherit;padding:10px 16px;border:1px solid #c99536;border-radius:8px;background:#fffaf0;color:#173955;cursor:pointer}
 .ars-bilancio button:disabled{opacity:.55;cursor:default}
 .ars-economia-azioni{display:flex;flex-wrap:wrap;gap:14px;align-items:end;margin:20px 0}
+.ars-istruzioni-filtri{font-size:14px;line-height:1.5;margin:-8px 0 18px;color:#173955}
 .ars-bilancio label{display:flex;flex-direction:column;gap:6px}
 .ars-bilancio input,.ars-bilancio select{font:inherit;padding:10px;border:1px solid #d6c8b4;border-radius:8px;background:#fff;color:#173955;max-width:100%;box-sizing:border-box}
 .ars-economia-tabella{overflow:auto;margin:20px 0}
@@ -1406,6 +1407,11 @@ function EconomiaPerCausale({ parrocchiaId, tornaDashboard, nomeParrocchia, moda
       <button type="button" disabled={salvataggio} onClick={()=>{setFiltri({dataDa:"",dataA:"",tipo:"",collegamento:"",stato:"",ricerca:""});setDateApplicate({dataDa:"",dataA:""});}}>Azzera filtri</button>
       <button type="button" disabled={caricamento||salvataggio} onClick={()=>setRevisione(n=>n+1)}>Aggiorna</button>
     </form>
+    <p className="ars-istruzioni-filtri">
+      {bilancio
+        ? "Per consultare il bilancio di una singola attività, seleziona «Attività: tutti i movimenti» nel menu «Causale». Comparirà un nuovo menu «Attività», dal quale potrai scegliere l’attività desiderata."
+        : "Per consultare i versamenti di una singola attività, seleziona «Attività: tutti i movimenti» nel menu «Causale». Comparirà un nuovo menu «Attività», dal quale potrai scegliere l’attività desiderata."}
+    </p>
     {messaggio&&<p role="status">{messaggio}</p>}{errore&&<p role="alert">{errore}</p>}
     {incassoAperto&&<ModuloIncasso parrocchiaId={parrocchiaId} attivita={dati?.attivita||[]} progetti={dati?.progetti||[]} tipoIniziale={filtri.tipo === "attivita_tutte" ? "donazione_attivita" : filtri.tipo} collegamentoIniziale={filtri.collegamento} onOccupato={setSalvataggio} onAnnulla={()=>setIncassoAperto(false)} onSalvato={(idPagamento)=>{
       setIncassoAperto(false);setSalvataggio(false);setMessaggio("Incasso registrato. Il bilancio viene aggiornato.");
