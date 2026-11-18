@@ -27,6 +27,8 @@ export default function DashboardParroco({
   const [erroreBilanci, setErroreBilanci] = useState("");
   const [caricamentoBilanci, setCaricamentoBilanci] = useState(false);
   const [erroreRiepilogo, setErroreRiepilogo] = useState("");
+  const [bonificiDaVerificare, setBonificiDaVerificare] = useState(null);
+  const [erroreBonifici, setErroreBonifici] = useState("");
   const [caricamentoRiepilogo, setCaricamentoRiepilogo] = useState(true);
   const [aggiornamento, setAggiornamento] = useState(0);
   const [parrocchia, setParrocchia] = useState(null);
@@ -201,6 +203,34 @@ export default function DashboardParroco({
       document.removeEventListener("visibilitychange", alRientro);
     };
   }, []);
+
+  // Conteggio della dashboard e lista operativa usano la STESSA RPC.
+  // Non si usa "pagamenti_in_attesa", che non conta i bonifici dichiarati.
+  useEffect(() => {
+    if (!parrocchia?.id || stanzaAperta) return;
+    let attivo = true;
+    setBonificiDaVerificare(null);
+    setErroreBonifici("");
+    async function caricaBonifici() {
+      try {
+        const { data, error } = await supabase.rpc("ars_bonifici_da_verificare", {
+          p_parrocchia_id: parrocchia.id,
+        });
+        if (error) throw error;
+        if (!data || !Array.isArray(data.movimenti)) {
+          throw new Error("Conteggio dei bonifici non disponibile.");
+        }
+        if (attivo) setBonificiDaVerificare(data.movimenti.length);
+      } catch (e) {
+        if (attivo) {
+          console.error("Conteggio bonifici da verificare:", e);
+          setErroreBonifici("Impossibile aggiornare i bonifici da verificare.");
+        }
+      }
+    }
+    caricaBonifici();
+    return () => { attivo = false; };
+  }, [parrocchia?.id, stanzaAperta, aggiornamento]);
 
   // Controllo di sola lettura sull'intero storico, non limitato al mese corrente.
   // Stesse RPC e regole contabili della pagina Gestione economica.
@@ -470,11 +500,12 @@ export default function DashboardParroco({
     );
   }
 
-  if (stanzaAperta === "pagamenti") {
+  if (stanzaAperta === "pagamenti" || stanzaAperta === "pagamenti-verifica") {
     return (
       <PagamentiParrocchia
         parrocchiaId={parrocchia?.id}
         nomeParrocchia={parrocchia?.nome || ""}
+        paginaIniziale={stanzaAperta === "pagamenti-verifica" ? "verifica" : "versamenti"}
         tornaDashboard={() =>
           setStanzaAperta(null)
         }
@@ -527,7 +558,7 @@ export default function DashboardParroco({
       </div>
       {caricamentoRiepilogo && <p role="status">Caricamento del riepilogo…</p>}
       {erroreRiepilogo && <p role="alert" className="ars-riepilogo-errore">{erroreRiepilogo}</p>}
-      {riepilogo && <RiepilogoDashboard dati={riepilogo} apri={setStanzaAperta} bilanciNegativi={bilanciNegativi} erroreBilanci={erroreBilanci} caricamentoBilanci={caricamentoBilanci} />}
+      {riepilogo && <RiepilogoDashboard dati={riepilogo} apri={setStanzaAperta} bonificiDaVerificare={bonificiDaVerificare} erroreBonifici={erroreBonifici} bilanciNegativi={bilanciNegativi} erroreBilanci={erroreBilanci} caricamentoBilanci={caricamentoBilanci} />}
       <h3 className="ars-titolo-sezioni">Gestione della parrocchia</h3>
       <div className="griglia-gestione">
         {sezioniGestione.map((sezione) => (
@@ -550,7 +581,7 @@ export default function DashboardParroco({
             {!sezione.stanza && <span className="ars-dato-card">In preparazione</span>}
             {riepilogo && sezione.stanza === "celebrazioni" && <span className="ars-dato-card">{riepilogo.intenzioni_oggi} {riepilogo.intenzioni_oggi === 1 ? "intenzione" : "intenzioni"} oggi</span>}
             {riepilogo && sezione.stanza === "attivita-progetti" && <span className="ars-dato-card">{riepilogo.attivita_pubblicate} {riepilogo.attivita_pubblicate === 1 ? "attività pubblicata" : "attività pubblicate"}</span>}
-            {riepilogo && sezione.stanza === "pagamenti" && <span className="ars-dato-card">{riepilogo.pagamenti_in_attesa} versamenti in attesa</span>}
+            {riepilogo && sezione.stanza === "pagamenti" && <span className="ars-dato-card">{bonificiDaVerificare === null ? "—" : bonificiDaVerificare} bonifici da verificare</span>}
           </button>
         ))}
       </div>
@@ -568,14 +599,12 @@ function denaro(importo, valuta) {
   return new Intl.NumberFormat("it-IT", { style: "currency", currency: valuta }).format(Number(importo));
 }
 
-function RiepilogoDashboard({ dati, apri, bilanciNegativi, erroreBilanci, caricamentoBilanci }) {
+function RiepilogoDashboard({ dati, apri, bonificiDaVerificare, erroreBonifici, bilanciNegativi, erroreBilanci, caricamentoBilanci }) {
   const [mostraBilanciNegativi, setMostraBilanciNegativi] = useState(false);
   const mese = new Intl.DateTimeFormat("it-IT", { month: "long", year: "numeric", timeZone: "Europe/Rome" })
     .format(new Date(dati.mese + "T12:00:00Z"));
   const daSeguire = [
-    { numero: dati.iscrizioni_da_esaminare, testo: "Iscrizioni da esaminare", stanza: "attivita-gruppi" },
-    { numero: dati.pagamenti_in_attesa, testo: "Versamenti in attesa di conferma", stanza: "pagamenti" },
-    { numero: dati.intenzioni_da_regolarizzare, testo: "Intenzioni da regolarizzare", stanza: "intenzioni" },
+    { numero: bonificiDaVerificare, testo: "Versamenti da verificare", stanza: "pagamenti-verifica" },
   ];
   return <div className="ars-riepilogo-griglia">
     <section className="ars-riepilogo-pannello">
@@ -594,10 +623,10 @@ function RiepilogoDashboard({ dati, apri, bilanciNegativi, erroreBilanci, carica
     <section className="ars-riepilogo-pannello">
       <h3>Da seguire</h3>
       <div className="ars-elenco-attenzioni">{daSeguire.map(voce => <button key={voce.stanza} type="button" onClick={() => apri(voce.stanza)}>
-        <span className={voce.numero > 0 ? "ars-conteggio ars-conteggio-attivo" : "ars-conteggio"}>{voce.numero}</span>
+        <span className={voce.numero > 0 ? "ars-conteggio ars-conteggio-attivo" : "ars-conteggio"}>{voce.numero === null ? "—" : voce.numero}</span>
         <span>{voce.testo}</span><span aria-hidden="true">→</span>
       </button>)}</div>
-      <p className="ars-nota">I versamenti in attesa sono registrazioni da confermare; le quote ancora da versare si consultano nelle attività.</p>
+      {erroreBonifici && <p className="ars-nota" role="status">{erroreBonifici}</p>}
     </section>
     <section className="ars-riepilogo-pannello ars-pannello-economia">
       <h3>Gestione economica</h3>
