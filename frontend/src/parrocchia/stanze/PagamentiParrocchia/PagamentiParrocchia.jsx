@@ -111,8 +111,8 @@ function righeStampa(righe, valuta) {
   return righe.map((r) => `<tr><td>${escapeHtml(nomeGenitore(r))}<br>${escapeHtml(r.telefono_contatto || "")}</td><td>${escapeHtml(nomeRagazzo(r))}</td><td>${escapeHtml((r.gruppi || []).map((g) => g.nome).join(", ") || "Non assegnato")}</td><td class="numero">${escapeHtml(formattaImporto(r.dovuto, valuta))}</td><td class="numero">${escapeHtml(formattaImporto(r.pagato, valuta))}</td><td class="numero">${escapeHtml(formattaImporto(r.residuo, valuta))}</td><td>${escapeHtml(ETICHETTE_QUOTA[r.stato_quota] || r.stato_quota)}</td></tr>`).join("");
 }
 
-export default function PagamentiParrocchia({ parrocchiaId, tornaDashboard, nomeParrocchia = "" }) {
-  const [pagina, setPagina] = useState("versamenti");
+export default function PagamentiParrocchia({ parrocchiaId, tornaDashboard, nomeParrocchia = "", paginaIniziale = "versamenti" }) {
+  const [pagina, setPagina] = useState(() => paginaIniziale === "verifica" ? "verifica" : "versamenti");
   const [occupato, setOccupato] = useState(false);
   return <div className="ars-pagina-economica">
     <style>{STILI_ECONOMIA}</style>
@@ -131,28 +131,16 @@ export default function PagamentiParrocchia({ parrocchiaId, tornaDashboard, nome
 }
 
 
-// Verifica incassi: sola consultazione e storno; nessuna seconda conferma PayPal/Stripe.
-function tipoMetodoVerifica(p) {
-  const metodo = String(p.metodo || "").toLowerCase();
-  const gestore = String(p.gestore_pagamento || "").toLowerCase();
-  if (metodo === "bonifico") return "bonifico";
-  if (metodo === "paypal" || gestore === "paypal") return "paypal";
-  if (["stripe", "link_pagamento"].includes(metodo) || ["stripe", "link_pagamento"].includes(gestore)) return "stripe";
-  return null; // Esclude consegna_diretta e metodi online non identificabili.
-}
-function LogoMetodoVerifica({ tipo }) {
-  if (tipo === "paypal") return <span className="ars-logo-paypal" aria-label="PayPal"><strong>Pay</strong><strong>Pal</strong></span>;
-  if (tipo === "stripe") return <span className="ars-logo-stripe" aria-label="Stripe">stripe</span>;
-  return <span className="ars-logo-bonifico" aria-label="Bonifico bancario"><span aria-hidden="true">▥</span> Bonifico</span>;
-}
+// Verifica incassi: lista operativa dei soli bonifici ancora da controllare.
+// PayPal e Stripe non sono sottoposti a una seconda conferma manuale.
+// La conferma bancaria non crea movimenti contabili, mentre lo storno
+// continua ad essere gestito dalla procedura già esistente.
 function VerificaIncassi({ parrocchiaId, tornaDashboard, nomeParrocchia, onOccupato }) {
   const [movimenti, setMovimenti] = useState([]);
   const [caricamento, setCaricamento] = useState(true);
   const [errore, setErrore] = useState("");
   const [messaggio, setMessaggio] = useState("");
   const [ricerca, setRicerca] = useState("");
-  const [metodo, setMetodo] = useState("");
-  const [stato, setStato] = useState("");
   const [dal, setDal] = useState("");
   const [al, setAl] = useState("");
   const [revisione, setRevisione] = useState(0);
@@ -160,83 +148,133 @@ function VerificaIncassi({ parrocchiaId, tornaDashboard, nomeParrocchia, onOccup
   const [stampaInCorso, setStampaInCorso] = useState(null);
   const [documentoAnteprima, setDocumentoAnteprima] = useState(null);
   const blocco = useRef(false);
+
   useEffect(() => { onOccupato?.(occupato); return () => onOccupato?.(false); }, [occupato, onOccupato]);
   useEffect(() => {
     let attivo = true;
-    setCaricamento(true); setErrore("");
+    setCaricamento(true);
+    setErrore("");
     async function carica() {
       try {
         if (!parrocchiaId) throw new Error("Seleziona una parrocchia.");
-        const { data, error } = await supabase.rpc("ars_economia_parrocchia_per_causale", {
-          p_parrocchia_id: parrocchiaId, p_data_da: null, p_data_a: null,
+        const { data, error } = await supabase.rpc("ars_bonifici_da_verificare", {
+          p_parrocchia_id: parrocchiaId,
         });
         if (error) throw error;
-        if (!Array.isArray(data?.movimenti)) throw new Error("Elenco incassi non disponibile.");
-        if (attivo) setMovimenti(data.movimenti.filter(p => tipoMetodoVerifica(p)));
-      } catch (e) { if (attivo) setErrore(e.message || "Impossibile caricare gli incassi."); }
-      finally { if (attivo) setCaricamento(false); }
+        if (!data || !Array.isArray(data.movimenti)) {
+          throw new Error("Elenco dei bonifici da verificare non disponibile.");
+        }
+        if (attivo) setMovimenti(data.movimenti);
+      } catch (e) {
+        if (attivo) { setMovimenti([]); setErrore(e.message || "Impossibile caricare i bonifici."); }
+      } finally {
+        if (attivo) setCaricamento(false);
+      }
     }
-    carica(); return () => { attivo = false; };
+    carica();
+    return () => { attivo = false; };
   }, [parrocchiaId, revisione]);
+
   const elenco = useMemo(() => movimenti.filter(p => {
-    const tipo = tipoMetodoVerifica(p);
-    const testo = [p.pagante, p.causale, p.partecipante, causaleMovimento(p), tipo].filter(Boolean).join(" ").toLocaleLowerCase("it-IT");
+    const testo = [p.pagante, p.partecipante, p.causale, "bonifico"]
+      .filter(Boolean).join(" ").toLocaleLowerCase("it-IT");
     const giorno = p.data ? new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Rome" }).format(new Date(p.data)) : "";
-    const statoEffettivo = p.stornato_mancato_incasso ? "stornato" : p.stato;
-    return (!metodo || tipo === metodo) && (!stato || statoEffettivo === stato) &&
-      (!ricerca.trim() || testo.includes(ricerca.trim().toLocaleLowerCase("it-IT"))) &&
+    return (!ricerca.trim() || testo.includes(ricerca.trim().toLocaleLowerCase("it-IT"))) &&
       (!dal || giorno >= dal) && (!al || giorno <= al);
-  }).sort((a,b) => new Date(b.data || 0) - new Date(a.data || 0)), [movimenti, ricerca, metodo, stato, dal, al]);
-  async function storna(p) {
-    if (blocco.current || p.stornato_mancato_incasso) return;
-    if (!window.confirm(`Confermi il mancato incasso di ${formattaImporto(p.importo,p.valuta)}? Verrà registrato un movimento negativo collegato all'originale. Non è un rimborso.`)) return;
-    blocco.current = true; setOccupato(true); setErrore(""); setMessaggio("");
+  }).sort((a, b) => new Date(b.data || 0) - new Date(a.data || 0)), [movimenti, ricerca, dal, al]);
+
+  async function verificato(p) {
+    if (blocco.current) return;
+    blocco.current = true;
+    setOccupato(true); setErrore(""); setMessaggio("");
     try {
-      const { data, error } = await supabase.rpc("ars_storna_mancato_incasso", { p_pagamento_id: p.id });
+      const { data, error } = await supabase.rpc("ars_bonifico_segna_verificato", {
+        p_pagamento_id: p.id,
+      });
+      if (error) throw error;
+      if (data !== true) throw new Error("Bonifico già controllato o non disponibile. Aggiorna l'elenco.");
+      setMovimenti(righe => righe.filter(r => r.id !== p.id));
+      setMessaggio("Bonifico verificato. Nessun secondo incasso è stato registrato.");
+      setRevisione(n => n + 1);
+    } catch (e) {
+      setErrore(e.message || "Impossibile registrare la verifica.");
+    } finally {
+      blocco.current = false; setOccupato(false);
+    }
+  }
+
+  async function storna(p) {
+    if (blocco.current) return;
+    const descrizione = p.partecipante ? ` per ${p.partecipante}` : "";
+    if (!window.confirm(`Vuoi stornare il bonifico di ${formattaImporto(p.importo, p.valuta)}${descrizione}?\n\nIl versamento sarà annullato nella contabilità e resterà nello storico.`)) return;
+    blocco.current = true;
+    setOccupato(true); setErrore(""); setMessaggio("");
+    try {
+      const { data, error } = await supabase.rpc("ars_storna_mancato_incasso", {
+        p_pagamento_id: p.id,
+      });
       if (error) throw error;
       if (data !== true) throw new Error("Incasso già stornato o non disponibile. Aggiorna l'elenco.");
-      setMessaggio("Storno registrato. I bilanci sono aggiornati.");
+      setMovimenti(righe => righe.filter(r => r.id !== p.id));
+      setMessaggio("Storno registrato. Il versamento resta consultabile nello storico contabile.");
       setRevisione(n => n + 1);
-    } catch (e) { setErrore(e.message || "Storno non riuscito."); }
-    finally { blocco.current = false; setOccupato(false); }
+    } catch (e) {
+      setErrore(e.message || "Storno non riuscito.");
+    } finally {
+      blocco.current = false; setOccupato(false);
+    }
   }
+
   async function ricevuta(p) {
-    if (stampaInCorso) return;
+    if (stampaInCorso || occupato) return;
     setStampaInCorso(p.id); setMessaggio("");
     try {
       const doc = await recuperaDocumentoEconomico(parrocchiaId, "pagamento", p.id, null);
-      if (!doc || doc.tipo_documento !== "ricevuta") { setMessaggio("Ricevuta non disponibile nell'archivio. Nessun nuovo documento è stato emesso."); return; }
+      if (!doc || doc.tipo_documento !== "ricevuta") {
+        setMessaggio("Ricevuta non disponibile nell'archivio. Nessun nuovo documento è stato emesso.");
+        return;
+      }
       setDocumentoAnteprima(doc);
-    } catch(e) { setMessaggio(`Impossibile aprire la ricevuta: ${e.message}`); }
-    finally { setStampaInCorso(null); }
+    } catch (e) {
+      setMessaggio(`Impossibile aprire la ricevuta: ${e.message}`);
+    } finally {
+      setStampaInCorso(null);
+    }
   }
+
   return <main className="ars-bilancio ars-verifica-incassi">
     <AnteprimaConAnagrafica documento={documentoAnteprima} parrocchiaId={parrocchiaId} nomeParrocchia={nomeParrocchia} onChiudi={() => setDocumentoAnteprima(null)} />
     <button type="button" onClick={tornaDashboard} disabled={occupato}>← Torna alla dashboard</button>
     <h2>Verifica incassi</h2>
-    <p>Qui trovi i pagamenti effettuati con PayPal, Stripe e bonifico, con data, causale e importo.</p>
-    <p>PayPal e Stripe sono già confermati dal gestore. Per un bonifico non ricevuto puoi utilizzare «Storna incasso».</p>
+    <p>Qui compaiono soltanto i bonifici dichiarati e non ancora controllati. Dopo «Verificato» o «Storna incasso» il bonifico esce da questa lista, ma rimane nello storico contabile.</p>
     <div className="ars-economia-azioni azioni-non-stampabili">
-      <label>Cerca<input value={ricerca} onChange={e=>setRicerca(e.target.value)} placeholder="Pagante o causale" /></label>
-      <label>Metodo<select value={metodo} onChange={e=>setMetodo(e.target.value)}><option value="">Tutti</option><option value="paypal">PayPal</option><option value="stripe">Stripe</option><option value="bonifico">Bonifico</option></select></label>
-      <label>Stato<select value={stato} onChange={e=>setStato(e.target.value)}><option value="">Tutti</option><option value="completata">Completato</option><option value="in_attesa">In attesa</option><option value="stornato">Stornato</option><option value="fallita">Fallito</option><option value="annullata">Annullato</option></select></label>
-      <label>Dal<input type="date" value={dal} onChange={e=>setDal(e.target.value)} /></label>
-      <label>Al<input type="date" value={al} onChange={e=>setAl(e.target.value)} /></label>
-      <button type="button" disabled={caricamento || occupato} onClick={()=>setRevisione(n=>n+1)}>Aggiorna</button>
-      <button type="button" onClick={()=>{setRicerca("");setMetodo("");setStato("");setDal("");setAl("");}}>Azzera filtri</button>
+      <label>Cerca<input value={ricerca} onChange={e => setRicerca(e.target.value)} placeholder="Pagante, partecipante o causale" /></label>
+      <label>Dal<input type="date" value={dal} onChange={e => setDal(e.target.value)} /></label>
+      <label>Al<input type="date" value={al} onChange={e => setAl(e.target.value)} /></label>
+      <button type="button" disabled={caricamento || occupato} onClick={() => setRevisione(n => n + 1)}>Aggiorna</button>
+      <button type="button" disabled={occupato} onClick={() => { setRicerca(""); setDal(""); setAl(""); }}>Azzera filtri</button>
     </div>
-    {messaggio && <p role="status">{messaggio}</p>}{errore && <p role="alert">{errore}</p>}
-    {caricamento ? <p>Caricamento incassi…</p> : <>
-      <p>{elenco.length} incassi nella selezione.</p>
-      {!elenco.length ? <p>Nessun incasso corrisponde ai filtri scelti.</p> : <div className="ars-economia-tabella ars-versamenti-responsive ars-verifica-tabella"><table><thead><tr><th>Data pagamento</th><th>Pagante</th><th>Importo</th><th>Metodo</th><th>Causale</th><th>Stato</th><th>Ricevuta</th><th>Storno</th></tr></thead><tbody>
-        {elenco.map(p => <tr key={p.id}>
-          <td>{formattaData(p.data)}</td><td>{p.pagante || "—"}</td><td><strong>{formattaImporto(p.importo,p.valuta)}</strong></td>
-          <td><LogoMetodoVerifica tipo={tipoMetodoVerifica(p)} /></td><td>{p.causale || causaleMovimento(p)}</td>
-          <td>{p.stornato_mancato_incasso ? "Stornato" : etichettaStato(p.stato)}</td>
-          <td>{["completata", "in_attesa"].includes(p.stato) ? <button type="button" disabled={!!stampaInCorso || occupato} onClick={()=>ricevuta(p)}>{stampaInCorso===p.id ? "Apertura…" : "Stampa"}</button> : "—"}</td>
-          <td>{p.stornato_mancato_incasso ? "Stornato" : ["completata", "in_attesa"].includes(p.stato) ? <button type="button" disabled={occupato} onClick={()=>storna(p)}>Storna incasso</button> : "—"}</td>
-        </tr>)}
-      </tbody></table></div>}
+    {messaggio && <p role="status">{messaggio}</p>}
+    {errore && <p role="alert">{errore}</p>}
+    {caricamento ? <p>Caricamento dei bonifici…</p> : !errore && <>
+      <p><strong>{movimenti.length}</strong> {movimenti.length === 1 ? "bonifico da verificare" : "bonifici da verificare"}{elenco.length !== movimenti.length ? ` · ${elenco.length} nella selezione` : ""}.</p>
+      {!elenco.length ? <p>{movimenti.length ? "Nessun bonifico corrisponde ai filtri scelti." : "Nessun bonifico da verificare."}</p> :
+        <div className="ars-economia-tabella ars-versamenti-responsive ars-verifica-tabella">
+          <table><thead><tr><th>Data</th><th>Pagante / partecipante</th><th>Importo</th><th>Causale</th><th>Stato</th><th>Ricevuta</th><th>Azioni</th></tr></thead>
+            <tbody>{elenco.map(p => <tr key={p.id}>
+              <td>{formattaData(p.data)}</td>
+              <td>{p.pagante || "—"}{p.partecipante && <><br /><small>Per {p.partecipante}</small></>}</td>
+              <td><strong>{formattaImporto(p.importo, p.valuta)}</strong></td>
+              <td>{p.causale || "—"}</td>
+              <td>Da verificare</td>
+              <td><button type="button" disabled={!!stampaInCorso || occupato} onClick={() => ricevuta(p)}>{stampaInCorso === p.id ? "Apertura…" : "Stampa"}</button></td>
+              <td><div className="ars-economia-azioni">
+                <button type="button" disabled={occupato || !!stampaInCorso} onClick={() => verificato(p)}>Verificato</button>
+                <button type="button" disabled={occupato || !!stampaInCorso} onClick={() => storna(p)}>Storna incasso</button>
+              </div></td>
+            </tr>)}</tbody>
+          </table>
+        </div>}
     </>}
   </main>;
 }
