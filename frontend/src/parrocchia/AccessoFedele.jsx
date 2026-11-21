@@ -6,7 +6,7 @@ export default function AccessoFedele({ tornaHome }) {
   const [identificativo, setIdentificativo] = useState("");
   const [messaggio, setMessaggio] = useState("");
   const [caricamento, setCaricamento] = useState(false);
-  const [accessoCompletato, setAccessoCompletato] = useState(false);
+  const [profiloAttivo, setProfiloAttivo] = useState(null);
 
   async function entraNellaParrocchia() {
     const idScelto = identificativo.trim();
@@ -26,9 +26,21 @@ export default function AccessoFedele({ tornaHome }) {
         setMessaggio("Non troviamo questo nome. Controlla di averlo scritto come al momento della registrazione.");
         return;
       }
-      localStorage.setItem("ars_utente_id", data.utente_id);
-      localStorage.setItem("ars_parrocchia_id", data.parrocchia_id);
-      localStorage.setItem("ars_nome_parrocchia", data.nome_parrocchia);
+      // La parrocchia e l'utente arrivano dal profilo gia' creato,
+      // non dal CAP del ragazzo. Li manteniamo anche nello stato React:
+      // cosi' la dashboard non dipende soltanto da localStorage.
+      const profilo = {
+        utenteId: data.utente_id,
+        parrocchiaId: data.parrocchia_id,
+        nomeParrocchia: data.nome_parrocchia || "La tua Parrocchia",
+      };
+      if (!profilo.utenteId || !profilo.parrocchiaId) {
+        setMessaggio("Il profilo è stato trovato, ma non sono arrivati i dati della parrocchia. Controlla il collegamento nell'accesso.");
+        return;
+      }
+      localStorage.setItem("ars_utente_id", profilo.utenteId);
+      localStorage.setItem("ars_parrocchia_id", profilo.parrocchiaId);
+      localStorage.setItem("ars_nome_parrocchia", profilo.nomeParrocchia);
       localStorage.setItem("ars_identificativo", data.identificativo);
       localStorage.setItem("ars_nome_parroco", data.nome_parroco || "");
       sessionStorage.setItem("ars_anagrafica_fedele", JSON.stringify({
@@ -39,7 +51,7 @@ export default function AccessoFedele({ tornaHome }) {
         telefono: data.telefono || "",
         email: data.email || "",
       }));
-      setAccessoCompletato(true);
+      setProfiloAttivo(profilo);
     } catch (error) {
       console.error("Errore accesso fedele:", error);
       setMessaggio("Non è stato possibile entrare nella tua Parrocchia. Riprova.");
@@ -48,7 +60,13 @@ export default function AccessoFedele({ tornaHome }) {
     }
   }
 
-  if (accessoCompletato) return <DashboardFedele />;
+  if (profiloAttivo) {
+    return <DashboardFedele
+      utenteIdIniziale={profiloAttivo.utenteId}
+      parrocchiaIdIniziale={profiloAttivo.parrocchiaId}
+      nomeParrocchiaIniziale={profiloAttivo.nomeParrocchia}
+    />;
+  }
 
   return (
     <div style={{ maxWidth: "560px", margin: "40px auto", padding: "32px", background: "#fffaf0", border: "1px solid #d6a23a", borderRadius: "18px", textAlign: "center", boxShadow: "0 8px 24px rgba(68, 52, 35, 0.10)" }}>
