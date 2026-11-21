@@ -1148,12 +1148,191 @@ function QuotePagamentiComunioneFedele({ parrocchiaId, utenteId, nomeParrocchia 
   </section>;
 }
 
+// Chat condivisa con il parroco: stessa conversazione e stesse RPC già in uso nella Card 05.
+// La ricerca dei gruppi e le autorizzazioni sono determinate da Supabase,
+// mai dal browser o dall'identificativo liberamente scelto dal fedele.
+function ChatComunioneFedele({ gruppo, onTorna }) {
+  const [pagina, setPagina] = useState(null);
+  const [testo, setTesto] = useState("");
+  const [errore, setErrore] = useState("");
+  const [inCorso, setInCorso] = useState(false);
+  const operazione = useRef(false);
+  const identificativoInvio = useRef(null);
+  const gruppoId = gruppo.gruppo_id;
+  const annualeId = gruppo.gruppo_annuale_id;
+
+  async function chiamaChat(nome, parametri = {}) {
+    const { data, error } = await supabase.rpc(`ars_comunione_chat_${nome}`, {
+      p_gruppo_id: gruppoId, ...parametri,
+    });
+    if (error) throw error;
+    return data;
+  }
+
+  async function leggiChat(parametri = {}) {
+    const risultato = await chiamaChat("leggi", parametri);
+    if (!risultato?.accesso || risultato.accesso.gruppo_annuale_id !== annualeId) {
+      throw new Error("Il gruppo di catechismo è cambiato. Torna all'elenco.");
+    }
+    return risultato;
+  }
+
+  useEffect(() => {
+    let attivo = true;
+    setPagina(null);
+    setErrore("");
+    leggiChat().then(risultato => { if (attivo) setPagina(risultato); })
+      .catch(err => { if (attivo) setErrore(err.message || "Impossibile leggere la chat."); });
+    return () => { attivo = false; };
+    // Il contenuto è ricaricato passando a un altro gruppo.
+  }, [gruppoId, annualeId]);
+
+  async function esegui(azione) {
+    if (operazione.current) return;
+    operazione.current = true;
+    setInCorso(true);
+    setErrore("");
+    try { await azione(); }
+    catch (err) { setErrore(err.message || "Operazione non riuscita. Riprova."); }
+    finally { operazione.current = false; setInCorso(false); }
+  }
+
+  async function invia() {
+    const messaggio = testo.trim();
+    if (!messaggio || !pagina?.accesso?.puo_scrivere) return;
+    if (!identificativoInvio.current) identificativoInvio.current = crypto.randomUUID();
+    await chiamaChat("invia", {
+      p_gruppo_annuale_id: annualeId,
+      p_invio_id: identificativoInvio.current,
+      p_testo: messaggio,
+    });
+    setTesto("");
+    identificativoInvio.current = null;
+    setPagina(await leggiChat());
+  }
+
+  async function caricaPrecedenti() {
+    const primo = pagina?.messaggi?.[0];
+    if (!primo) return;
+    const precedenti = await leggiChat({ p_prima_del: primo.inviato_il, p_prima_id: primo.id });
+    const giaCaricati = new Set((precedenti.messaggi || []).map(m => m.id));
+    setPagina({ ...precedenti, messaggi: [
+      ...(precedenti.messaggi || []),
+      ...(pagina.messaggi || []).filter(m => !giaCaricati.has(m.id)),
+    ] });
+  }
+
+  return <div className="ars-com-chat-fedele">
+    <button type="button" className="ars-sac-azione ars-sac-azione-chiara" onClick={onTorna}>
+      ← Torna ai miei gruppi
+    </button>
+    <h4>Chat · {gruppo.nome}</h4>
+    <p>{gruppo.anno_percorso}° anno · {gruppo.anno_pastorale}</p>
+    <details className="ars-com-chat-guida">
+      <summary>Come utilizzare questa pagina</summary>
+      <p>Qui puoi leggere i messaggi condivisi dal parroco, dai catechisti e dagli altri partecipanti autorizzati. Premi «Aggiorna messaggi» per vedere le novità.</p>
+      <p>Quando la chat è aperta e il tuo profilo è abilitato, scrivi nel riquadro e premi «Invia». Le risposte saranno visibili nella stessa conversazione.</p>
+    </details>
+    {errore && <p role="alert" className="ars-sac-errore">{errore}</p>}
+    <button type="button" className="ars-sac-azione ars-sac-azione-chiara" disabled={inCorso}
+      onClick={() => esegui(async () => setPagina(await leggiChat()))}>
+      Aggiorna messaggi
+    </button>
+    {!pagina && !errore && <p role="status">Caricamento dei messaggi…</p>}
+    {pagina && <>
+      {pagina.accesso.chat_chiusa && <p className="ars-com-chat-avviso">La chat è temporaneamente chiusa: i messaggi restano leggibili.</p>}
+      {pagina.altri_precedenti && <button type="button" className="ars-sac-azione ars-sac-azione-chiara"
+        disabled={inCorso} onClick={() => esegui(caricaPrecedenti)}>Carica messaggi precedenti</button>}
+      {!(pagina.messaggi || []).length && <p>Nessun messaggio pubblicato in questo gruppo.</p>}
+      <div className="ars-com-chat-messaggi" aria-label="Messaggi del gruppo">
+        {(pagina.messaggi || []).map(m => <article className="ars-com-chat-messaggio" key={m.id}>
+          <small>{m.mio ? "Tu" : "Partecipante"} · {new Date(m.inviato_il).toLocaleString("it-IT")}</small>
+          <p>{m.rimosso ? "Messaggio rimosso" : m.testo}</p>
+        </article>)}
+      </div>
+      {pagina.accesso.puo_scrivere && !pagina.accesso.chat_chiusa && <form onSubmit={e => {
+        e.preventDefault(); esegui(invia);
+      }}>
+        <label className="ars-sac-campo" htmlFor="ars-messaggio-chat-fedele">Scrivi un messaggio
+          <textarea id="ars-messaggio-chat-fedele" rows={3} disabled={inCorso}
+            value={testo} onChange={e => { identificativoInvio.current = null; setTesto(e.target.value); }} />
+        </label>
+        <button type="submit" className="ars-sac-azione" disabled={inCorso || !testo.trim()}>Invia</button>
+      </form>}
+      {!pagina.accesso.puo_scrivere && !pagina.accesso.chat_chiusa &&
+        <p className="ars-com-chat-avviso">Per questo profilo è disponibile la lettura dei messaggi.</p>}
+    </>}
+  </div>;
+}
+
+function IlMioGruppoComunione({ parrocchiaId }) {
+  const [gruppi, setGruppi] = useState([]);
+  const [apertoId, setApertoId] = useState(null);
+  const [caricamento, setCaricamento] = useState(true);
+  const [errore, setErrore] = useState("");
+  const [ricarica, setRicarica] = useState(0);
+
+  useEffect(() => {
+    let attivo = true;
+    setGruppi([]);
+    setCaricamento(true);
+    setErrore("");
+    if (!parrocchiaId) {
+      setCaricamento(false);
+      setErrore("Parrocchia non selezionata.");
+      return () => { attivo = false; };
+    }
+    (async () => {
+      try {
+        const { data, error } = await supabase.rpc("ars_comunione_chat_miei_gruppi", {
+          p_parrocchia_id: parrocchiaId,
+        });
+        if (error) throw error;
+        if (!Array.isArray(data)) throw new Error("Elenco dei gruppi non disponibile.");
+        if (attivo) {
+          setGruppi(data);
+          setApertoId(corrente => data.some(g => g.gruppo_annuale_id === corrente) ? corrente : null);
+        }
+      } catch (err) {
+        if (attivo) setErrore(err.message || "Impossibile caricare i gruppi.");
+      } finally { if (attivo) setCaricamento(false); }
+    })();
+    return () => { attivo = false; };
+  }, [parrocchiaId, ricarica]);
+
+  const aperto = gruppi.find(g => g.gruppo_annuale_id === apertoId);
+  if (aperto) return <ChatComunioneFedele key={aperto.gruppo_annuale_id}
+    gruppo={aperto} onTorna={() => setApertoId(null)} />;
+
+  return <section className="ars-com-miei-gruppi">
+    <p>Qui trovi i gruppi di catechismo collegati al tuo profilo e le relative conversazioni.</p>
+    <details className="ars-com-chat-guida">
+      <summary>Come utilizzare questa pagina</summary>
+      <p>Quando la parrocchia assegna un ragazzo a un gruppo, la chat comparirà qui per i profili autorizzati. Se hai più figli iscritti, puoi trovare più gruppi.</p>
+      <p>Premi «Apri chat» per leggere e, dove consentito, inviare messaggi.</p>
+    </details>
+    <button type="button" className="ars-sac-azione ars-sac-azione-chiara"
+      disabled={caricamento} onClick={() => setRicarica(n => n + 1)}>Aggiorna i miei gruppi</button>
+    {caricamento && <p role="status">Caricamento gruppi…</p>}
+    {errore && <p className="ars-sac-errore" role="alert">{errore}</p>}
+    {!caricamento && !errore && !gruppi.length &&
+      <p>Non risultano ancora gruppi associati al tuo profilo. Se l'iscrizione è già completa, la parrocchia potrebbe non aver ancora assegnato il gruppo.</p>}
+    {gruppi.map(g => <article className="ars-com-chat-gruppo" key={g.gruppo_annuale_id}>
+      <h4>{g.nome}</h4>
+      <p>{g.anno_percorso}° anno · {g.anno_pastorale}</p>
+      <p><strong>Catechisti:</strong> {Array.isArray(g.catechisti) && g.catechisti.length
+        ? g.catechisti.join(", ") : "Non ancora assegnati"}</p>
+      <button type="button" className="ars-sac-azione" onClick={() => setApertoId(g.gruppo_annuale_id)}>Apri chat</button>
+    </article>)}
+  </section>;
+}
+
 function DettaglioSottocard({ sezione, parrocchiaId, utenteId, nomeParrocchia, onApriQuote }) {
   switch (sezione) {
     case "iscrizioni":
       return <ModuloComunione parrocchiaId={parrocchiaId} utenteId={utenteId} nomeParrocchia={nomeParrocchia} onApriQuote={onApriQuote} />;
     case "gruppo":
-      return <><p>Qui troverai il gruppo di Catechismo assegnato e lo spazio di dialogo condiviso con i catechisti e il parroco.</p><p>Ai ragazzi sarà consentito scrivere nel gruppo, ma non inviare messaggi privati ad altri ragazzi.</p><p className="ars-sac-prossimamente">Le conversazioni saranno attivate dopo la predisposizione dei gruppi e delle autorizzazioni.</p></>;
+      return <IlMioGruppoComunione parrocchiaId={parrocchiaId} />;
     case "calendario":
       return <><p>Un calendario dedicato <strong>esclusivamente al Catechismo</strong>: incontri, scadenze, riunioni con i genitori, ritiri e prove.</p><p>Gli appuntamenti saranno gestiti dal parroco e dai catechisti autorizzati. Genitori e ragazzi vedranno quelli del proprio gruppo.</p><p>Questo calendario è separato dal Calendario generale del fedele, che resta invariato.</p><p className="ars-sac-prossimamente">Gli appuntamenti saranno visualizzati qui non appena disponibili.</p></>;
     case "comunicazioni":
@@ -1227,6 +1406,20 @@ export default function SacramentiFedele({ tornaDashboard, utenteId = null, parr
   );
 }
 const STILE = `
+/* Gruppi e chat di Prima Comunione: lato fedele */
+.ars-com-miei-gruppi,.ars-com-chat-fedele{margin:10px 0;color:#243c40}
+.ars-com-chat-guida{margin:15px 0 17px;text-align:left;border:1px solid #decda9;border-radius:10px;padding:12px 15px;background:#fbf7ee}
+.ars-com-chat-guida summary{font-weight:700;cursor:pointer;color:#173955}
+.ars-com-chat-guida p{margin-top:12px!important}
+.ars-com-chat-gruppo,.ars-com-chat-messaggio{margin:14px 0;padding:16px;border:1px solid #dfcba6;border-radius:12px;background:#fffaf1}
+.ars-com-chat-gruppo h4,.ars-com-chat-fedele h4{font:700 1.18rem Georgia,serif;color:#173955;margin:8px 0}
+.ars-com-chat-fedele .ars-sac-azione,.ars-com-miei-gruppi .ars-sac-azione{margin:5px 5px 10px 0}
+.ars-com-chat-messaggi{margin:15px 0}
+.ars-com-chat-messaggio small{display:block;font-size:.88rem;color:#536568}
+.ars-com-chat-messaggio p{white-space:pre-wrap;overflow-wrap:anywhere;margin:7px 0 0!important}
+.ars-com-chat-fedele textarea{min-height:100px}
+.ars-com-chat-avviso{padding:12px 14px;background:#fbf3de;border:1px solid #e5d3aa;border-radius:9px;color:#694e1f!important}
+
 .ars-com-fedele-pagamenti{margin:12px 0;color:#243c40}
 .ars-com-versamento{border-top:1px solid #e5ddd1;margin:18px 0 15px;padding-top:15px}
 .ars-com-versamento-azione{background:#ae812c!important;color:#fff!important;border:1px solid #ae812c!important;border-radius:9px;padding:11px 17px;font-weight:700;cursor:pointer}
