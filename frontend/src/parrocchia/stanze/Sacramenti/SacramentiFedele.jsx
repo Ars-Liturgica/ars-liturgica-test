@@ -378,7 +378,7 @@ function ModificaIscrizioneComunione({ parrocchiaId, iscrizioneId, utenteId, ope
       </fieldset>
       <div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:14}}>
         <button type="button" disabled={occupato} onClick={onAnnulla} className="ars-sac-azione ars-sac-azione-chiara">Annulla</button>
-        <button type="submit" disabled={occupato} className="ars-sac-conferma">
+        <button type="submit" disabled={occupato} className="ars-sac-azione">
           {occupato ? "Salvataggio…" : "Salva modifiche"}
         </button>
       </div>
