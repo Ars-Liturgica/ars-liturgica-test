@@ -219,12 +219,182 @@ function CompletaFotoComunione({ pratica, parrocchiaId, utenteId, onCaricata, do
   </div>;
 }
 
+// Modifica una domanda ESISTENTE: stessa pratica, stessi pagamenti e gruppi.
+// La lettura dei consensi avviene dal server, non dal JSON della vecchia domanda.
+const CAMPI_MODIFICA_ISCRIZIONE = [
+  ["Dati del bambino", [
+    ["nome", "Nome del bambino", "text"], ["cognome", "Cognome del bambino", "text"],
+    ["dataNascita", "Data di nascita", "date"], ["luogoNascita", "Luogo di nascita", "text"],
+    ["codiceFiscale", "Codice fiscale (facoltativo)", "text"],
+    ["indirizzo", "Indirizzo", "text"], ["comune", "Comune", "text"],
+    ["cap", "CAP", "text"], ["dataBattesimo", "Data del Battesimo", "date"],
+    ["parrocchiaBattesimo", "Parrocchia del Battesimo", "text"],
+  ]],
+  ["Genitori e recapiti", [
+    ["genitore1Nome", "Nome del genitore richiedente", "text"],
+    ["genitore1Cognome", "Cognome del genitore richiedente", "text"],
+    ["genitore1CF", "Codice fiscale del genitore", "text"],
+    ["genitore1Telefono", "Telefono del genitore", "tel"],
+    ["genitore1Email", "Email del genitore", "email"],
+    ["genitore2Nome", "Secondo genitore: nome", "text"],
+    ["genitore2Cognome", "Secondo genitore: cognome", "text"],
+    ["genitore2Telefono", "Secondo genitore: telefono", "tel"],
+    ["genitore2Email", "Secondo genitore: email", "email"],
+    ["tutore", "Qualità del tutore (se presente)", "text"],
+    ["delegati", "Delegati al ritiro", "text"],
+  ]],
+];
+
+function ModificaIscrizioneComunione({ parrocchiaId, iscrizioneId, operatoreParrocchia = false, onAnnulla, onSalvata }) {
+  const [originale, setOriginale] = useState(null);
+  const [bozza, setBozza] = useState({});
+  const [account, setAccount] = useState(false);
+  const [chat, setChat] = useState(false);
+  const [consensiRaccolti, setConsensiRaccolti] = useState(false);
+  const [caricamento, setCaricamento] = useState(true);
+  const [occupato, setOccupato] = useState(false);
+  const [errore, setErrore] = useState("");
+  const [messaggio, setMessaggio] = useState("");
+
+  useEffect(() => {
+    let attivo = true;
+    setCaricamento(true); setErrore(""); setMessaggio("");
+    (async () => {
+      const {data,error} = await supabase.rpc("ars_comunione_leggi_modifica_iscrizione", {
+        p_parrocchia_id:parrocchiaId, p_iscrizione_id:iscrizioneId,
+      });
+      if (!attivo) return;
+      setCaricamento(false);
+      if (error || !data?.id) { setErrore(error?.message || "Impossibile aprire la domanda."); return; }
+      setOriginale(data);
+      setBozza(data.dati_modulo || {});
+      setAccount(data.consenso_account === true);
+      setChat(data.consenso_chat === true);
+    })();
+    return () => { attivo = false; };
+  }, [parrocchiaId,iscrizioneId]);
+
+  function cambia(campo, valore) {
+    setBozza(precedente => ({ ...precedente, [campo]: valore }));
+    setMessaggio("");
+  }
+  async function salva(e) {
+    e.preventDefault();
+    if (!originale || occupato) return;
+    const confronto = originale.dati_modulo || {};
+    const campi = CAMPI_MODIFICA_ISCRIZIONE.flatMap(([, items]) => items.map(([key]) => key))
+      .concat(["battesimoInQuestaParrocchia", "telefonoRagazzo"]);
+    const patch = {};
+    for (const chiave of campi) {
+      const nuovo = chiave === "battesimoInQuestaParrocchia" ? bozza[chiave] : String(bozza[chiave] ?? "").trim();
+      if (chiave === "battesimoInQuestaParrocchia" && typeof nuovo !== "boolean") continue;
+      if (JSON.stringify(nuovo) !== JSON.stringify(confronto[chiave] ?? (chiave === "battesimoInQuestaParrocchia" ? null : "")))
+        patch[chiave] = nuovo;
+    }
+    const modificaAccount = account !== (originale.consenso_account === true);
+    const modificaChat = chat !== (originale.consenso_chat === true);
+    if (!Object.keys(patch).length && !modificaAccount && !modificaChat) {
+      setMessaggio("Nessuna modifica da salvare."); return;
+    }
+    if (operatoreParrocchia && (modificaAccount || modificaChat) && !consensiRaccolti) {
+      setErrore("Conferma di aver raccolto i consensi del genitore prima di registrarli.");return;
+    }
+    setOccupato(true);setErrore("");setMessaggio("");
+    const {data,error} = await supabase.rpc("ars_comunione_modifica_iscrizione", {
+      p_parrocchia_id:parrocchiaId,
+      p_iscrizione_id:iscrizioneId,
+      p_dati_patch:patch,
+      p_consenso_account:modificaAccount ? account : null,
+      p_consenso_chat:modificaChat ? chat : null,
+      p_consensi_raccolti_in_parrocchia:operatoreParrocchia && consensiRaccolti,
+      p_aggiornata_il_attesa:originale.aggiornata_il,
+    });
+    setOccupato(false);
+    if (error || !data?.ok) {setErrore(error?.message || "Non è stato possibile salvare le modifiche.");return;}
+    const statoAccount = data.account_ragazzo?.account_stato;
+    setMessaggio(statoAccount === "creato" ? "Modifiche salvate. L'account del ragazzo è stato creato." :
+      "Modifiche salvate nella domanda esistente.");
+    onSalvata?.(data);
+  }
+  return <section className="ars-com-modifica-esistente" aria-label="Modifica iscrizione"
+    style={{border:"1px solid #c8d8d5",borderRadius:12,padding:18,marginTop:16,background:"#fcfefd"}}>
+    <h4>Modifica iscrizione</h4>
+    <p>Correggi i dati o aggiorna i consensi. L'iscrizione, i documenti, il gruppo assegnato e i pagamenti restano gli stessi.</p>
+    {caricamento && <p role="status">Apertura della domanda…</p>}
+    {errore && <p role="alert" style={{color:"#ad2929",fontWeight:600}}>{errore}</p>}
+    {messaggio && <p role="status" style={{color:"#136145",fontWeight:600}}>{messaggio}</p>}
+    {originale && <form onSubmit={salva}>
+      {CAMPI_MODIFICA_ISCRIZIONE.map(([titolo, campi]) => <fieldset key={titolo}
+        style={{border:"1px solid #e0e7e5",borderRadius:9,margin:"14px 0",padding:12}}>
+        <legend style={{fontWeight:700}}>{titolo}</legend>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12}}>
+          {campi.map(([key,etichetta,tipo]) => <label key={key} style={{display:"flex",flexDirection:"column",gap:5}}>
+            <span>{etichetta}</span>
+            <input type={tipo} value={String(bozza[key] ?? "")}
+              onChange={e => cambia(key,e.target.value)} disabled={occupato}
+              style={{width:"100%",minHeight:38,padding:7,border:"1px solid #b6c7c3",borderRadius:6}} />
+          </label>)}
+        </div>
+      </fieldset>)}
+      <fieldset style={{border:"1px solid #e0e7e5",borderRadius:9,margin:"14px 0",padding:12}}>
+        <legend style={{fontWeight:700}}>Battesimo</legend>
+        <label style={{display:"flex",flexDirection:"column",gap:6}}>
+          <span>Il bambino è stato battezzato in questa parrocchia?</span>
+          <select value={typeof bozza.battesimoInQuestaParrocchia === "boolean" ? String(bozza.battesimoInQuestaParrocchia) : ""}
+            disabled={occupato} onChange={e => cambia("battesimoInQuestaParrocchia",e.target.value === "" ? null : e.target.value === "true")}
+            style={{minHeight:40,border:"1px solid #b6c7c3",borderRadius:6}}>
+            <option value="">Da chiarire</option><option value="true">Sì</option><option value="false">No</option>
+          </select>
+        </label>
+        {bozza.battesimoInQuestaParrocchia === false &&
+          <p>Se battezzato in un'altra parrocchia, il certificato rimane obbligatorio.</p>}
+      </fieldset>
+      <fieldset style={{border:"1px solid #e0e7e5",borderRadius:9,margin:"14px 0",padding:12}}>
+        <legend style={{fontWeight:700}}>Account del ragazzo e chat</legend>
+        <label style={{display:"flex",alignItems:"flex-start",gap:9,margin:"9px 0"}}>
+          <input type="checkbox" checked={account} disabled={occupato}
+            onChange={e => {setAccount(e.target.checked);if (!e.target.checked) setChat(false);}} />
+          <span>Autorizzo l'utilizzo o la creazione dell'account Ars Liturgica per il ragazzo.</span>
+        </label>
+        <label style={{display:"flex",alignItems:"flex-start",gap:9,margin:"9px 0"}}>
+          <input type="checkbox" checked={chat} disabled={occupato || !account}
+            onChange={e => setChat(e.target.checked)} />
+          <span>Autorizzo separatamente il ragazzo a partecipare alla chat del gruppo di catechismo.</span>
+        </label>
+        {account && <label style={{display:"flex",flexDirection:"column",gap:5,marginTop:12}}>
+          <span>Cellulare del ragazzo (facoltativo)</span>
+          <input type="tel" value={String(bozza.telefonoRagazzo ?? "")}
+            onChange={e => cambia("telefonoRagazzo",e.target.value)} disabled={occupato}
+            style={{minHeight:38,padding:7,border:"1px solid #b6c7c3",borderRadius:6}} />
+        </label>}
+        <p>Stato account: <strong>{originale.account_ragazzo_stato === "attivo" ? "già attivo" :
+          originale.account_ragazzo_stato === "da_verificare" ? "da verificare" : "non autorizzato"}</strong>.</p>
+        {operatoreParrocchia &&
+          <label style={{display:"flex",alignItems:"flex-start",gap:9,marginTop:12}}>
+            <input type="checkbox" checked={consensiRaccolti} disabled={occupato}
+              onChange={e => setConsensiRaccolti(e.target.checked)} />
+            <span>Confermo di aver raccolto dal genitore i consensi che sto modificando.</span>
+          </label>}
+      </fieldset>
+      <div style={{display:"flex",gap:10,flexWrap:"wrap",marginTop:14}}>
+        <button type="button" disabled={occupato} onClick={onAnnulla} className="ars-sac-azione ars-sac-azione-chiara">Annulla</button>
+        <button type="submit" disabled={occupato} className="ars-sac-conferma">
+          {occupato ? "Salvataggio…" : "Salva modifiche"}
+        </button>
+      </div>
+    </form>}
+  </section>;
+}
+
+
 function StatoDomandeComunioneGenitore({ parrocchiaId, utenteId, nuovaIscrizioneId }) {
   const [domande, setDomande] = useState([]);
   const [caricamento, setCaricamento] = useState(true);
   const [errore, setErrore] = useState("");
   const [apertaId, setApertaId] = useState(null);
   const [completaId, setCompletaId] = useState(null);
+  const [modificaDomandaId, setModificaDomandaId] = useState(null);
+  const [esitoModifica, setEsitoModifica] = useState("");
   const [revisione, setRevisione] = useState(0);
   const [firmateOra, setFirmateOra] = useState([]);
   const [firmaConsentita, setFirmaConsentita] = useState(null);
@@ -285,6 +455,7 @@ function StatoDomandeComunioneGenitore({ parrocchiaId, utenteId, nuovaIscrizione
   return <section className="ars-com-genitore-stato" aria-label="Le mie domande di Prima Comunione">
     <h4>Le mie domande e documenti</h4>
     <p>Qui trovi le domande inviate alla parrocchia e le eventuali informazioni o certificati ancora da fornire.</p>
+    {esitoModifica && <p role="status" className="ars-sac-successo">{esitoModifica}</p>}
     {caricamento && <p role="status">Caricamento delle tue domande…</p>}
     {errore && <p className="ars-sac-errore" role="alert">{errore}</p>}
     {!caricamento && !errore && domande.length === 0 && <p>Non hai ancora inviato domande di Prima Comunione.</p>}
@@ -325,11 +496,21 @@ function StatoDomandeComunioneGenitore({ parrocchiaId, utenteId, nuovaIscrizione
             onClick={() => setApertaId(v => v===pratica.id ? null:pratica.id)}>
             {apertaId===pratica.id ? "Chiudi domanda" : "Apri domanda"}
           </button>
+          <button className="ars-sac-azione" type="button"
+            onClick={() => {setModificaDomandaId(v => v === pratica.id ? null : pratica.id);setEsitoModifica("");}}>
+            {modificaDomandaId === pratica.id ? "Chiudi modifica" : "Modifica iscrizione"}
+          </button>
           {documentiMancanti.length > 0 && <button className="ars-sac-azione" type="button"
             onClick={() => setCompletaId(v => v===pratica.id ? null:pratica.id)}>
             {completaId===pratica.id ? "Chiudi documenti" : "Completa documenti"}
           </button>}
         </div>
+        {modificaDomandaId===pratica.id && <ModificaIscrizioneComunione
+          parrocchiaId={parrocchiaId} iscrizioneId={pratica.id}
+          onAnnulla={() => setModificaDomandaId(null)}
+          onSalvata={(esito) => {setModificaDomandaId(null);setRevisione(v=>v+1);setEsitoModifica(
+            esito?.account_ragazzo?.account_stato === "creato" ? "Modifiche salvate. Account del ragazzo creato." :
+            "Iscrizione aggiornata correttamente.");}} />}
         {apertaId===pratica.id && <div className="ars-com-genitore-dettaglio">
           <h5>Domanda inviata alla parrocchia</h5>
           <p>Questa è la copia della domanda presentata alla parrocchia.</p>
