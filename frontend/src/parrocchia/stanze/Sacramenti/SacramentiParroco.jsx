@@ -1549,11 +1549,26 @@ function GruppiChatComunione({ parrocchiaId, annoPastorale, durata }) {
     setErrore("");
     async function carica() {
       try {
-        const { data, error } = await supabase.rpc("ars_comunione_quadro_gruppi", {
+        const parametri = {
           p_parrocchia_id: parrocchiaId, p_anno_pastorale: annoPastorale, p_anno_percorso: anno
+        };
+        const [quadroRisposta, propostaRisposta] = await Promise.all([
+          supabase.rpc("ars_comunione_quadro_gruppi", parametri),
+          supabase.rpc("ars_comunione_proponi_gruppi", { ...parametri, p_ragazzi_per_gruppo: 2147483647 })
+        ]);
+        if (quadroRisposta.error) throw quadroRisposta.error;
+        if (propostaRisposta.error) throw propostaRisposta.error;
+        const data = quadroRisposta.data;
+        const disponibili = (propostaRisposta.data?.gruppi || []).flatMap(g => g.ragazzi || []);
+        const presenti = new Set((data?.ragazzi || []).map(r => r.iscrizione_id));
+        const daAggiungere = disponibili
+          .filter(r => !presenti.has(r.iscrizione_id))
+          .map(r => ({ ...r, gruppo_annuale_id: null, nome_gruppo: null }));
+        if (corrente) setQuadro({
+          ...data,
+          totale_da_assegnare: disponibili.length,
+          ragazzi: [...(data?.ragazzi || []), ...daAggiungere]
         });
-        if (error) throw error;
-        if (corrente) setQuadro(data);
       } catch (e) {
         if (corrente) setErrore(e.message || "Impossibile caricare i gruppi.");
       }
@@ -1651,7 +1666,7 @@ function GruppiChatComunione({ parrocchiaId, annoPastorale, durata }) {
   return <section className="ars-sac-dettaglio ars-gruppi-chat">
     <h3>Gruppi di catechismo</h3>
     <details><summary>Come utilizzare questa pagina</summary>
-      <p>Scegli l’anno e indica i catechisti disponibili e il massimo di ragazzi per gruppo. Controlla la proposta prima di salvare. Usa «Rinomina gruppo» per dare a un gruppo un nome personalizzato senza cambiare iscritti o messaggi della chat. Per cambiare le assegnazioni, seleziona i ragazzi e il gruppo di destinazione.</p>
+      <p>Scegli l’anno e indica i catechisti disponibili e il massimo di ragazzi per gruppo. Controlla la proposta prima di salvare. Usa «Rinomina gruppo» per dare a un gruppo un nome personalizzato senza cambiare iscritti o messaggi della chat. Per cambiare le assegnazioni, seleziona i ragazzi e il gruppo di destinazione. I ragazzi con domanda presentata possono essere inseriti nei gruppi anche se mancano documenti: la segreteria continuerà a seguirli nella Card 03.</p>
     </details>
     <label>Anno di percorso <select disabled={occupato} value={anno} onChange={e => {
       setSelezione([]); setAvviso(""); setCatechisti(""); setMassimo(""); setDestinazione(""); annullaRinomina(); setQuadro(null); setAnno(Number(e.target.value));
@@ -1659,7 +1674,7 @@ function GruppiChatComunione({ parrocchiaId, annoPastorale, durata }) {
       <option key={n} value={n}>{n}° anno</option>)}</select></label>
     {avviso && <p role="status">{avviso}</p>}
     {quadro && <form onSubmit={e => { e.preventDefault(); aggiornaGruppi(true); }}>
-      <p>{quadro.totale_da_assegnare} ragazzi con iscrizione completa da assegnare.</p>
+      <p>{quadro.totale_da_assegnare} ragazzi con domanda presentata da assegnare (anche con documenti da completare).</p>
       <label>Catechisti disponibili per questi ragazzi <input type="number" min="0" step="1" required
         value={catechisti} disabled={occupato} onChange={e => setCatechisti(e.target.value)} /></label>
       <label>Numero massimo di ragazzi per gruppo <input type="number" min="1" max="2147483647" step="1"
