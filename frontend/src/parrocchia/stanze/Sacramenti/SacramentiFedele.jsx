@@ -245,7 +245,7 @@ const CAMPI_MODIFICA_ISCRIZIONE = [
   ]],
 ];
 
-function ModificaIscrizioneComunione({ parrocchiaId, iscrizioneId, operatoreParrocchia = false, onAnnulla, onSalvata }) {
+function ModificaIscrizioneComunione({ parrocchiaId, iscrizioneId, utenteId, operatoreParrocchia = false, onAnnulla, onSalvata }) {
   const [originale, setOriginale] = useState(null);
   const [bozza, setBozza] = useState({});
   const [account, setAccount] = useState(false);
@@ -260,8 +260,8 @@ function ModificaIscrizioneComunione({ parrocchiaId, iscrizioneId, operatoreParr
     let attivo = true;
     setCaricamento(true); setErrore(""); setMessaggio("");
     (async () => {
-      const {data,error} = await supabase.rpc("ars_comunione_leggi_modifica_iscrizione", {
-        p_parrocchia_id:parrocchiaId, p_iscrizione_id:iscrizioneId,
+      const {data,error} = await supabase.rpc("ars_comunione_fedele_leggi_modifica", {
+        p_parrocchia_id:parrocchiaId, p_iscrizione_id:iscrizioneId, p_utente_id:utenteId,
       });
       if (!attivo) return;
       setCaricamento(false);
@@ -300,13 +300,13 @@ function ModificaIscrizioneComunione({ parrocchiaId, iscrizioneId, operatoreParr
       setErrore("Conferma di aver raccolto i consensi del genitore prima di registrarli.");return;
     }
     setOccupato(true);setErrore("");setMessaggio("");
-    const {data,error} = await supabase.rpc("ars_comunione_modifica_iscrizione", {
+    const {data,error} = await supabase.rpc("ars_comunione_fedele_modifica", {
       p_parrocchia_id:parrocchiaId,
       p_iscrizione_id:iscrizioneId,
+      p_utente_id:utenteId,
       p_dati_patch:patch,
       p_consenso_account:modificaAccount ? account : null,
       p_consenso_chat:modificaChat ? chat : null,
-      p_consensi_raccolti_in_parrocchia:operatoreParrocchia && consensiRaccolti,
       p_aggiornata_il_attesa:originale.aggiornata_il,
     });
     setOccupato(false);
@@ -506,7 +506,7 @@ function StatoDomandeComunioneGenitore({ parrocchiaId, utenteId, nuovaIscrizione
           </button>}
         </div>
         {modificaDomandaId===pratica.id && <ModificaIscrizioneComunione
-          parrocchiaId={parrocchiaId} iscrizioneId={pratica.id}
+          parrocchiaId={parrocchiaId} iscrizioneId={pratica.id} utenteId={utenteId}
           onAnnulla={() => setModificaDomandaId(null)}
           onSalvata={(esito) => {setModificaDomandaId(null);setRevisione(v=>v+1);setEsitoModifica(
             esito?.account_ragazzo?.account_stato === "creato" ? "Modifiche salvate. Account del ragazzo creato." :
