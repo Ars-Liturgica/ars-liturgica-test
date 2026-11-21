@@ -1373,6 +1373,141 @@ function RicevutaRimborsoComunione({riga,documenti}) {
   </article>;
 }
 
+function GruppiChatComunione({ parrocchiaId, annoPastorale, durata }) {
+  const [anno, setAnno] = useState(1);
+  const [quadro, setQuadro] = useState(null);
+  const [errore, setErrore] = useState("");
+  const [aperto, setAperto] = useState(null);
+  const [ricarica, setRicarica] = useState(0);
+
+  useEffect(() => {
+    let corrente = true;
+    setQuadro(null);
+    setErrore("");
+    async function carica() {
+      try {
+        const { data, error } = await supabase.rpc("ars_comunione_quadro_gruppi", {
+          p_parrocchia_id: parrocchiaId, p_anno_pastorale: annoPastorale, p_anno_percorso: anno
+        });
+        if (error) throw error;
+        if (corrente) setQuadro(data);
+      } catch (e) {
+        if (corrente) setErrore(e.message || "Impossibile caricare i gruppi.");
+      }
+    }
+    if (parrocchiaId && annoPastorale) carica();
+    return () => { corrente = false; };
+  }, [anno, annoPastorale, parrocchiaId, ricarica]);
+
+  if (aperto) return <ChatGruppoComunione key={aperto.gruppo_annuale_id} gruppo={aperto}
+    indietro={() => { setAperto(null); setRicarica(n => n + 1); }} />;
+
+  return <section className="ars-sac-dettaglio ars-gruppi-chat">
+    <h3>Gruppi di catechismo</h3>
+    <details><summary>Come utilizzare questa pagina</summary>
+      <p>Scegli l’anno di percorso e apri la chat accanto al nome del gruppo.</p>
+    </details>
+    <label>Anno di percorso <select value={anno} onChange={e => {
+      setQuadro(null); setAnno(Number(e.target.value));
+    }}>{[1, 2, 3].filter(n => n <= Number(durata)).map(n =>
+      <option key={n} value={n}>{n}° anno</option>)}</select></label>
+    {errore ? <p role="alert">{errore} <button onClick={() => setRicarica(n => n + 1)}>Riprova</button></p>
+      : !quadro ? <p>Caricamento gruppi…</p>
+      : !quadro.gruppi.length ? <p>Nessun gruppo per questo anno di percorso.</p>
+      : quadro.gruppi.map(g => <article key={g.gruppo_annuale_id}>
+        <h4>{g.nome}</h4><p>Ragazzi assegnati: {g.numero_ragazzi}</p>
+        <button onClick={() => setAperto(g)}>Apri chat</button>
+      </article>)}
+  </section>;
+}
+
+function ChatGruppoComunione({ gruppo, indietro }) {
+  const [pagina, setPagina] = useState(null);
+  const [testo, setTesto] = useState("");
+  const [errore, setErrore] = useState("");
+  const [busy, setBusy] = useState(false);
+  const blocco = useRef(false);
+  const invio = useRef(null);
+  const parametri = { p_gruppo_id: gruppo.gruppo_id };
+
+  async function rpc(nome, extra = {}) {
+    const { data, error } = await supabase.rpc("ars_comunione_chat_" + nome, { ...parametri, ...extra });
+    if (error) throw error;
+    return data;
+  }
+  async function leggi(extra) {
+    const data = await rpc("leggi", extra);
+    if (data.accesso.gruppo_annuale_id !== gruppo.gruppo_annuale_id)
+      throw new Error("Il gruppo annuale è cambiato. Torna ai gruppi.");
+    return data;
+  }
+
+  useEffect(() => {
+    let attiva = true;
+    leggi().then(data => { if (attiva) setPagina(data); })
+      .catch(e => { if (attiva) setErrore(e.message || "Lettura non riuscita."); });
+    return () => { attiva = false; };
+  }, [gruppo.gruppo_annuale_id, gruppo.gruppo_id]);
+
+  async function esegui(azione) {
+    if (blocco.current) return;
+    blocco.current = true; setBusy(true); setErrore("");
+    try { await azione(); }
+    catch (e) { setErrore(e.message || "Operazione non riuscita. Riprova."); }
+    finally { blocco.current = false; setBusy(false); }
+  }
+
+  async function invia() {
+    if (!testo.trim()) return;
+    if (!invio.current) invio.current = crypto.randomUUID();
+    await rpc("invia", { p_gruppo_annuale_id: gruppo.gruppo_annuale_id,
+      p_invio_id: invio.current, p_testo: testo });
+    setTesto(""); invio.current = null;
+    setPagina(await leggi());
+  }
+
+  async function precedenti() {
+    const primo = pagina.messaggi[0];
+    const prima = await leggi({ p_prima_del: primo.inviato_il, p_prima_id: primo.id });
+    setPagina({ ...prima, messaggi: [...prima.messaggi, ...pagina.messaggi] });
+  }
+
+  return <section className="ars-sac-dettaglio ars-gruppi-chat">
+    <button disabled={busy} onClick={indietro}>Torna ai gruppi</button>
+    <h3>Chat · {gruppo.nome}</h3>
+    <details><summary>Come utilizzare questa pagina</summary>
+      <p>Scrivi il messaggio e premi Invia. Usa «Aggiorna messaggi» per leggere le risposte.</p>
+      {pagina?.accesso.puo_moderare && <p>Puoi rimuovere un messaggio oppure chiudere e riaprire la chat del gruppo.</p>}
+    </details>
+    {errore && <p role="alert">{errore}</p>}
+    {(pagina || errore) && <button disabled={busy} onClick={() => esegui(async () => setPagina(await leggi()))}>Aggiorna messaggi</button>}
+    {!pagina && !errore && <p>Caricamento messaggi…</p>}
+    {pagina && <>
+      {pagina.accesso.puo_moderare && <button disabled={busy} onClick={() => esegui(async () => {
+        await rpc("imposta_chiusura", { p_chiusa: !pagina.accesso.chat_chiusa });
+        setPagina(await leggi());
+      })}>{pagina.accesso.chat_chiusa ? "Riapri chat" : "Chiudi chat"}</button>}
+      {pagina.accesso.chat_chiusa && <p>Chat chiusa. I messaggi restano leggibili.</p>}
+      {pagina.altri_precedenti && <button disabled={busy} onClick={() => esegui(precedenti)}>Carica messaggi precedenti</button>}
+      {!pagina.messaggi.length && <p>In questo gruppo non ci sono ancora messaggi.</p>}
+      {pagina.messaggi.map(m => <article key={m.id}>
+        <small>{m.mio ? "Tu" : "Partecipante"} · {new Date(m.inviato_il).toLocaleString("it-IT")}</small>
+        <p style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{m.rimosso ? "Messaggio rimosso" : m.testo}</p>
+        {pagina.accesso.puo_moderare && !m.rimosso && <button disabled={busy} onClick={() => esegui(async () => {
+          await rpc("rimuovi_messaggio", { p_messaggio_id: m.id });
+          setPagina(p => ({ ...p, messaggi: p.messaggi.map(x => x.id === m.id ? { ...x, rimosso: true, testo: null } : x) }));
+        })}>Rimuovi messaggio</button>}
+      </article>)}
+      {pagina.accesso.puo_scrivere && <form onSubmit={e => { e.preventDefault(); esegui(invia); }}>
+        <label>Messaggio<textarea disabled={busy} value={testo} onChange={e => {
+          invio.current = null; setTesto(e.target.value);
+        }} rows={3} /></label>
+        <button disabled={busy || !testo.trim()} type="submit">Invia</button>
+      </form>}
+    </>}
+  </section>;
+}
+
 export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "", parrocchiaId, onGestisciPagamentiComunione }) {
   const [scelto, setScelto] = useState(null);
   const [sezione, setSezione] = useState(null);
@@ -2065,6 +2200,9 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
             </div>}
           </div>
         </section>
+      ) : sezione === "gruppi" ? (
+        <GruppiChatComunione key={[parrocchiaId, impostazioni.anno, impostazioni.durata].join("-")}
+          parrocchiaId={parrocchiaId} annoPastorale={impostazioni.anno} durata={impostazioni.durata} />
       ) : sezione === "quote" ? (
         <QuoteComunioneParroco key={parrocchiaId} parrocchiaId={parrocchiaId} annoAttivo={impostazioni.anno} nomeParrocchia={nomeParrocchia} onGestisciPagamenti={onGestisciPagamentiComunione || setAnnoGestioneEconomica} tornaDashboard={tornaDashboard} sezioneIniziale={ripresaSituazioneEconomica ? "situazione" : "quote"} />
       ) : sezione === "iscrizioni" ? (
@@ -2396,4 +2534,9 @@ const STILE = `
 .ars-com-residuo-aperto{color:#982f28;font-weight:600}
 .ars-com-economica-collegamento{border-top:1px solid #dfcba6;margin-top:20px;padding-top:9px}
 @media(max-width:430px){.ars-com-economica-indicatori>div{padding:10px}.ars-com-economica-indicatori strong{font-size:1.15rem}.ars-com-economica-indicatori span{font-size:.82rem}}
+
+.ars-gruppi-chat article{margin:12px 0;padding:14px;border:1px solid #dfcba6;border-radius:10px;background:#fffaf1}
+.ars-gruppi-chat details{margin:12px 0}.ars-gruppi-chat summary{cursor:pointer}
+.ars-gruppi-chat button{font:inherit;margin:4px;padding:8px 12px;cursor:pointer;border:1px solid #bdab89;border-radius:8px;background:#fffaf1;color:#173955}
+.ars-gruppi-chat textarea{display:block;box-sizing:border-box;width:100%;padding:10px;font:inherit}
 `;
