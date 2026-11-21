@@ -1330,9 +1330,9 @@ function QuotePagamentiComunioneFedele({ parrocchiaId, utenteId, nomeParrocchia 
 }
 
 // Chat condivisa con il parroco: stessa conversazione e stesse RPC già in uso nella Card 05.
-// La ricerca dei gruppi e le autorizzazioni sono determinate da Supabase,
-// mai dal browser o dall'identificativo liberamente scelto dal fedele.
-function ChatComunioneFedele({ gruppo, onTorna }) {
+// Il lato fedele utilizza lo stesso ID profilo impiegato nelle iscrizioni;
+// il database collega i gruppi e la chat alla domanda annuale.
+function ChatComunioneFedele({ gruppo, parrocchiaId, utenteId, onTorna }) {
   const [pagina, setPagina] = useState(null);
   const [testo, setTesto] = useState("");
   const [errore, setErrore] = useState("");
@@ -1343,8 +1343,11 @@ function ChatComunioneFedele({ gruppo, onTorna }) {
   const annualeId = gruppo.gruppo_annuale_id;
 
   async function chiamaChat(nome, parametri = {}) {
-    const { data, error } = await supabase.rpc(`ars_comunione_chat_${nome}`, {
-      p_gruppo_id: gruppoId, ...parametri,
+    const { data, error } = await supabase.rpc(`ars_comunione_fedele_chat_${nome}`, {
+      p_parrocchia_id: parrocchiaId,
+      p_utente_id: utenteId,
+      p_gruppo_id: gruppoId,
+      ...parametri,
     });
     if (error) throw error;
     return data;
@@ -1366,7 +1369,7 @@ function ChatComunioneFedele({ gruppo, onTorna }) {
       .catch(err => { if (attivo) setErrore(err.message || "Impossibile leggere la chat."); });
     return () => { attivo = false; };
     // Il contenuto è ricaricato passando a un altro gruppo.
-  }, [gruppoId, annualeId]);
+  }, [gruppoId, annualeId, parrocchiaId, utenteId]);
 
   async function esegui(azione) {
     if (operazione.current) return;
@@ -1446,7 +1449,7 @@ function ChatComunioneFedele({ gruppo, onTorna }) {
   </div>;
 }
 
-function IlMioGruppoComunione({ parrocchiaId }) {
+function IlMioGruppoComunione({ parrocchiaId, utenteId }) {
   const [gruppi, setGruppi] = useState([]);
   const [apertoId, setApertoId] = useState(null);
   const [caricamento, setCaricamento] = useState(true);
@@ -1458,15 +1461,16 @@ function IlMioGruppoComunione({ parrocchiaId }) {
     setGruppi([]);
     setCaricamento(true);
     setErrore("");
-    if (!parrocchiaId) {
+    if (!parrocchiaId || !utenteId) {
       setCaricamento(false);
-      setErrore("Parrocchia non selezionata.");
+      setErrore("Accedi alla parrocchia per visualizzare i tuoi gruppi.");
       return () => { attivo = false; };
     }
     (async () => {
       try {
-        const { data, error } = await supabase.rpc("ars_comunione_chat_miei_gruppi", {
+        const { data, error } = await supabase.rpc("ars_comunione_fedele_chat_miei_gruppi", {
           p_parrocchia_id: parrocchiaId,
+          p_utente_id: utenteId,
         });
         if (error) throw error;
         if (!Array.isArray(data)) throw new Error("Elenco dei gruppi non disponibile.");
@@ -1479,11 +1483,12 @@ function IlMioGruppoComunione({ parrocchiaId }) {
       } finally { if (attivo) setCaricamento(false); }
     })();
     return () => { attivo = false; };
-  }, [parrocchiaId, ricarica]);
+  }, [parrocchiaId, utenteId, ricarica]);
 
   const aperto = gruppi.find(g => g.gruppo_annuale_id === apertoId);
   if (aperto) return <ChatComunioneFedele key={aperto.gruppo_annuale_id}
-    gruppo={aperto} onTorna={() => setApertoId(null)} />;
+    gruppo={aperto} parrocchiaId={parrocchiaId} utenteId={utenteId}
+    onTorna={() => setApertoId(null)} />;
 
   return <section className="ars-com-miei-gruppi">
     <p>Qui trovi i gruppi di catechismo collegati al tuo profilo e le relative conversazioni.</p>
@@ -1513,7 +1518,7 @@ function DettaglioSottocard({ sezione, parrocchiaId, utenteId, nomeParrocchia, o
     case "iscrizioni":
       return <ModuloComunione parrocchiaId={parrocchiaId} utenteId={utenteId} nomeParrocchia={nomeParrocchia} onApriQuote={onApriQuote} />;
     case "gruppo":
-      return <IlMioGruppoComunione parrocchiaId={parrocchiaId} />;
+      return <IlMioGruppoComunione parrocchiaId={parrocchiaId} utenteId={utenteId} />;
     case "calendario":
       return <><p>Un calendario dedicato <strong>esclusivamente al Catechismo</strong>: incontri, scadenze, riunioni con i genitori, ritiri e prove.</p><p>Gli appuntamenti saranno gestiti dal parroco e dai catechisti autorizzati. Genitori e ragazzi vedranno quelli del proprio gruppo.</p><p>Questo calendario è separato dal Calendario generale del fedele, che resta invariato.</p><p className="ars-sac-prossimamente">Gli appuntamenti saranno visualizzati qui non appena disponibili.</p></>;
     case "comunicazioni":
