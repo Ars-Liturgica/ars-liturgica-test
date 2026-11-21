@@ -1379,6 +1379,8 @@ function GruppiChatComunione({ parrocchiaId, annoPastorale, durata }) {
   const [errore, setErrore] = useState("");
   const [aperto, setAperto] = useState(null);
   const [ricarica, setRicarica] = useState(0);
+  const [gruppoDaRinominare, setGruppoDaRinominare] = useState(null);
+  const [nomeGruppo, setNomeGruppo] = useState("");
 
   useEffect(() => {
     let corrente = true;
@@ -1444,16 +1446,54 @@ function GruppiChatComunione({ parrocchiaId, annoPastorale, durata }) {
     }
   }
 
+  function iniziaRinomina(gruppo) {
+    setGruppoDaRinominare(gruppo.gruppo_annuale_id);
+    setNomeGruppo(gruppo.nome || "");
+    setAvviso("");
+  }
+
+  function annullaRinomina() {
+    setGruppoDaRinominare(null);
+    setNomeGruppo("");
+  }
+
+  async function rinominaGruppo(evento, gruppo) {
+    evento.preventDefault();
+    const nome = nomeGruppo.trim();
+    if (!nome || occupato || operazione.current) return;
+    operazione.current = true;
+    setOccupato(true);
+    setAvviso("");
+    try {
+      const { data, error } = await supabase.rpc("ars_comunione_rinomina_gruppo", {
+        p_parrocchia_id: parrocchiaId,
+        p_gruppo_annuale_id: gruppo.gruppo_annuale_id,
+        p_nuovo_nome: nome
+      });
+      if (error) throw error;
+      if (!data?.ok) throw new Error("Il nome del gruppo non è stato aggiornato.");
+      annullaRinomina();
+      setAvviso("Nome del gruppo aggiornato: " + data.nome);
+      setQuadro(null);
+      setRicarica(n => n + 1);
+    } catch (e) {
+      setAvviso(e.message || "Impossibile rinominare il gruppo.");
+    } finally {
+      operazione.current = false;
+      setOccupato(false);
+    }
+  }
+
   if (aperto) return <ChatGruppoComunione key={aperto.gruppo_annuale_id} gruppo={aperto}
     indietro={() => { setAperto(null); setRicarica(n => n + 1); }} />;
 
   return <section className="ars-sac-dettaglio ars-gruppi-chat">
     <h3>Gruppi di catechismo</h3>
     <details><summary>Come utilizzare questa pagina</summary>
-      <p>Scegli l’anno e indica i catechisti disponibili e il massimo di ragazzi per gruppo. Controlla la proposta: puoi cambiare i numeri prima di salvare. Per cambiare le assegnazioni, seleziona i ragazzi e il gruppo di destinazione.</p>
+      <p>Scegli l’anno e indica i catechisti disponibili e il massimo di ragazzi per gruppo. Controlla la proposta prima di salvare. Usa «Rinomina gruppo» per dare a un gruppo un nome personalizzato senza cambiare iscritti o messaggi della chat. Per cambiare le assegnazioni, seleziona i ragazzi e il gruppo di destinazione.</p>
     </details>
     <label>Anno di percorso <select disabled={occupato} value={anno} onChange={e => {
-      setSelezione([]); setAvviso(""); setCatechisti(""); setMassimo(""); setDestinazione(""); setQuadro(null); setAnno(Number(e.target.value));
+      setSelezione([]); setAvviso(""); setCatechisti(""); setMassimo(""); setDestinazione(""); annullaRinomina(); setQuadro(null); setAnno(Number(e.target.value));
     }}>{[1, 2, 3].filter(n => n <= Number(durata)).map(n =>
       <option key={n} value={n}>{n}° anno</option>)}</select></label>
     {avviso && <p role="status">{avviso}</p>}
@@ -1482,7 +1522,27 @@ function GruppiChatComunione({ parrocchiaId, annoPastorale, durata }) {
       : !quadro.gruppi.length ? <p>Nessun gruppo per questo anno di percorso.</p>
       : quadro.gruppi.map(g => <article key={g.gruppo_annuale_id}>
         <h4>{g.nome}</h4><p>Ragazzi assegnati: {g.numero_ragazzi}</p>
-        <button disabled={occupato} onClick={() => setAperto(g)}>Apri chat</button>
+        <div className="ars-sac-azioni">
+          <button type="button" disabled={occupato} onClick={() => setAperto(g)}>Apri chat</button>
+          <button type="button" className="ars-sac-stampa" disabled={occupato}
+            onClick={() => gruppoDaRinominare === g.gruppo_annuale_id ? annullaRinomina() : iniziaRinomina(g)}>
+            {gruppoDaRinominare === g.gruppo_annuale_id ? "Chiudi modifica nome" : "Rinomina gruppo"}
+          </button>
+        </div>
+        {gruppoDaRinominare === g.gruppo_annuale_id && <form
+          onSubmit={e => rinominaGruppo(e, g)} className="ars-sac-form">
+          <label>Nuovo nome del gruppo
+            <input type="text" required value={nomeGruppo} disabled={occupato}
+              onChange={e => setNomeGruppo(e.target.value)} />
+          </label>
+          <div className="ars-sac-azioni">
+            <button type="submit" className="ars-sac-conferma"
+              disabled={occupato || !nomeGruppo.trim() || nomeGruppo.trim() === g.nome}>
+              {occupato ? "Salvataggio…" : "Salva nome"}
+            </button>
+            <button type="button" disabled={occupato} onClick={annullaRinomina}>Annulla</button>
+          </div>
+        </form>}
       </article>)}
     {quadro?.gruppi.length > 0 && quadro.ragazzi.length > 0 && <details>
       <summary>Modifica assegnazioni</summary>
