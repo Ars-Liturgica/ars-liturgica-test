@@ -10,18 +10,36 @@ import AttivitaGruppiFedele from "./stanze/AttivitaGruppi/AttivitaGruppiFedele";
 import ProgettiDonazioniFedele from "./stanze/ProgettiDonazioni/ProgettiDonazioniFedele";
 import SacramentiFedele from "./stanze/Sacramenti/SacramentiFedele";
 
-export default function DashboardFedele() {
+export default function DashboardFedele({
+  utenteIdIniziale = null,
+  parrocchiaIdIniziale = null,
+  nomeParrocchiaIniziale = "",
+} = {}) {
   const [stanzaAperta, setStanzaAperta] = useState(null);
   const [numeroNotificheNonLette, setNumeroNotificheNonLette] =
     useState(0);
 
-  const utenteId = localStorage.getItem("ars_utente_id");
-
+  // Dati passati direttamente dall'accesso, con fallback sul profilo gia' salvato.
+  // Evita che la chat consideri il ragazzo privo di parrocchia.
+  const anagraficaSalvata = (() => {
+    try {
+      return JSON.parse(sessionStorage.getItem("ars_anagrafica_fedele") || "null") || {};
+    } catch (_) {
+      return {};
+    }
+  })();
+  const utenteId = utenteIdIniziale
+    || localStorage.getItem("ars_utente_id")
+    || anagraficaSalvata.utente_id
+    || null;
   const parrocchia = {
-    id: localStorage.getItem("ars_parrocchia_id"),
-    nome:
-      localStorage.getItem("ars_nome_parrocchia") ||
-      "La tua Parrocchia",
+    id: parrocchiaIdIniziale
+      || localStorage.getItem("ars_parrocchia_id")
+      || anagraficaSalvata.parrocchia_id
+      || null,
+    nome: nomeParrocchiaIniziale
+      || localStorage.getItem("ars_nome_parrocchia")
+      || "La tua Parrocchia",
   };
 
   const messaggioBenvenuto =
@@ -131,7 +149,12 @@ export default function DashboardFedele() {
   }
 
   if (stanzaAperta === "sacramenti") {
-    return <SacramentiFedele tornaDashboard={() => setStanzaAperta(null)} />;
+    return <SacramentiFedele
+      utenteId={utenteId}
+      parrocchiaId={parrocchia.id}
+      nomeParrocchia={parrocchia.nome}
+      tornaDashboard={() => setStanzaAperta(null)}
+    />;
   }
 
   const stileCard = {
@@ -508,11 +531,7 @@ export default function DashboardFedele() {
             </p>
           </button>
           <button type="button" onClick={() => setStanzaAperta("sacramenti")} style={stileCard}>
-            <div style={{ width: "40px", height: "44px", marginBottom: "12px", color: "#b18426" }} aria-hidden="true">
-              <svg viewBox="0 0 32 40" width="40" height="44" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path d="M13 2H19V13H28V19H19V38H13V19H4V13H13V2Z" fill="currentColor" />
-              </svg>
-            </div>
+            <div style={{ fontSize: "34px", marginBottom: "16px", color: "#b18426", lineHeight: 1 }} aria-hidden="true"><i className="fa-solid fa-cross" /></div>
             <h2 style={{ margin: "0 0 10px", fontSize: "22px", fontWeight: "500", color: "#49392c" }}>Sacramenti</h2>
             <p style={{ margin: 0, fontFamily: "Arial, sans-serif", fontSize: "15px", lineHeight: "1.6", color: "#75695e" }}>
               Battesimo, Prima Comunione, Cresima e Matrimonio.
