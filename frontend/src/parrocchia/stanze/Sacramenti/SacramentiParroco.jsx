@@ -1399,25 +1399,107 @@ function GruppiChatComunione({ parrocchiaId, annoPastorale, durata }) {
     return () => { corrente = false; };
   }, [anno, annoPastorale, parrocchiaId, ricarica]);
 
+  const [massimo, setMassimo] = useState("");
+  const [catechisti, setCatechisti] = useState("");
+  const disponibili = Number(quadro?.totale_da_assegnare || 0);
+  const capienza = Number(massimo);
+  const educatori = Number(catechisti);
+  const gruppiPrevisti = Number.isInteger(capienza) && capienza > 0 && capienza <= 2147483647
+    ? Math.ceil(disponibili / capienza) : 0;
+  const conteggioValido = catechisti !== "" && Number.isSafeInteger(educatori) && educatori >= 0;
+  const taglio = gruppiPrevisti ? Math.floor(disponibili / gruppiPrevisti) : 0;
+  const grandi = gruppiPrevisti ? disponibili % gruppiPrevisti : 0;
+  function descrivi(numero, dimensione) {
+    return numero + (numero === 1 ? " gruppo da " : " gruppi da ") + dimensione +
+      (dimensione === 1 ? " ragazzo" : " ragazzi");
+  }
+  const [selezione, setSelezione] = useState([]);
+  const [destinazione, setDestinazione] = useState("");
+  const [avviso, setAvviso] = useState("");
+  const [occupato, setOccupato] = useState(false);
+  const operazione = useRef(false);
+
+  async function aggiornaGruppi(genera) {
+    if (operazione.current) return;
+    operazione.current = true;
+    setOccupato(true);
+    setAvviso("");
+    try {
+      const base = { p_parrocchia_id: parrocchiaId, p_anno_pastorale: annoPastorale, p_anno_percorso: anno };
+      const risposta = genera
+        ? await supabase.rpc("ars_comunione_genera_gruppi", { ...base, p_massimo: Number(massimo) })
+        : await supabase.rpc("ars_comunione_assegna_ragazzi", {
+            ...base, p_gruppo_destinazione: destinazione === "liberi" ? null : destinazione,
+            p_selezione: quadro.ragazzi.filter(r => selezione.includes(r.iscrizione_id)).map(r => ({
+              iscrizione_id: r.iscrizione_id, gruppo_annuale_id: r.gruppo_annuale_id
+            }))
+          });
+      if (risposta.error) throw risposta.error;
+      setAvviso(genera ? "Gruppi creati: " + risposta.data.numero_gruppi : "Assegnazioni aggiornate.");
+    } catch (e) {
+      setAvviso(e.message || "Operazione non riuscita. Controlla l’elenco aggiornato.");
+    } finally {
+      operazione.current = false; setOccupato(false);
+      setSelezione([]); setDestinazione(""); setQuadro(null); setRicarica(n => n + 1);
+    }
+  }
+
   if (aperto) return <ChatGruppoComunione key={aperto.gruppo_annuale_id} gruppo={aperto}
     indietro={() => { setAperto(null); setRicarica(n => n + 1); }} />;
 
   return <section className="ars-sac-dettaglio ars-gruppi-chat">
     <h3>Gruppi di catechismo</h3>
     <details><summary>Come utilizzare questa pagina</summary>
-      <p>Scegli l’anno di percorso e apri la chat accanto al nome del gruppo.</p>
+      <p>Scegli l’anno e indica i catechisti disponibili e il massimo di ragazzi per gruppo. Controlla la proposta: puoi cambiare i numeri prima di salvare. Per cambiare le assegnazioni, seleziona i ragazzi e il gruppo di destinazione.</p>
     </details>
-    <label>Anno di percorso <select value={anno} onChange={e => {
-      setQuadro(null); setAnno(Number(e.target.value));
+    <label>Anno di percorso <select disabled={occupato} value={anno} onChange={e => {
+      setSelezione([]); setAvviso(""); setCatechisti(""); setMassimo(""); setDestinazione(""); setQuadro(null); setAnno(Number(e.target.value));
     }}>{[1, 2, 3].filter(n => n <= Number(durata)).map(n =>
       <option key={n} value={n}>{n}° anno</option>)}</select></label>
+    {avviso && <p role="status">{avviso}</p>}
+    {quadro && <form onSubmit={e => { e.preventDefault(); aggiornaGruppi(true); }}>
+      <p>{quadro.totale_da_assegnare} ragazzi con iscrizione completa da assegnare.</p>
+      <label>Catechisti disponibili per questi ragazzi <input type="number" min="0" step="1" required
+        value={catechisti} disabled={occupato} onChange={e => setCatechisti(e.target.value)} /></label>
+      <label>Numero massimo di ragazzi per gruppo <input type="number" min="1" max="2147483647" step="1"
+        required value={massimo} disabled={occupato} onChange={e => setMassimo(e.target.value)} /></label>
+      {gruppiPrevisti > 0 && <div aria-live="polite">
+        <p><strong>Distribuzione proposta</strong><br />
+          {[grandi > 0 && descrivi(grandi, taglio + 1), descrivi(gruppiPrevisti - grandi, taglio)].filter(Boolean).join(" e ")}.
+        </p>
+        {conteggioValido && <p>{educatori === 0
+          ? "Non hai indicato catechisti disponibili. Puoi comunque salvare i gruppi."
+          : educatori < gruppiPrevisti
+          ? "Per coprire tutti i gruppi, almeno un catechista dovrà seguirne più di uno. Per avere un solo gruppo per catechista, imposta il massimo ad almeno " + Math.ceil(disponibili / educatori) + " ragazzi."
+          : "I catechisti disponibili bastano per affidare ogni gruppo a una persona diversa."}</p>}
+      </div>}
+      <button type="submit" disabled={occupato || !gruppiPrevisti || !conteggioValido}>
+        {gruppiPrevisti === 1 ? "Salva il gruppo" : gruppiPrevisti ? "Salva i " + gruppiPrevisti + " gruppi" : "Salva gruppi"}
+      </button>
+    </form>}
     {errore ? <p role="alert">{errore} <button onClick={() => setRicarica(n => n + 1)}>Riprova</button></p>
       : !quadro ? <p>Caricamento gruppi…</p>
       : !quadro.gruppi.length ? <p>Nessun gruppo per questo anno di percorso.</p>
       : quadro.gruppi.map(g => <article key={g.gruppo_annuale_id}>
         <h4>{g.nome}</h4><p>Ragazzi assegnati: {g.numero_ragazzi}</p>
-        <button onClick={() => setAperto(g)}>Apri chat</button>
+        <button disabled={occupato} onClick={() => setAperto(g)}>Apri chat</button>
       </article>)}
+    {quadro?.gruppi.length > 0 && quadro.ragazzi.length > 0 && <details>
+      <summary>Modifica assegnazioni</summary>
+      <fieldset disabled={occupato}><legend>Seleziona i ragazzi da spostare</legend>
+        {quadro.ragazzi.map(r => <label key={r.iscrizione_id} style={{display:"block", textAlign:"left"}}>
+          <input type="checkbox" checked={selezione.includes(r.iscrizione_id)} onChange={e =>
+            setSelezione(e.target.checked ? [...selezione, r.iscrizione_id] : selezione.filter(id => id !== r.iscrizione_id))} />
+          {" "}{r.cognome} {r.nome} · {r.nome_gruppo || "Da assegnare"}
+        </label>)}
+        <label>Destinazione <select value={destinazione} onChange={e => setDestinazione(e.target.value)}>
+          <option value="">Scegli la destinazione</option>
+          {quadro.gruppi.map(g => <option key={g.gruppo_annuale_id} value={g.gruppo_annuale_id}>{g.nome}</option>)}
+          <option value="liberi">Da assegnare</option>
+        </select></label>
+        <button disabled={!selezione.length || !destinazione} onClick={() => aggiornaGruppi(false)}>Sposta selezionati</button>
+      </fieldset>
+    </details>}
   </section>;
 }
 
@@ -2535,6 +2617,10 @@ const STILE = `
 .ars-com-economica-collegamento{border-top:1px solid #dfcba6;margin-top:20px;padding-top:9px}
 @media(max-width:430px){.ars-com-economica-indicatori>div{padding:10px}.ars-com-economica-indicatori strong{font-size:1.15rem}.ars-com-economica-indicatori span{font-size:.82rem}}
 
+.ars-gruppi-chat form>label{display:block;margin:12px 0}.ars-gruppi-chat form input[type=number]{width:6em;padding:6px;font:inherit}.ars-gruppi-chat label:has(>select){display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:12px;margin:16px 0;color:#173955;font-weight:600}
+.ars-gruppi-chat select{min-height:44px;min-width:10rem;max-width:100%;padding:8px 12px;border:1px solid #b79b66;border-radius:9px;background-color:#fffaf1;color:#173955;font:inherit;cursor:pointer}
+.ars-gruppi-chat select:focus-visible{outline:3px solid #295477;outline-offset:2px}
+@media(max-width:540px){.ars-gruppi-chat label:has(>select){align-items:stretch;flex-direction:column;text-align:left}.ars-gruppi-chat select{width:100%}}
 .ars-gruppi-chat article{margin:12px 0;padding:14px;border:1px solid #dfcba6;border-radius:10px;background:#fffaf1}
 .ars-gruppi-chat details{margin:12px 0}.ars-gruppi-chat summary{cursor:pointer}
 .ars-gruppi-chat button{font:inherit;margin:4px;padding:8px 12px;cursor:pointer;border:1px solid #bdab89;border-radius:8px;background:#fffaf1;color:#173955}
