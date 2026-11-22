@@ -1739,7 +1739,133 @@ function GruppiChatComunione({ parrocchiaId, annoPastorale, durata }) {
   </section>;
 }
 
+
+// Presentazione della chat: il ruolo proviene dal database quando disponibile.
+// Se la risposta RPC non include ancora il ruolo, manteniamo una tonalità neutra:
+// non attribuiamo mai a un partecipante un ruolo per supposizione.
+function arsChatRuolo(messaggio, ruoloProfilo = "") {
+  const valore = String(
+    messaggio?.mittente_ruolo || messaggio?.autore_ruolo || messaggio?.ruolo_autore ||
+    messaggio?.ruolo || (messaggio?.mio ? ruoloProfilo : "") || ""
+  ).trim().toLowerCase();
+  if (valore === "parroco") return "parroco";
+  if (/(viceparroco|sacerdot|catechist|presbiter)/.test(valore)) return "operatori";
+  if (/(ragazz|bambin|minore)/.test(valore)) return "ragazzi";
+  if (/(genitor|tutor|familiare)/.test(valore)) return "genitori";
+  return "neutro";
+}
+
+function arsChatNome(messaggio, ruoloProfilo = "") {
+  if (messaggio?.mio) return "Tu";
+  const nome = messaggio?.mittente_nome || messaggio?.autore_nome ||
+    messaggio?.nome_autore || messaggio?.autore_nome_completo ||
+    messaggio?.nome_visualizzato || "";
+  const pulito = String(nome).trim();
+  if (pulito) return pulito;
+  const ruolo = arsChatRuolo(messaggio, ruoloProfilo);
+  return ({ parroco: "Parroco", operatori: "Operatore del catechismo",
+    ragazzi: "Ragazzo", genitori: "Genitore" })[ruolo] || "Membro del gruppo";
+}
+
+function arsChatOra(valore) {
+  const data = new Date(valore);
+  return Number.isNaN(data.getTime()) ? "" : data.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" });
+}
+
+
+// Rubrica del catechismo: legge soltanto i nominativi autorizzati dall'RPC.
+// La ricerca include il collegamento reciproco tra genitori e figli.
+const ARS_CHAT_CATEGORIE = [
+  { ruolo: "parroco", titolo: "Parroco" },
+  { ruolo: "viceparroco", titolo: "Viceparroco" },
+  { ruolo: "sacerdote", titolo: "Sacerdoti" },
+  { ruolo: "catechista", titolo: "Catechisti" },
+  { ruolo: "ragazzo", titolo: "Ragazzi" },
+  { ruolo: "genitore", titolo: "Genitori e tutori" },
+];
+
+function arsChatNormalizza(testo) {
+  return String(testo || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("it-IT").trim();
+}
+
+function RubricaChatComunione({ partecipanti, ricerca, onRicerca, onChiudi, caricamento, errore }) {
+  useEffect(() => {
+    function chiudiConEsc(evento) { if (evento.key === "Escape") onChiudi(); }
+    document.addEventListener("keydown", chiudiConEsc);
+    return () => document.removeEventListener("keydown", chiudiConEsc);
+  }, [onChiudi]);
+
+  const filtro = arsChatNormalizza(ricerca);
+  const elenco = Array.isArray(partecipanti) ? partecipanti : [];
+  const gruppi = ARS_CHAT_CATEGORIE.map(cat => ({
+    ...cat,
+    voci: elenco.filter(voce => {
+      if (voce?.ruolo !== cat.ruolo) return false;
+      if (!filtro) return true;
+      const nomiCollegati = [...(Array.isArray(voce.genitori) ? voce.genitori : []),
+        ...(Array.isArray(voce.figli) ? voce.figli : [])];
+      return arsChatNormalizza(voce.nome).includes(filtro) ||
+        nomiCollegati.some(persona => arsChatNormalizza(persona?.nome).includes(filtro));
+    }),
+  }));
+  const risultati = gruppi.reduce((somma, cat) => somma + cat.voci.length, 0);
+
+  return <div className="ars-chat-rubrica-sfondo" role="presentation"
+    onMouseDown={evento => { if (evento.target === evento.currentTarget) onChiudi(); }}>
+    <section className="ars-chat-rubrica-finestra" role="dialog" aria-modal="true"
+      aria-label="Partecipanti del gruppo">
+      <div className="ars-chat-rubrica-testata">
+        <div><strong>Partecipanti del gruppo</strong>
+          <small>{caricamento ? "Caricamento..." : `${elenco.length} nominativi`}</small>
+        </div>
+        <button type="button" className="ars-chat-rubrica-chiudi"
+          aria-label="Chiudi partecipanti" onClick={onChiudi}>✕</button>
+      </div>
+      <label className="ars-chat-rubrica-ricerca">Cerca per nome del partecipante o di un familiare
+        <input type="search" value={ricerca} onChange={e => onRicerca(e.target.value)}
+          placeholder="Es. Genoveffa o Maria Rossi" autoFocus />
+      </label>
+      {errore && <p className="ars-chat-rubrica-errore" role="alert">{errore}</p>}
+      {caricamento && <p role="status">Caricamento dei partecipanti...</p>}
+      {!caricamento && !errore && risultati === 0 &&
+        <p className="ars-chat-rubrica-vuota">Nessun partecipante corrisponde alla ricerca.</p>}
+      {!caricamento && !errore && <div className="ars-chat-rubrica-elenco">
+        {gruppi.map(cat => <details key={cat.ruolo} className="ars-chat-rubrica-gruppo"
+          open={filtro ? true : undefined}>
+          <summary>{cat.titolo} <span className="ars-chat-rubrica-numero">{cat.voci.length}</span></summary>
+          {cat.voci.length === 0 &&
+            <p className="ars-chat-rubrica-vuota">Nessun nominativo</p>}
+          {cat.voci.map(persona => {
+            const parenti = Array.isArray(persona.genitori) ? persona.genitori : [];
+            const figli = Array.isArray(persona.figli) ? persona.figli : [];
+            return <div className="ars-chat-rubrica-persona" key={persona.id}>
+              <div className="ars-chat-rubrica-identita">
+                <strong>{persona.nome}</strong>
+                {parenti.length > 0 && <small>{parenti.map(p =>
+                  `${p.rapporto === "tutore" ? "Tutore" : "Genitore"}: ${p.nome}${p.rapporto === "tutore" && p.qualita_tutore ? ` (${p.qualita_tutore})` : ""}`
+                ).join(" · ")}</small>}
+                {figli.length > 0 && <small>{figli.map(f =>
+                  `${f.rapporto === "tutore" ? "Tutore di" : "Genitore di"} ${f.nome}${f.rapporto === "tutore" && f.qualita_tutore ? ` (${f.qualita_tutore})` : ""}`
+                ).join(" · ")}</small>}
+              </div>
+              <button type="button" disabled aria-disabled="true"
+                title={persona.utente_id ? "I messaggi individuali saranno abilitati dopo il completamento delle conversazioni private." : "Account di messaggistica non collegato."}
+                className="ars-chat-rubrica-scrivi">Scrivi</button>
+            </div>;
+          })}
+        </details>)}
+      </div>}
+      <div className="ars-chat-rubrica-nota">I messaggi individuali non sono ancora attivi. La rubrica è consultabile.</div>
+    </section>
+  </div>;
+}
+
 function ChatGruppoComunione({ gruppo, indietro }) {
+  const [rubricaAperta, setRubricaAperta] = useState(false);
+  const [rubrica, setRubrica] = useState(null);
+  const [ricercaRubrica, setRicercaRubrica] = useState("");
+  const [erroreRubrica, setErroreRubrica] = useState("");
+  const [caricamentoRubrica, setCaricamentoRubrica] = useState(false);
   const [pagina, setPagina] = useState(null);
   const [testo, setTesto] = useState("");
   const [errore, setErrore] = useState("");
@@ -1790,9 +1916,32 @@ function ChatGruppoComunione({ gruppo, indietro }) {
     setPagina({ ...prima, messaggi: [...prima.messaggi, ...pagina.messaggi] });
   }
 
+  async function apriRubrica() {
+    setRubricaAperta(true);
+    if (rubrica || caricamentoRubrica) return;
+    setCaricamentoRubrica(true);
+    setErroreRubrica("");
+    try {
+      const { data, error } = await supabase.rpc("ars_comunione_chat_rubrica", {
+        p_gruppo_id: gruppo.gruppo_id,
+      });
+      if (error) throw error;
+      if (!Array.isArray(data?.partecipanti) || data.gruppo_annuale_id !== gruppo.gruppo_annuale_id)
+        throw new Error("La rubrica del gruppo non è disponibile. Riapri la chat.");
+      setRubrica(data.partecipanti);
+    } catch (e) { setErroreRubrica(e.message || "Impossibile caricare la rubrica."); }
+    finally { setCaricamentoRubrica(false); }
+  }
   return <section className="ars-sac-dettaglio ars-gruppi-chat">
     <button disabled={busy} onClick={indietro}>Torna ai gruppi</button>
     <h3>Chat · {gruppo.nome}</h3>
+    <button type="button" className="ars-chat-rubrica-apri" onClick={apriRubrica}>
+      👥 Partecipanti {rubrica ? `(${rubrica.length})` : ""}
+    </button>
+    {rubricaAperta && <RubricaChatComunione partecipanti={rubrica} ricerca={ricercaRubrica}
+      onRicerca={setRicercaRubrica} onChiudi={() => setRubricaAperta(false)}
+      caricamento={caricamentoRubrica} errore={erroreRubrica} />}
+
     <details><summary>Come utilizzare questa pagina</summary>
       <p>Scrivi il messaggio e premi Invia. Usa «Aggiorna messaggi» per leggere le risposte.</p>
       {pagina?.accesso.puo_moderare && <p>Puoi rimuovere un messaggio oppure chiudere e riaprire la chat del gruppo.</p>}
@@ -1808,18 +1957,28 @@ function ChatGruppoComunione({ gruppo, indietro }) {
       {pagina.accesso.chat_chiusa && <p>Chat chiusa. I messaggi restano leggibili.</p>}
       {pagina.altri_precedenti && <button disabled={busy} onClick={() => esegui(precedenti)}>Carica messaggi precedenti</button>}
       {!pagina.messaggi.length && <p>In questo gruppo non ci sono ancora messaggi.</p>}
-      {pagina.messaggi.map(m => <article key={m.id}>
-        <small>{m.mio ? "Tu" : "Partecipante"} · {new Date(m.inviato_il).toLocaleString("it-IT")}</small>
-        <p style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{m.rimosso ? "Messaggio rimosso" : m.testo}</p>
-        {pagina.accesso.puo_moderare && !m.rimosso && <button disabled={busy} onClick={() => esegui(async () => {
-          await rpc("rimuovi_messaggio", { p_messaggio_id: m.id });
-          setPagina(p => ({ ...p, messaggi: p.messaggi.map(x => x.id === m.id ? { ...x, rimosso: true, testo: null } : x) }));
-        })}>Rimuovi messaggio</button>}
-      </article>)}
-      {pagina.accesso.puo_scrivere && <form onSubmit={e => { e.preventDefault(); esegui(invia); }}>
+      <div className="ars-chat-messaggi" aria-label="Messaggi del gruppo" role="log" aria-live="polite">
+        {pagina.messaggi.map(m => <div className={`ars-chat-riga${m.mio ? " ars-chat-riga--mia" : ""}`} key={m.id}>
+          <article className="ars-chat-bolla" data-ruolo={arsChatRuolo(m, pagina.accesso?.ruolo)}>
+            <span className="ars-chat-mittente">{arsChatNome(m, pagina.accesso?.ruolo)}</span>
+            <p className="ars-chat-testo">{m.rimosso ? "Messaggio rimosso" : m.testo}</p>
+            <div className="ars-chat-meta">
+              <time dateTime={m.inviato_il}>{arsChatOra(m.inviato_il)}</time>
+              {pagina.accesso.puo_moderare && !m.rimosso && <details className="ars-chat-opzioni">
+                <summary title="Opzioni messaggio" aria-label="Opzioni messaggio">⋯</summary>
+                <button type="button" disabled={busy} onClick={() => esegui(async () => {
+                  await rpc("rimuovi_messaggio", { p_messaggio_id: m.id });
+                  setPagina(p => ({ ...p, messaggi: p.messaggi.map(x => x.id === m.id ? { ...x, rimosso: true, testo: null } : x) }));
+                })}>Rimuovi messaggio</button>
+              </details>}
+            </div>
+          </article>
+        </div>)}
+      </div>
+      {pagina.accesso.puo_scrivere && <form className="ars-chat-scrittura" onSubmit={e => { e.preventDefault(); esegui(invia); }}>
         <label>Messaggio<textarea disabled={busy} value={testo} onChange={e => {
           invio.current = null; setTesto(e.target.value);
-        }} rows={3} /></label>
+        }} rows={2} /></label>
         <button disabled={busy || !testo.trim()} type="submit">Invia</button>
       </form>}
     </>}
@@ -2861,4 +3020,55 @@ const STILE = `
 .ars-gruppi-chat details{margin:12px 0}.ars-gruppi-chat summary{cursor:pointer}
 .ars-gruppi-chat button{font:inherit;margin:4px;padding:8px 12px;cursor:pointer;border:1px solid #bdab89;border-radius:8px;background:#fffaf1;color:#173955}
 .ars-gruppi-chat textarea{display:block;box-sizing:border-box;width:100%;padding:10px;font:inherit}
+
+
+/* Chat di Prima Comunione: bolle compatte, riconoscimento del ruolo e scorrimento. */
+.ars-chat-messaggi{display:flex;flex-direction:column;gap:8px;max-height:min(57vh,590px);overflow-y:auto;overscroll-behavior:contain;padding:12px 8px;margin:12px 0;background:#fffcf8;border:1px solid #e5d9c6;border-radius:12px;text-align:left}
+.ars-chat-riga{display:flex;justify-content:flex-start;width:100%}
+.ars-chat-riga--mia{justify-content:flex-end}
+.ars-gruppi-chat .ars-chat-bolla,.ars-com-chat-fedele .ars-chat-bolla{box-sizing:border-box;width:fit-content;max-width:min(88%,560px);margin:0;padding:8px 12px;border:1px solid #d8d9d8;border-radius:13px;background:#f4f5f6;color:#283a41;text-align:left;overflow-wrap:anywhere;font:inherit;line-height:1.4;box-shadow:0 1px 1px #0000000d}
+.ars-gruppi-chat .ars-chat-bolla[data-ruolo="parroco"],.ars-com-chat-fedele .ars-chat-bolla[data-ruolo="parroco"]{background:#ffe1ca;border-color:#efb595}
+.ars-gruppi-chat .ars-chat-riga--mia .ars-chat-bolla[data-ruolo="parroco"],.ars-com-chat-fedele .ars-chat-riga--mia .ars-chat-bolla[data-ruolo="parroco"]{background:#f8c4a5}
+.ars-gruppi-chat .ars-chat-bolla[data-ruolo="operatori"],.ars-com-chat-fedele .ars-chat-bolla[data-ruolo="operatori"]{background:#ddf5f6;border-color:#a9dfe4}
+.ars-gruppi-chat .ars-chat-riga--mia .ars-chat-bolla[data-ruolo="operatori"],.ars-com-chat-fedele .ars-chat-riga--mia .ars-chat-bolla[data-ruolo="operatori"]{background:#b6e8ed}
+.ars-gruppi-chat .ars-chat-bolla[data-ruolo="ragazzi"],.ars-com-chat-fedele .ars-chat-bolla[data-ruolo="ragazzi"]{background:#eee6fb;border-color:#d5c5f0}
+.ars-gruppi-chat .ars-chat-riga--mia .ars-chat-bolla[data-ruolo="ragazzi"],.ars-com-chat-fedele .ars-chat-riga--mia .ars-chat-bolla[data-ruolo="ragazzi"]{background:#ddd0f8}
+.ars-gruppi-chat .ars-chat-bolla[data-ruolo="genitori"],.ars-com-chat-fedele .ars-chat-bolla[data-ruolo="genitori"]{background:#e5f2db;border-color:#c1dfb0}
+.ars-gruppi-chat .ars-chat-riga--mia .ars-chat-bolla[data-ruolo="genitori"],.ars-com-chat-fedele .ars-chat-riga--mia .ars-chat-bolla[data-ruolo="genitori"]{background:#d2ebc2}
+.ars-gruppi-chat .ars-chat-riga--mia .ars-chat-bolla[data-ruolo="neutro"],.ars-com-chat-fedele .ars-chat-riga--mia .ars-chat-bolla[data-ruolo="neutro"]{background:#fbe4bb;border-color:#e8c88c}
+.ars-gruppi-chat .ars-chat-mittente,.ars-com-chat-fedele .ars-chat-mittente{display:block;font-size:.78rem;font-weight:700;line-height:1.25;color:#314f5a}
+.ars-gruppi-chat .ars-chat-testo,.ars-com-chat-fedele .ars-chat-testo{margin:4px 0 0!important;color:#283a41!important;font-size:.96rem;line-height:1.35;white-space:pre-wrap;overflow-wrap:anywhere;text-align:left}
+.ars-gruppi-chat .ars-chat-meta,.ars-com-chat-fedele .ars-chat-meta{display:flex;justify-content:flex-end;align-items:center;gap:8px;margin-top:3px;font-size:.71rem;color:#4e5e65}
+.ars-gruppi-chat .ars-chat-opzioni{position:relative;display:inline-block;margin:0}
+.ars-gruppi-chat .ars-chat-opzioni summary{list-style:none;display:inline-block;line-height:1;cursor:pointer;font-size:1.2rem;font-weight:bold;min-width:25px;text-align:center}
+.ars-gruppi-chat .ars-chat-opzioni summary::-webkit-details-marker{display:none}
+.ars-gruppi-chat .ars-chat-opzioni button{display:block;margin:4px 0 0;padding:5px 8px;font-size:.81rem;background:#fff;border:1px solid #cebda3;color:#7a3430;white-space:nowrap}
+.ars-gruppi-chat .ars-chat-scrittura textarea,.ars-com-chat-fedele .ars-chat-scrittura textarea{box-sizing:border-box;min-height:58px;width:100%;padding:9px 11px;resize:vertical;font:inherit}
+.ars-gruppi-chat .ars-chat-scrittura label,.ars-com-chat-fedele .ars-chat-scrittura label{display:block;margin:8px 0 3px}
+@media(max-width:600px){.ars-chat-messaggi{max-height:60vh;padding:9px 5px}.ars-gruppi-chat .ars-chat-bolla,.ars-com-chat-fedele .ars-chat-bolla{max-width:91%;padding:8px 10px}}
+
+
+/* Rubrica del gruppo: finestra sovrapposta che non sottrae spazio ai messaggi. */
+.ars-chat-rubrica-apri{display:inline-flex;align-items:center;gap:6px;max-width:100%;margin:8px 8px 8px 0;padding:8px 13px;border:1px solid #8cb7c0;border-radius:9px;background:#eff9f9;color:#275263;font-size:.88rem;font-weight:650;cursor:pointer}
+.ars-chat-rubrica-sfondo{position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:#0b223c8c;padding:12px}
+.ars-chat-rubrica-finestra{box-sizing:border-box;display:flex;flex-direction:column;gap:12px;width:min(540px,100%);max-height:min(86vh,790px);padding:17px;border-radius:16px;background:#fffdfa;color:#283b41;border:1px solid #d7d0c0;box-shadow:0 18px 50px #0003;overflow:hidden}
+.ars-chat-rubrica-testata{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.ars-chat-rubrica-testata strong{display:block;font-size:1.06rem;color:#294955}
+.ars-chat-rubrica-testata small{display:block;font-size:.78rem;color:#526a73;margin-top:2px}
+.ars-chat-rubrica-chiudi{border:1px solid #d9e2e3;border-radius:7px;background:white;color:#344b54;font-size:1.1rem;padding:5px 11px;cursor:pointer}
+.ars-chat-rubrica-ricerca{display:flex;flex-direction:column;gap:5px;font-size:.81rem;font-weight:550}
+.ars-chat-rubrica-ricerca input{box-sizing:border-box;width:100%;padding:10px 12px;background:#fff;border:1px solid #b5cdd0;border-radius:9px;color:#203843;font-size:.95rem}
+.ars-chat-rubrica-elenco{overflow-y:auto;min-height:60px;padding-right:4px;overscroll-behavior:contain}
+.ars-chat-rubrica-gruppo{border:1px solid #dce4e0;border-radius:9px;overflow:hidden;margin-bottom:7px;background:#fff}
+.ars-chat-rubrica-gruppo>summary{cursor:pointer;background:#f3f8f5;padding:9px 12px;font-weight:680;list-style-position:inside;color:#244c5c}
+.ars-chat-rubrica-numero{display:inline-block;background:#e5edeb;border-radius:20px;padding:1px 9px;font-size:.75rem;margin-left:5px}
+.ars-chat-rubrica-persona{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:9px 12px;border-top:1px solid #edf1f0}
+.ars-chat-rubrica-identita{min-width:0;flex:1}
+.ars-chat-rubrica-identita strong{display:block;font-size:.91rem;color:#263e49;overflow-wrap:anywhere}
+.ars-chat-rubrica-identita small{display:block;font-size:.78rem;color:#597078;margin-top:2px;overflow-wrap:anywhere}
+.ars-chat-rubrica-scrivi{flex:0 0 auto;border:1px solid #b8c6ca;border-radius:8px;padding:6px 10px;font-size:.81rem;background:#f4f6f6;color:#7b8b8f;cursor:not-allowed}
+.ars-chat-rubrica-nota{font-size:.76rem;color:#50636c;border-top:1px solid #e6e8e3;padding-top:9px}
+.ars-chat-rubrica-vuota{font-size:.82rem;color:#6c777c;margin:9px 12px!important}
+.ars-chat-rubrica-errore{color:#aa3029;font-size:.9rem}
+@media(max-width:570px){.ars-chat-rubrica-finestra{max-height:94vh;padding:12px}.ars-chat-rubrica-sfondo{padding:5px}.ars-chat-rubrica-persona{padding:9px}}
 `;
