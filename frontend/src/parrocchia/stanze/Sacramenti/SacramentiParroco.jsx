@@ -14,7 +14,7 @@ const sezioniComunione = [
   { id: "quote", nome: "Quote e iscrizioni", descrizione: "Quote annuali, iscritti e rimborsi" },
   { id: "iscrizioni", nome: "Iscrizioni e rinnovi", descrizione: "Nuove iscrizioni e rinnovi annuali" },
   { id: "catechisti", nome: "Catechisti", descrizione: "Responsabili e assegnazioni" },
-  { id: "gruppi", nome: "Gruppi di catechismo", descrizione: "Classi e organizzazione" },
+  { id: "gruppi", nome: "Gruppi di catechismo e chat", descrizione: "Organizza i gruppi, assegna i catechisti e comunica con ragazzi e famiglie" },
   { id: "incontri", nome: "Calendario incontri", descrizione: "Date e appuntamenti" },
   { id: "presenze", nome: "Presenze", descrizione: "Registro degli incontri" },
   { id: "comunicazioni", nome: "Comunicazioni", descrizione: "Avvisi alle famiglie" },
@@ -1664,7 +1664,8 @@ function GruppiChatComunione({ parrocchiaId, annoPastorale, durata }) {
     indietro={() => { setAperto(null); setRicarica(n => n + 1); }} />;
 
   return <section className="ars-sac-dettaglio ars-gruppi-chat">
-    <h3>Gruppi di catechismo</h3>
+    <h3>Gruppi di catechismo e chat</h3>
+    <p><strong>Ogni gruppo di catechismo ha una propria chat.</strong> Ragazzi, genitori, catechisti e sacerdoti comunicano con i partecipanti del proprio gruppo. Per entrare nella conversazione, apri il gruppo desiderato.</p>
     <details><summary>Come utilizzare questa pagina</summary>
       <p>Scegli l’anno e indica i catechisti disponibili e il massimo di ragazzi per gruppo. Controlla la proposta prima di salvare. Usa «Rinomina gruppo» per dare a un gruppo un nome personalizzato senza cambiare iscritti o messaggi della chat. Per cambiare le assegnazioni, seleziona i ragazzi e il gruppo di destinazione. I ragazzi con domanda presentata possono essere inseriti nei gruppi anche se mancano documenti: la segreteria continuerà a seguirli nella Card 03.</p>
     </details>
@@ -2492,7 +2493,7 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
             ))}
             <fieldset className="ars-sac-anno ars-sac-orari-sezione" disabled={!modifica || caricamento || operazione}>
               <legend>Giorni e orari del Catechismo</legend>
-              <p className="ars-sac-orari-intro">Puoi indicare gli orari già stabiliti, oppure comunicarli alle famiglie in seguito. I gruppi e le assegnazioni saranno organizzati nella card «Gruppi di catechismo».</p>
+              <p className="ars-sac-orari-intro">Puoi indicare gli orari già stabiliti, oppure comunicarli alle famiglie in seguito. I gruppi e le assegnazioni saranno organizzati nella card «Gruppi di catechismo e chat».</p>
               {[1, 2, 3].filter((anno) => anno <= Number(impostazioni.durata)).map((anno) => {
                 const configOrari = orariAnno(anno);
                 const definiti = configOrari.stato === "definiti";
