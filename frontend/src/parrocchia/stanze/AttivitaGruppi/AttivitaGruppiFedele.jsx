@@ -67,7 +67,7 @@ function euro(valore, valuta = "EUR") {
   return Number(valore || 0).toLocaleString("it-IT", { style: "currency", currency: valuta || "EUR" });
 }
 
-function IscrizioneOrdinaria({ attivita, parrocchiaId, utenteId, metodi, erroreMetodi, onIndietro }) {
+export function IscrizioneOrdinaria({ attivita, parrocchiaId, utenteId, metodi, erroreMetodi, onIndietro }) {
   const [partecipanti, setPartecipanti] = useState([{ nome: "", cognome: "" }]);
   const [telefono, setTelefono] = useState("");
   const [email, setEmail] = useState("");
