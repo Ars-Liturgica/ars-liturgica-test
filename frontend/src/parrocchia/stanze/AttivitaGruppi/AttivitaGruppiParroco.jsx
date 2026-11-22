@@ -228,7 +228,7 @@ export default function AttivitaGruppiParroco({
         eliminaBozza ? { p_attivita_id: voce.id } : {
           p_attivita_id: voce.id,
           p_messaggio: messaggioCancellazione.trim(),
-          p_pubblica_bacheca: true,
+          p_pubblica_bacheca: !modalitaCatechismo,
         }
       );
       if (error) throw error;
@@ -624,6 +624,9 @@ export default function AttivitaGruppiParroco({
           <p>{cartella ? "Gestisci questa attività e le iniziative al suo interno."
             : modalitaCatechismo ? "Le attività vengono mostrate solo ai gruppi di catechismo selezionati; quote e incassi confluiscono nella gestione economica generale."
             : "Le attività della tua parrocchia, comprese le bozze. Puoi creare un GREST, una gita o un’altra attività parrocchiale."}</p>
+          {modalitaCatechismo && !cartella && !mostraModulo && !mostraCancellate && (
+            <p>Per correggere o cancellare un’attività già salvata, usa «Modifica attività» o «Elimina bozza / Cancella attività» nella sua scheda qui sotto.</p>
+          )}
           {!cartella && <button type="button" style={stile.pulsante} disabled={rimborsiOccupati || operazioneAttivita} onClick={() => { setMostraCancellate(v => !v); setPraticaAvvisi(null); setMostraModulo(false); setAzioneAttivita(null); }}>
             {mostraCancellate ? "← Attività attive e bozze" : `Attività cancellate (${attivita.filter(a => a.stato === "annullata" &&
               ((a.configurazione_modulo?.ambito === "catechismo") === modalitaCatechismo)).length})`}
@@ -649,7 +652,9 @@ export default function AttivitaGruppiParroco({
               disabled={operazioneAttivita} value={messaggioCancellazione}
               onChange={(e) => setMessaggioCancellazione(e.target.value)} />
           </label>
-          <p>Lo stesso messaggio sarà pubblicato in Bacheca Avvisi. L’avviso includerà la data entro cui contattare la parrocchia per il rimborso delle quote.</p>
+          <p>{modalitaCatechismo
+            ? "La cancellazione resterà riservata ai partecipanti dell’attività. Non verrà pubblicato un avviso nella Bacheca generale. Per le quote versate resta la normale procedura di rimborso."
+            : "Lo stesso messaggio sarà pubblicato in Bacheca Avvisi. L’avviso includerà la data entro cui contattare la parrocchia per il rimborso delle quote."}</p>
         </>}
         {attivita.some((a) => a.attivita_principale_id === azioneAttivita.id && (azioneAttivita.stato === "bozza" || a.stato !== "annullata")) &&
           <p>Questa attività contiene iniziative collegate: elimina prima le loro bozze e cancella quelle pubblicate.</p>}
@@ -670,10 +675,10 @@ export default function AttivitaGruppiParroco({
           <p>Le notifiche nell’app sono automatiche per gli account collegati. WhatsApp e gli altri contatti richiedono l’invio o il contatto personale.</p>
           {!pratiche.find(p => p.id === praticaAvvisi.attivita.id)?.notifica_id && <button type="button" style={stile.pulsante} disabled={operazioneAttivita} onClick={async () => {
             setOperazioneAttivita(true); setErroreAvvisi("");
-            try { const { data, error } = await supabase.rpc("ars_cancella_attivita_con_avvisi_parroco", { p_attivita_id: praticaAvvisi.attivita.id, p_messaggio: praticaAvvisi.messaggio, p_pubblica_bacheca: true });
+            try { const { data, error } = await supabase.rpc("ars_cancella_attivita_con_avvisi_parroco", { p_attivita_id: praticaAvvisi.attivita.id, p_messaggio: praticaAvvisi.messaggio, p_pubblica_bacheca: !modalitaCatechismo });
               if (error) throw error; await caricaAttivita(); await apriAvvisiCancellazione(praticaAvvisi.attivita, data);
             } catch (e) { setErroreAvvisi(e.message); } finally { setOperazioneAttivita(false); }
-          }}>Completa notifiche e bacheca della cancellazione precedente</button>}
+          }}>{modalitaCatechismo ? "Completa le notifiche della cancellazione" : "Completa notifiche e bacheca della cancellazione precedente"}</button>}
           {!caricamentoAvvisi && !erroreAvvisi && avvisiCancellazione.length === 0 && <p>Non risultano destinatari per questa attività.</p>}
           {avvisiCancellazione.map((avviso) => {
             const cifre = String(avviso.telefono || "").replace(/[^0-9]/g, "");
@@ -719,7 +724,7 @@ export default function AttivitaGruppiParroco({
         }</p>}
         <p>{cartella.modello_quota === "quota_fissa" ? `Quota: ${Number(cartella.importo_quota).toLocaleString("it-IT", { style: "currency", currency: "EUR" })}` : cartella.modello_quota === "contributo_libero" ? "Contributo libero" : "Gratuita"}</p>
         {["bozza", "pubblicata"].includes(cartella.stato) && <>
-          <button type="button" style={stile.pulsante} disabled={caricamentoInformativa} onClick={() => apriModulo(cartella)}>Modifica</button>
+          <button type="button" style={stile.pulsante} disabled={caricamentoInformativa} onClick={() => apriModulo(cartella)}>Modifica attività</button>
           {cartella.tipo?.toLowerCase() === "grest" && <>
             {cartella.stato === "pubblicata" && <> {" "}<button type="button" style={stile.pulsante} onClick={() => setGrestIscrizioni(cartella)}>Vedi iscrizioni</button></>}
             {" "}<button type="button" style={stile.pulsante} onClick={() => setGrestGruppi(cartella)}>Gestisci gruppi</button>
@@ -894,7 +899,7 @@ export default function AttivitaGruppiParroco({
                 <p>{voce.modello_quota === "quota_fissa" ? `Quota: ${Number(voce.importo_quota).toLocaleString("it-IT", { style: "currency", currency: "EUR" })}` : voce.modello_quota === "contributo_libero" ? "Contributo libero" : "Gratuita"}</p>
                 <button type="button" style={stile.pulsante} onClick={() => apriCartella(voce)}>Apri attività</button>{" "}
                 {["bozza", "pubblicata"].includes(voce.stato) && (
-                  <button type="button" style={stile.pulsante} disabled={caricamentoInformativa} onClick={() => apriModulo(voce)}>Modifica</button>
+                  <button type="button" style={stile.pulsante} disabled={caricamentoInformativa} onClick={() => apriModulo(voce)}>Modifica attività</button>
                 )}
                 {["bozza", "pubblicata"].includes(voce.stato) && voce.tipo?.toLowerCase() === "grest" && <>
                   {voce.stato === "pubblicata" && <>{" "}<button type="button" style={stile.pulsante} onClick={() => setGrestIscrizioni(voce)}>Vedi iscrizioni</button></>}
