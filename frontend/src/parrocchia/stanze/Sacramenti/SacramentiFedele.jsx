@@ -19,7 +19,7 @@ const sottocardComunione = [
   { id: "iscrizioni", nome: "Iscrizioni e rinnovi", descrizione: "Domande, rinnovi e documenti", simbolo: "✎" },
   { id: "gruppo", nome: "Il mio gruppo e chat", descrizione: "Dialogo con catechisti e parroco", simbolo: "☏" },
   { id: "calendario", nome: "Calendario del Catechismo", descrizione: "Incontri e scadenze del percorso", simbolo: "▦" },
-  { id: "comunicazioni", nome: "Comunicazioni", descrizione: "Avvisi e informazioni", simbolo: "✉" },
+  { id: "comunicazioni", nome: "Attività del catechismo", descrizione: "Sondaggi e Fabbrica delle idee", simbolo: "🌈" },
   { id: "pagamenti", nome: "Quote e pagamenti", descrizione: "Situazione e ricevute", simbolo: "€" },
   { id: "celebrazioni", nome: "Celebrazioni", descrizione: "Preparazione e Prima Comunione", simbolo: "✝" },
 ];
@@ -1563,6 +1563,11 @@ function ChatComunioneFedele({ gruppo, parrocchiaId, utenteId, onTorna }) {
       caricamento={caricamentoRubrica} errore={erroreRubrica} />}
 
     <p>{gruppo.anno_percorso}° anno · {gruppo.anno_pastorale}</p>
+    {pagina?.accesso?.ruolo === "ragazzo" && <aside className="ars-com-chat-invito-ragazzi" aria-label="Domande e dialogo personale">
+      <strong>💬 Hai una domanda o un dubbio?</strong>
+      <p>Qui puoi parlarne con il parroco, i catechisti e gli amici del tuo gruppo. Se preferisci fare una domanda personale, senza condividerla con tutti, potrai scrivere direttamente al parroco o a un catechista.</p>
+      <small>La funzione dei messaggi individuali nell'app sarà disponibile quando la completeremo.</small>
+    </aside>}
     <details className="ars-com-chat-guida">
       <summary>Come utilizzare questa pagina</summary>
       <p>Qui puoi leggere i messaggi condivisi dal parroco, dai catechisti e dagli altri partecipanti autorizzati. Premi «Aggiorna messaggi» per vedere le novità.</p>
@@ -1667,6 +1672,239 @@ function IlMioGruppoComunione({ parrocchiaId, utenteId }) {
   </section>;
 }
 
+
+// La fabbrica delle idee e i sondaggi usano le stesse RPC per parroco e fedeli.
+// Le adesioni sono solo positive: nessun voto "No" e nessuna nuova procedura di accesso.
+function BachecaIdeeComunione({ gruppo, parrocchiaId = null, utenteId = null, gestore = false }) {
+  const [dati, setDati] = useState(null);
+  const [errore, setErrore] = useState("");
+  const [avviso, setAvviso] = useState("");
+  const [occupato, setOccupato] = useState(false);
+  const [nuova, setNuova] = useState(false);
+  const [titolo, setTitolo] = useState("");
+  const [descrizione, setDescrizione] = useState("");
+  const [destinatari, setDestinatari] = useState("ragazzi");
+  const [perRagazzo, setPerRagazzo] = useState({});
+  const [ricarica, setRicarica] = useState(0);
+  const blocco = useRef(false);
+  const parametri = {
+    p_gruppo_id: gruppo.gruppo_id,
+    ...(gestore ? {} : { p_parrocchia_id: parrocchiaId, p_utente_id: utenteId })
+  };
+  useEffect(() => {
+    let attivo = true;
+    setDati(null);
+    setErrore("");
+    (async () => {
+      try {
+        const { data, error } = await supabase.rpc("ars_comunione_idee_elenco", parametri);
+        if (error) throw error;
+        if (attivo) setDati(data);
+      } catch (e) {
+        if (attivo) setErrore(e.message || "Non è stato possibile caricare le iniziative.");
+      }
+    })();
+    return () => { attivo = false; };
+  }, [gruppo.gruppo_id, gruppo.gruppo_annuale_id, parrocchiaId, utenteId, gestore, ricarica]);
+
+  async function operazione(nome, args, dopo) {
+    if (blocco.current) return;
+    blocco.current = true;
+    setOccupato(true);
+    setErrore("");
+    setAvviso("");
+    try {
+      const { error } = await supabase.rpc(nome, { ...parametri, ...args });
+      if (error) throw error;
+      dopo?.();
+      setRicarica(n => n + 1);
+    } catch (e) {
+      setErrore(e.message || "Operazione non riuscita.");
+    } finally {
+      blocco.current = false;
+      setOccupato(false);
+    }
+  }
+
+  async function crea(e) {
+    e.preventDefault();
+    const tipo = gestore ? "sondaggio" : "idea";
+    if (titolo.trim().length < 3) return;
+    await operazione("ars_comunione_idee_crea", {
+      p_tipo: tipo,
+      p_titolo: titolo.trim(),
+      p_descrizione: descrizione.trim(),
+      p_destinatari: gestore ? destinatari : "ragazzi"
+    }, () => {
+      setTitolo("");
+      setDescrizione("");
+      setNuova(false);
+      setAvviso(tipo === "sondaggio" ? "Sondaggio pubblicato." : "La tua idea è stata pubblicata! 🌈");
+    });
+  }
+
+  const opzioni = Array.isArray(dati?.opzioni_ragazzi) ? dati.opzioni_ragazzi : [];
+  const iniziative = Array.isArray(dati?.iniziative) ? dati.iniziative : [];
+  const puoProporre = !gestore && dati?.ruolo === "ragazzo" && dati?.fabbrica_aperta;
+  const raggruppa = (tipo) => iniziative.filter(i => i.tipo === tipo);
+  function renderIniziativa(item) {
+    const adesioni = Array.isArray(item.adesioni) ? item.adesioni : [];
+    const ragazzi = item.destinatari === "ragazzi";
+    const soggetto = ragazzi
+      ? (opzioni.length === 1 ? opzioni[0].bambino_id : perRagazzo[item.id] || "")
+      : utenteId;
+    const soggettoId = ragazzi ? (soggetto ? `ragazzo:${soggetto}` : "") : (utenteId ? `adulto:${utenteId}` : "");
+    const aderito = !!soggettoId && adesioni.some(x => x.soggetto_id === soggettoId);
+    const puoRispondere = !gestore && !item.chiusa &&
+      (ragazzi ? !!soggetto : dati?.ruolo === "genitore");
+    return <article className={`ars-idee-proposta ars-idee-proposta--${item.tipo}`} key={item.id}>
+      <div className="ars-idee-proposta-capo">
+        <span aria-hidden="true">{item.tipo === "idea" ? "💡" : "📋"}</span>
+        <div>
+          <strong>{item.titolo}</strong>
+          <small>{item.tipo === "idea" ? `Proposta di ${item.proponente || "un ragazzo"}`
+            : `Sondaggio del parroco · ${ragazzi ? "Ragazzi" : "Genitori e tutori"}`}</small>
+        </div>
+      </div>
+      {item.descrizione && <p className="ars-idee-descrizione">{item.descrizione}</p>}
+      {!gestore && ragazzi && opzioni.length > 1 && <label className="ars-idee-scelta">
+        Per chi rispondi?
+        <select value={perRagazzo[item.id] || ""} onChange={e => setPerRagazzo(v => ({ ...v, [item.id]: e.target.value }))}>
+          <option value="">Seleziona il ragazzo</option>
+          {opzioni.map(b => <option key={b.bambino_id} value={b.bambino_id}>{b.nome}</option>)}
+        </select>
+      </label>}
+      <div className="ars-idee-adesioni">
+        {!gestore && (ragazzi ? opzioni.length > 0 : dati?.ruolo === "genitore") && <button
+          type="button" disabled={occupato || !puoRispondere}
+          className={`ars-idee-aderisci ${aderito ? "ars-idee-aderisci--attivo" : ""}`}
+          onClick={() => operazione("ars_comunione_idee_adesione", {
+            p_idea_id: item.id,
+            p_aderisco: !aderito,
+            p_bambino_id: ragazzi ? soggetto : null
+          })}>
+          {aderito ? "✓ Hai aderito · ritira" : "❤️ Sì, ci sarò!"}
+        </button>}
+        <details className="ars-idee-nomi">
+          <summary>👥 {adesioni.length} {adesioni.length === 1 ? "adesione" : "adesioni"} ▾</summary>
+          <div className="ars-idee-nomi-lista">
+            {adesioni.length ? adesioni.map((a, index) => <div key={`${a.soggetto_id}-${index}`}>{a.nome}</div>)
+              : <span>Non ci sono ancora adesioni.</span>}
+          </div>
+        </details>
+      </div>
+      {item.chiusa && <small>Adesioni chiuse</small>}
+    </article>;
+  }
+  return <div className="ars-idee-sezione">
+    <div className="ars-idee-intestazione">
+      <div className="ars-idee-arcobaleno" aria-hidden="true">🌈 ✨ 💡</div>
+      <h4>Attività e idee · {gruppo.nome}</h4>
+      <p>Qui le idee possono diventare occasioni per stare insieme!</p>
+    </div>
+    <details className="ars-idee-guida">
+      <summary>Come utilizzare questa pagina</summary>
+      {gestore ? <p>Scrivi un sondaggio e scegli se rivolgerlo ai ragazzi o ai genitori. Ogni persona può aderire con «Sì, ci sarò!». Apri il numero delle adesioni per leggere i nomi. Puoi anche vedere le proposte dei ragazzi e sospenderne temporaneamente l'invio.</p>
+        : <p>Leggi i sondaggi e le proposte del gruppo. Per partecipare premi «Sì, ci sarò!». Puoi ritirare l'adesione fino alla chiusura. Se hai più figli, seleziona prima il ragazzo interessato. Se sei un ragazzo, puoi proporre una nuova idea!</p>}
+    </details>
+    {gestore && dati && <div className="ars-idee-gestione">
+      <button type="button" disabled={occupato} className="ars-idee-pulsante"
+        onClick={() => { setNuova(v => !v); setTitolo(""); setDescrizione(""); }}>📋 {nuova ? "Chiudi modulo sondaggio" : "Crea un sondaggio"}</button>
+      <button type="button" disabled={occupato} className="ars-idee-pulsante ars-idee-pulsante--secondario"
+        onClick={() => operazione("ars_comunione_idee_apertura", { p_aperta: !dati.fabbrica_aperta })}>
+        {dati.fabbrica_aperta ? "Sospendi nuove idee" : "Riapri la fabbrica delle idee"}
+      </button>
+    </div>}
+    {puoProporre && <button type="button" disabled={occupato} className="ars-idee-pulsante"
+      onClick={() => { setNuova(v => !v); setTitolo(""); setDescrizione(""); }}>
+      {nuova ? "Chiudi modulo" : "🌟 Proponi un'idea"}
+    </button>}
+    {!gestore && dati && dati.ruolo === "ragazzo" && !dati.fabbrica_aperta &&
+      <p className="ars-idee-avviso">La fabbrica delle idee è temporaneamente chiusa. Puoi leggere le proposte già pubblicate.</p>}
+    {nuova && (gestore || puoProporre) && <form className="ars-idee-modulo" onSubmit={crea}>
+      <label>{gestore ? "Domanda del sondaggio" : "Come si chiama la tua idea?"}
+        <input value={titolo} maxLength={180} minLength={3} required disabled={occupato}
+          onChange={e => setTitolo(e.target.value)} placeholder={gestore ? "Parteciperai alla visita di domenica?" : "Una festa dei compleanni! 🎂"} />
+      </label>
+      <label>{gestore ? "Dettagli (facoltativi)" : "Raccontaci la tua proposta"}
+        <textarea value={descrizione} maxLength={2000} rows={3} disabled={occupato}
+          onChange={e => setDescrizione(e.target.value)} placeholder="Scrivi qui qualche dettaglio…" />
+      </label>
+      {gestore && <label>Il sondaggio è rivolto a
+        <select value={destinatari} disabled={occupato} onChange={e => setDestinatari(e.target.value)}>
+          <option value="ragazzi">Ragazzi (adesione per ciascun figlio)</option>
+          <option value="genitori">Genitori e tutori (adesione personale)</option>
+        </select>
+      </label>}
+      <button type="submit" className="ars-idee-pulsante" disabled={occupato || titolo.trim().length < 3}>
+        {gestore ? "Pubblica sondaggio" : "Invia la tua idea"}
+      </button>
+    </form>}
+    {errore && <p className="ars-idee-errore" role="alert">{errore}</p>}
+    {avviso && <p className="ars-idee-avviso" role="status">{avviso}</p>}
+    {!dati && !errore && <p>Caricamento delle iniziative…</p>}
+    {dati && <>
+      <div className="ars-idee-aggiorna"><button type="button" disabled={occupato}
+        onClick={() => setRicarica(n => n + 1)}>Aggiorna le adesioni</button></div>
+      <section className="ars-idee-blocco">
+        <h5>📋 Sondaggi del parroco</h5>
+        {raggruppa("sondaggio").length ? raggruppa("sondaggio").map(renderIniziativa)
+          : <p>Non ci sono ancora sondaggi per questo gruppo.</p>}
+      </section>
+      <section className="ars-idee-blocco">
+        <h5>🌈 La fabbrica delle idee</h5>
+        <p className="ars-idee-sottotitolo">Gite, giochi, feste, compleanni, piccole grandi idee: ogni proposta conta!</p>
+        {raggruppa("idea").length ? raggruppa("idea").map(renderIniziativa)
+          : <p>Ancora nessuna proposta. La prossima bella idea potrebbe essere la tua!</p>}
+      </section>
+    </>}
+  </div>;
+}
+
+
+function AttivitaCatechismoFedele({ parrocchiaId, utenteId }) {
+  const [gruppi, setGruppi] = useState([]);
+  const [gruppoId, setGruppoId] = useState("");
+  const [errore, setErrore] = useState("");
+  const [carica, setCarica] = useState(true);
+  useEffect(() => {
+    let attivo = true;
+    setGruppi([]); setCarica(true); setErrore("");
+    if (!parrocchiaId || !utenteId) { setErrore("Accedi alla tua parrocchia."); setCarica(false); return; }
+    (async () => {
+      try {
+        const { data, error } = await supabase.rpc("ars_comunione_fedele_chat_miei_gruppi", {
+          p_parrocchia_id: parrocchiaId, p_utente_id: utenteId
+        });
+        if (error) throw error;
+        const elenco = Array.isArray(data) ? data : [];
+        if (attivo) {
+          setGruppi(elenco);
+          setGruppoId(corrente => elenco.some(g => g.gruppo_annuale_id === corrente)
+            ? corrente : (elenco[0]?.gruppo_annuale_id || ""));
+        }
+      } catch (e) { if (attivo) setErrore(e.message || "Impossibile caricare le attività."); }
+      finally { if (attivo) setCarica(false); }
+    })();
+    return () => { attivo = false; };
+  }, [parrocchiaId, utenteId]);
+  const gruppo = gruppi.find(g => g.gruppo_annuale_id === gruppoId);
+  return <section className="ars-sac-dettaglio">
+    <h3>Attività del catechismo 🌈</h3>
+    <p>Scopri i sondaggi del parroco e le proposte dei ragazzi del tuo gruppo. Per aderire basta un «Sì, ci sarò!».</p>
+    {carica && <p>Caricamento dei tuoi gruppi…</p>}
+    {errore && <p className="ars-sac-errore" role="alert">{errore}</p>}
+    {!carica && !errore && !gruppi.length && <p>Non risultano ancora gruppi associati al tuo profilo.</p>}
+    {gruppi.length > 1 && <label className="ars-idee-scelta">Scegli il gruppo
+      <select value={gruppoId} onChange={e => setGruppoId(e.target.value)}>
+        {gruppi.map(g => <option key={g.gruppo_annuale_id} value={g.gruppo_annuale_id}>{g.nome}</option>)}
+      </select>
+    </label>}
+    {gruppo && <BachecaIdeeComunione key={gruppo.gruppo_annuale_id} gruppo={gruppo}
+      parrocchiaId={parrocchiaId} utenteId={utenteId} />}
+  </section>;
+}
+
 function DettaglioSottocard({ sezione, parrocchiaId, utenteId, nomeParrocchia, onApriQuote }) {
   switch (sezione) {
     case "iscrizioni":
@@ -1676,7 +1914,7 @@ function DettaglioSottocard({ sezione, parrocchiaId, utenteId, nomeParrocchia, o
     case "calendario":
       return <><p>Un calendario dedicato <strong>esclusivamente al Catechismo</strong>: incontri, scadenze, riunioni con i genitori, ritiri e prove.</p><p>Gli appuntamenti saranno gestiti dal parroco e dai catechisti autorizzati. Genitori e ragazzi vedranno quelli del proprio gruppo.</p><p>Questo calendario è separato dal Calendario generale del fedele, che resta invariato.</p><p className="ars-sac-prossimamente">Gli appuntamenti saranno visualizzati qui non appena disponibili.</p></>;
     case "comunicazioni":
-      return <><p>Avvisi e informazioni del Catechismo per le famiglie e i ragazzi del gruppo, pubblicati dai responsabili autorizzati.</p><p className="ars-sac-prossimamente">Le comunicazioni saranno visualizzate qui non appena disponibili.</p></>;
+      return <AttivitaCatechismoFedele parrocchiaId={parrocchiaId} utenteId={utenteId} />;
     case "pagamenti":
       return <QuotePagamentiComunioneFedele parrocchiaId={parrocchiaId} utenteId={utenteId} nomeParrocchia={nomeParrocchia} />;
     case "celebrazioni":
@@ -1746,8 +1984,46 @@ export default function SacramentiFedele({ tornaDashboard, utenteId = null, parr
   );
 }
 const STILE = `
+
+/* Attività del catechismo: schede compatte e allegre senza appesantire la chat. */
+.ars-idee-sezione{max-width:960px;margin:12px auto;color:#2f3c4a}
+.ars-idee-intestazione{border-radius:18px;padding:19px 20px;background:linear-gradient(120deg,#f7e6ff,#ddf6fa 55%,#fff1ca);border:1px solid #e6d7df;margin:16px 0}
+.ars-idee-intestazione h4{font:700 1.5rem Georgia,serif;color:#4d3b78;margin:3px 0 7px}
+.ars-idee-intestazione p{margin:0!important;color:#415e69}.ars-idee-arcobaleno{font-size:1.6rem;letter-spacing:5px}
+.ars-idee-guida{border:1px solid #ded9d1;border-radius:10px;padding:10px 14px;margin:10px 0;background:#fffdf8}
+.ars-idee-guida summary{cursor:pointer;font-weight:700;color:#3c5870}.ars-idee-guida p{margin:8px 0!important}
+.ars-idee-blocco{margin:19px 0 24px}.ars-idee-blocco h5{font-size:1.22rem;color:#4d3b78;margin:0 0 8px}
+.ars-idee-sottotitolo{font-size:.94rem;color:#48606d;margin:0 0 11px!important}
+.ars-idee-gestione{display:flex;gap:9px;flex-wrap:wrap;margin:12px 0}
+.ars-idee-pulsante{border:1px solid #7653be!important;background:#7653be!important;color:white!important;border-radius:10px!important;padding:10px 15px!important;font-weight:700!important;cursor:pointer}
+.ars-idee-pulsante--secondario{border-color:#cda9d2!important;background:#f7eafb!important;color:#5d447d!important}
+.ars-idee-pulsante:disabled{opacity:.55;cursor:not-allowed}
+.ars-idee-modulo{background:#fff9e9;border:1px solid #ecd5a0;border-radius:14px;padding:15px;margin:12px 0;display:grid;gap:10px}
+.ars-idee-modulo label,.ars-idee-scelta{display:grid;gap:5px;font-weight:650;color:#3b4b59}
+.ars-idee-modulo input,.ars-idee-modulo textarea,.ars-idee-modulo select,.ars-idee-scelta select{box-sizing:border-box;width:100%;padding:10px;border:1px solid #cbbfd2;border-radius:8px;background:white;color:#253643;font:inherit}
+.ars-idee-proposta{border:1px solid #ddd5ea;border-radius:14px;padding:14px 16px;margin:10px 0;background:#fcf8ff;box-shadow:0 2px 9px #32125908}
+.ars-idee-proposta--sondaggio{background:#f2fbf9;border-color:#bae4dd}
+.ars-idee-proposta-capo{display:flex;align-items:flex-start;gap:10px}
+.ars-idee-proposta-capo>span{font-size:1.5rem}.ars-idee-proposta-capo strong{display:block;font-size:1.04rem;color:#2a3950;overflow-wrap:anywhere}
+.ars-idee-proposta-capo small{display:block;color:#657080;margin-top:3px;font-size:.82rem}
+.ars-idee-descrizione{margin:9px 0!important;white-space:pre-wrap;overflow-wrap:anywhere}
+.ars-idee-adesioni{display:flex;align-items:center;justify-content:flex-start;flex-wrap:wrap;gap:10px;margin-top:10px}
+.ars-idee-aderisci{border:1px solid #328c5a!important;border-radius:11px!important;background:#dbf3e2!important;color:#1d6742!important;padding:9px 13px!important;font-weight:750;cursor:pointer}
+.ars-idee-aderisci--attivo{background:#abdcbc!important}
+.ars-idee-aderisci:disabled{cursor:not-allowed;opacity:.6}
+.ars-idee-nomi{border:1px solid #d3ccd9;border-radius:9px;background:white;padding:8px 11px;font-size:.9rem;max-width:100%}
+.ars-idee-nomi summary{cursor:pointer;color:#45536c;font-weight:650}
+.ars-idee-nomi-lista{padding-top:8px;display:grid;gap:5px;color:#435166}
+.ars-idee-errore{color:#a32a38!important;background:#fff2f0;border:1px solid #f0bdb8;border-radius:8px;padding:10px}
+.ars-idee-avviso{color:#2f674d!important;background:#eef9ed;border:1px solid #bbddbe;border-radius:8px;padding:10px}
+.ars-idee-aggiorna{display:flex;justify-content:flex-end;margin:8px 0}.ars-idee-aggiorna button{font-size:.85rem;background:none;border:0;text-decoration:underline;color:#52658b;cursor:pointer}
+@media(max-width:540px){.ars-idee-intestazione{padding:14px}.ars-idee-proposta{padding:11px}.ars-idee-adesioni{gap:7px}}
 /* Gruppi e chat di Prima Comunione: lato fedele */
 .ars-com-miei-gruppi,.ars-com-chat-fedele{margin:10px 0;color:#243c40}
+.ars-com-chat-invito-ragazzi{box-sizing:border-box;max-width:760px;margin:10px 0 12px;padding:11px 14px;border:1px solid #ddd0f4;border-left:4px solid #9670d3;border-radius:12px;background:linear-gradient(110deg,#f7f0ff 0%,#eff9fc 100%);text-align:left;color:#35465b}
+.ars-com-chat-invito-ragazzi strong{display:block;color:#61408c;font-size:.98rem;line-height:1.35}
+.ars-com-chat-invito-ragazzi p{margin:5px 0 4px!important;font-size:.9rem;line-height:1.45;color:#35465b}
+.ars-com-chat-invito-ragazzi small{display:block;color:#596a78;font-size:.76rem;line-height:1.35}
 .ars-com-chat-guida{margin:15px 0 17px;text-align:left;border:1px solid #decda9;border-radius:10px;padding:12px 15px;background:#fbf7ee}
 .ars-com-chat-guida summary{font-weight:700;cursor:pointer;color:#173955}
 .ars-com-chat-guida p{margin-top:12px!important}
