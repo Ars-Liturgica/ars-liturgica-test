@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { supabase } from "../../../supabaseClient";
+import AttivitaGruppiParroco from "../AttivitaGruppi/AttivitaGruppiParroco";
 import { GestioneEconomicaComunione, intestazioneStampaArs, STILI_INTESTAZIONE_STAMPA_ARS } from "../PagamentiParrocchia/PagamentiParrocchia";
 
 const sacramenti = [
@@ -1725,6 +1726,7 @@ function BachecaIdeeComunione({ gruppo, parrocchiaId = null, utenteId = null, ge
 
 
 function AttivitaCatechismoParroco({ parrocchiaId, annoPastorale, durata }) {
+  const [gestioneAttivita, setGestioneAttivita] = useState(null);
   const [gruppi, setGruppi] = useState([]);
   const [gruppoId, setGruppoId] = useState("");
   const [errore, setErrore] = useState("");
@@ -1757,10 +1759,22 @@ function AttivitaCatechismoParroco({ parrocchiaId, annoPastorale, durata }) {
     return () => { attivo = false; };
   }, [parrocchiaId, annoPastorale, durata]);
   const gruppo = gruppi.find(g => g.gruppo_annuale_id === gruppoId);
+  if (gestioneAttivita) return <AttivitaGruppiParroco
+    parrocchiaId={parrocchiaId}
+    tornaDashboard={() => setGestioneAttivita(null)}
+    modalitaCatechismo
+    gruppiCatechismo={gruppi}
+    annoCatechismo={annoPastorale}
+    avvioNuova={gestioneAttivita === "nuova"}
+  />;
   return <section className="ars-sac-dettaglio">
     <h3>Attività del catechismo</h3>
     <p>Scegli un gruppo per consultare le idee dei ragazzi e pubblicare un sondaggio con adesione «Sì, ci sarò!».</p>
-    <p>Le attività con iscrizioni, quote e pagamenti continuano a utilizzare la gestione generale delle Attività della parrocchia.</p>
+    <p>Le attività organizzate qui restano riservate ai gruppi selezionati; iscrizioni, quote, pagamenti e bilancini seguono la stessa gestione economica delle altre attività.</p>
+    <button type="button" className="ars-idee-pulsante" disabled={carica || !gruppi.length}
+      onClick={() => setGestioneAttivita("nuova")}>+ Nuova attività</button>{" "}
+    <button type="button" className="ars-idee-pulsante ars-idee-pulsante--secondario"
+      disabled={carica || !gruppi.length} onClick={() => setGestioneAttivita("elenco")}>Gestisci attività</button>
     {carica && <p>Caricamento dei gruppi…</p>}
     {errore && <p role="alert">{errore}</p>}
     {!carica && !errore && !gruppi.length && <p>Non ci sono ancora gruppi assegnati per questo anno pastorale.</p>}
