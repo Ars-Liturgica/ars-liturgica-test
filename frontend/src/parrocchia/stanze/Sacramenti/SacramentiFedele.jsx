@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { supabase } from "../../../supabaseClient";
+import { IscrizioneOrdinaria } from "../AttivitaGruppi/AttivitaGruppiFedele";
+import IscrizioneGrestFedele from "../AttivitaGruppi/IscrizioneGrestFedele";
 import FirmaSemplice from "../../componenti/FirmaSemplice";
 import AnteprimaDocumentoEconomico from "../PagamentiParrocchia/AnteprimaDocumentoEconomico";
 
@@ -1862,6 +1864,70 @@ function BachecaIdeeComunione({ gruppo, parrocchiaId = null, utenteId = null, ge
 }
 
 
+// Le attività ufficiali sono registrate nella stessa tabella delle Attività generali.
+// Qui sono consultabili soltanto dalle famiglie dei gruppi destinatari.
+function AttivitaUfficialiCatechismo({ parrocchiaId, utenteId, gruppo }) {
+  const [attivita, setAttivita] = useState([]);
+  const [scelta, setScelta] = useState(null);
+  const [metodi, setMetodi] = useState([]);
+  const [erroreMetodi, setErroreMetodi] = useState("");
+  const [errore, setErrore] = useState("");
+  const [caricamento, setCaricamento] = useState(true);
+  useEffect(() => {
+    let vivo = true;
+    setScelta(null); setAttivita([]); setErrore(""); setCaricamento(true);
+    (async () => {
+      try {
+        const [r, m] = await Promise.all([
+          supabase.rpc("ars_comunione_attivita_elenco", {
+            p_parrocchia_id: parrocchiaId,
+            p_gruppo_annuale_id: gruppo.gruppo_annuale_id,
+            p_utente_id: utenteId,
+          }),
+          supabase.rpc("ars_elenco_metodi_incasso_pubblici", { p_parrocchia_id: parrocchiaId }),
+        ]);
+        if (r.error) throw r.error;
+        if (!Array.isArray(r.data)) throw new Error("Formato delle attività non riconosciuto.");
+        if (!vivo) return;
+        setAttivita(r.data);
+        if (m.error || !Array.isArray(m.data)) {
+          setErroreMetodi("Le modalità di pagamento non sono disponibili al momento. Contatta la segreteria.");
+          setMetodi([]);
+        } else { setMetodi(m.data); setErroreMetodi(""); }
+      } catch (e) { if (vivo) setErrore(e.message || "Impossibile consultare le attività."); }
+      finally { if (vivo) setCaricamento(false); }
+    })();
+    return () => { vivo = false; };
+  }, [parrocchiaId, utenteId, gruppo.gruppo_annuale_id]);
+  if (scelta?.tipo?.toLowerCase() === "grest") return <IscrizioneGrestFedele
+    key={scelta.id} attivita={scelta} utenteId={utenteId}
+    onIndietro={() => setScelta(null)} />;
+  if (scelta) return <IscrizioneOrdinaria key={scelta.id}
+    attivita={scelta} parrocchiaId={parrocchiaId} utenteId={utenteId}
+    metodi={metodi} erroreMetodi={erroreMetodi} onIndietro={() => setScelta(null)} />;
+  return <section className="ars-idee-blocco">
+    <h4>📅 Attività organizzate</h4>
+    <p className="ars-idee-sottotitolo">Le iniziative pubblicate dalla parrocchia per questo gruppo.</p>
+    {caricamento && <p>Caricamento attività…</p>}
+    {errore && <p className="ars-idee-errore" role="alert">{errore}</p>}
+    {!caricamento && !errore && !attivita.length && <p>Non ci sono ancora attività organizzate per questo gruppo.</p>}
+    {attivita.map(a => <article className="ars-idee-proposta" key={a.id}>
+      <div className="ars-idee-proposta-capo"><span aria-hidden="true">📅</span>
+        <div><strong>{a.titolo}</strong>
+          <small>{[a.luogo, a.data_inizio ? new Date(a.data_inizio).toLocaleDateString("it-IT") : ""].filter(Boolean).join(" · ")}</small>
+        </div>
+      </div>
+      {a.descrizione && <p className="ars-idee-descrizione">{a.descrizione}</p>}
+      <p>{a.modello_quota === "quota_fissa"
+        ? `Quota: ${Number(a.importo_quota || 0).toLocaleString("it-IT", { style: "currency", currency: a.valuta || "EUR" })}`
+        : a.modello_quota === "contributo_libero" ? "Contributo libero" : "Partecipazione gratuita"}</p>
+      {a.prevede_iscrizioni ? <button className="ars-idee-aderisci" type="button"
+        onClick={() => setScelta(a)}>👍 Sì, ci sarò!</button>
+        : <p>Per le iscrizioni contatta la segreteria.</p>}
+    </article>)}
+  </section>;
+}
+
 function AttivitaCatechismoFedele({ parrocchiaId, utenteId }) {
   const [gruppi, setGruppi] = useState([]);
   const [gruppoId, setGruppoId] = useState("");
@@ -1900,6 +1966,8 @@ function AttivitaCatechismoFedele({ parrocchiaId, utenteId }) {
         {gruppi.map(g => <option key={g.gruppo_annuale_id} value={g.gruppo_annuale_id}>{g.nome}</option>)}
       </select>
     </label>}
+    {gruppo && <AttivitaUfficialiCatechismo key={`att:${gruppo.gruppo_annuale_id}`}
+      gruppo={gruppo} parrocchiaId={parrocchiaId} utenteId={utenteId} />}
     {gruppo && <BachecaIdeeComunione key={gruppo.gruppo_annuale_id} gruppo={gruppo}
       parrocchiaId={parrocchiaId} utenteId={utenteId} />}
   </section>;
