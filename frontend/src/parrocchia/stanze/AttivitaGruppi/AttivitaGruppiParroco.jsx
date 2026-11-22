@@ -98,7 +98,13 @@ Diritti. Puoi rivolgerti alla parrocchia per esercitare i diritti previsti dalla
 La conferma di presa visione permette di procedere all'iscrizione. Eventuali consensi specifici, ove necessari, vengono richiesti separatamente.`;
 }
 
-export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) {
+export default function AttivitaGruppiParroco({
+  parrocchiaId, tornaDashboard,
+  modalitaCatechismo = false,
+  gruppiCatechismo = [],
+  annoCatechismo = "",
+  avvioNuova = false,
+}) {
   const [attivita, setAttivita] = useState([]);
   const [tipologiePersonalizzate, setTipologiePersonalizzate] = useState([]);
   const [caricamento, setCaricamento] = useState(true);
@@ -108,6 +114,10 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
   const [caricamentoInformativa, setCaricamentoInformativa] = useState(false);
   const [mostraModulo, setMostraModulo] = useState(false);
   const [bozza, setBozza] = useState(bozzaIniziale);
+  const [gruppiDestinatari, setGruppiDestinatari] = useState([]);
+  const avvioNuovaEseguito = useRef(false);
+  const gruppiDisponibili = Array.isArray(gruppiCatechismo)
+    ? gruppiCatechismo.filter(g => g.gruppo_annuale_id) : [];
   const [datiInformativa, setDatiInformativa] = useState(null);
   const [testoInformativaDiversa, setTestoInformativaDiversa] = useState("");
   const [informativaAutomatica, setInformativaAutomatica] = useState(false);
@@ -147,10 +157,14 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
   const testoAggiunta = cartella
     ? cartella.tipo?.toLowerCase() === "grest" ? "Aggiungi un’attività al GREST" : "Aggiungi un’attività a questa iniziativa"
     : "Nuova attività";
-  const elencoVisibile = attivita.filter((voce) =>
-    cartella ? voce.attivita_principale_id === cartella.id && voce.stato !== "annullata"
-      : mostraCancellate ? voce.stato === "annullata" : !voce.attivita_principale_id && voce.stato !== "annullata"
-  );
+  const elencoVisibile = attivita.filter((voce) => {
+    const catechismo = voce.configurazione_modulo?.ambito === "catechismo";
+    if (modalitaCatechismo !== catechismo) return false;
+    if (modalitaCatechismo && voce.configurazione_modulo?.anno_pastorale
+      && voce.configurazione_modulo.anno_pastorale !== annoCatechismo) return false;
+    return cartella ? voce.attivita_principale_id === cartella.id && voce.stato !== "annullata"
+      : mostraCancellate ? voce.stato === "annullata" : !voce.attivita_principale_id && voce.stato !== "annullata";
+  });
 
   function avvisaFamiglie(voce) {
     const principale = attivita.find((a) => a.id === voce.attivita_principale_id);
@@ -382,6 +396,8 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
     setMessaggio("");
     const tipo = voce?.tipo || "altro";
     const configurazione = voce?.configurazione_modulo || { versione: 1, tipo };
+    setGruppiDestinatari(modalitaCatechismo && Array.isArray(configurazione.gruppi_destinatari)
+      ? configurazione.gruppi_destinatari.filter(id => typeof id === "string") : []);
     let informativaPrivacy = configurazione.informativa_privacy_testo || "";
     let datiParrocchia = null;
     const usaInformativaDiversa = Boolean(informativaPrivacy.trim()) &&
@@ -423,18 +439,34 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
       importoQuota: voce.importo_quota == null ? "" : String(voce.importo_quota),
       scadenzaQuota: voce.scadenza_quota || "",
       configurazioneModulo: configurazione,
-      iscrizioniOnline: voce.prevede_iscrizioni === true || (voce.prevede_iscrizioni == null && configurazione.abilita_iscrizioni_grest === true),
+      iscrizioniOnline: modalitaCatechismo ? true : (voce.prevede_iscrizioni === true || (voce.prevede_iscrizioni == null && configurazione.abilita_iscrizioni_grest === true)),
       informativaPrivacy,
       usaInformativaDiversa,
       moduloScelto: configurazione.modulo_cartaceo_modalita === "parrocchia" ||
         (configurazione.modulo_cartaceo_modalita === "entrambi" && configurazione.modulo_cartaceo_url) ||
         (!configurazione.modulo_cartaceo_modalita && configurazione.modulo_cartaceo_url) ? "parrocchia" : "ars",
       statoOriginale: voce.stato,
-    } : { ...bozzaIniziale, attivitaPrincipaleId: principaleId, configurazioneModulo: { ...bozzaIniziale.configurazioneModulo }, informativaPrivacy });
+    } : {
+      ...bozzaIniziale,
+      tipo: modalitaCatechismo ? "catechismo" : bozzaIniziale.tipo,
+      iscrizioniOnline: modalitaCatechismo ? true : bozzaIniziale.iscrizioniOnline,
+      attivitaPrincipaleId: principaleId,
+      configurazioneModulo: {
+        ...bozzaIniziale.configurazioneModulo,
+        ...(modalitaCatechismo ? { tipo: "catechismo", ambito: "catechismo", anno_pastorale: annoCatechismo } : {}),
+      },
+      informativaPrivacy,
+    });
     setPdfParrocchia(null);
     setMostraModulo(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
+
+  useEffect(() => {
+    if (!modalitaCatechismo || !avvioNuova || avvioNuovaEseguito.current || !parrocchiaId || !gruppiDisponibili.length) return;
+    avvioNuovaEseguito.current = true;
+    apriModulo(null, null);
+  }, [modalitaCatechismo, avvioNuova, parrocchiaId, gruppiCatechismo]);
 
   async function salvaAttivita(evento, stato = bozza.statoOriginale || "bozza") {
     evento?.preventDefault();
@@ -442,6 +474,10 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
     setMessaggio("");
     if (stato === "pubblicata" && !bozza.id) return setErrore("Salva prima la bozza, poi pubblicala.");
     if (!parrocchiaId) return setErrore("La parrocchia non è ancora disponibile.");
+    if (modalitaCatechismo && stato === "pubblicata" && gruppiDestinatari.length === 0)
+      return setErrore("Seleziona almeno un gruppo destinatario prima di pubblicare.");
+    if (modalitaCatechismo && gruppiDestinatari.some(id => !gruppiDisponibili.some(g => g.gruppo_annuale_id === id)))
+      return setErrore("Uno dei gruppi destinatari non è più disponibile. Ricarica i gruppi prima di salvare.");
     if (!bozza.titolo.trim()) return setErrore("Inserisci il titolo.");
     const nuovoTipo = bozza.tipo === "altro" && !bozza.id
       ? bozza.tipoPersonalizzato.trim().replace(/\s+/g, " ") : bozza.tipo;
@@ -493,6 +529,11 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
       urlPersonalizzato = `${pubblico.publicUrl}?v=${Date.now()}`;
     }
     const configurazioneModulo = { ...bozza.configurazioneModulo,
+      ...(modalitaCatechismo ? {
+        ambito: "catechismo",
+        anno_pastorale: annoCatechismo,
+        gruppi_destinatari: gruppiDestinatari,
+      } : {}),
       tipo: bozza.tipo,
       informativa_privacy_testo: bozza.informativaPrivacy.trim(),
       informativa_privacy_modalita: bozza.usaInformativaDiversa ? "diversa" : "standard",
@@ -577,12 +618,15 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
       <header style={stile.intestazione}>
         <div>
           <button type="button" style={stile.pulsante} disabled={rimborsiOccupati} onClick={tornaDashboard}>
-            ← Torna alla dashboard
+            {modalitaCatechismo ? "← Torna alle attività del catechismo" : "← Torna alla dashboard"}
           </button>
-          <h1>{cartella ? cartella.titolo : mostraCancellate ? "Attività cancellate" : "Attività e Gruppi"}</h1>
-          <p>{cartella ? "Gestisci questa attività e le iniziative al suo interno." : "Le attività della tua parrocchia, comprese le bozze. Puoi creare un GREST, una gita o un’altra attività parrocchiale."}</p>
+          <h1>{cartella ? cartella.titolo : mostraCancellate ? "Attività cancellate" : modalitaCatechismo ? "Attività del catechismo" : "Attività e Gruppi"}</h1>
+          <p>{cartella ? "Gestisci questa attività e le iniziative al suo interno."
+            : modalitaCatechismo ? "Le attività vengono mostrate solo ai gruppi di catechismo selezionati; quote e incassi confluiscono nella gestione economica generale."
+            : "Le attività della tua parrocchia, comprese le bozze. Puoi creare un GREST, una gita o un’altra attività parrocchiale."}</p>
           {!cartella && <button type="button" style={stile.pulsante} disabled={rimborsiOccupati || operazioneAttivita} onClick={() => { setMostraCancellate(v => !v); setPraticaAvvisi(null); setMostraModulo(false); setAzioneAttivita(null); }}>
-            {mostraCancellate ? "← Attività attive e bozze" : `Attività cancellate (${attivita.filter(a => a.stato === "annullata").length})`}
+            {mostraCancellate ? "← Attività attive e bozze" : `Attività cancellate (${attivita.filter(a => a.stato === "annullata" &&
+              ((a.configurazione_modulo?.ambito === "catechismo") === modalitaCatechismo)).length})`}
           </button>}
           {!cartella && mostraCancellate && <p>Restano disponibili per 30 giorni. Le pratiche non concluse sono evidenziate e restano accessibili per risolvere rimborsi e contatti.</p>}
           {cartella && <button type="button" style={stile.pulsante} disabled={rimborsiOccupati} onClick={chiudiCartella}>← Tutte le attività</button>}
@@ -667,6 +711,12 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
         {cartella.descrizione && <p>{cartella.descrizione}</p>}
         {(cartella.data_inizio || cartella.data_fine) && <p>{[dataItaliana(cartella.data_inizio), dataItaliana(cartella.data_fine)].filter(Boolean).join(" – ")}</p>}
         {cartella.luogo && <p>Luogo: {cartella.luogo}</p>}
+        {modalitaCatechismo && <p><strong>Gruppi destinatari:</strong> {
+          (cartella.configurazione_modulo?.gruppi_destinatari || []).map(id => {
+            const g = gruppiDisponibili.find(x => x.gruppo_annuale_id === id);
+            return g ? `${g.nome} (${g.anno_percorso}° anno)` : "Gruppo non disponibile";
+          }).join(", ") || "Nessuno"
+        }</p>}
         <p>{cartella.modello_quota === "quota_fissa" ? `Quota: ${Number(cartella.importo_quota).toLocaleString("it-IT", { style: "currency", currency: "EUR" })}` : cartella.modello_quota === "contributo_libero" ? "Contributo libero" : "Gratuita"}</p>
         {["bozza", "pubblicata"].includes(cartella.stato) && <>
           <button type="button" style={stile.pulsante} disabled={caricamentoInformativa} onClick={() => apriModulo(cartella)}>Modifica</button>
@@ -687,6 +737,27 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
       {mostraModulo && (
         <form onSubmit={(evento) => salvaAttivita(evento)} style={{ ...stile.card, marginBottom: 24 }}>
           <h2>{bozza.id ? "Modifica attività" : principaleBozza?.tipo?.toLowerCase() === "grest" ? `Nuova attività del ${principaleBozza.titolo}` : "Nuova attività"}</h2>
+          {modalitaCatechismo && <fieldset className="ars-cat-scelta-gruppi"
+            style={{ border: "1px solid #d8c7e5", borderRadius: 12, padding: 15, marginBottom: 16 }}>
+            <legend style={{ fontWeight: 700 }}>Gruppi destinatari</legend>
+            <p>Seleziona liberamente uno o più gruppi. Solo i gruppi scelti vedranno l'attività.</p>
+            <button type="button" style={stile.pulsante}
+              onClick={() => setGruppiDestinatari(gruppiDestinatari.length === gruppiDisponibili.length
+                ? [] : gruppiDisponibili.map(g => g.gruppo_annuale_id))}>
+              {gruppiDestinatari.length === gruppiDisponibili.length ? "Deseleziona tutti" : "Seleziona tutti"}
+            </button>
+            <div style={{ display: "grid", gap: 10, marginTop: 14 }}>
+              {gruppiDisponibili.map(g => <label key={g.gruppo_annuale_id}
+                style={{ display: "flex", gap: 9, alignItems: "center" }}>
+                <input type="checkbox" checked={gruppiDestinatari.includes(g.gruppo_annuale_id)}
+                  onChange={e => setGruppiDestinatari(precedenti => e.target.checked
+                    ? [...precedenti.filter(id => id !== g.gruppo_annuale_id), g.gruppo_annuale_id]
+                    : precedenti.filter(id => id !== g.gruppo_annuale_id))} />
+                <span>{g.nome} · {g.anno_percorso}° anno</span>
+              </label>)}
+            </div>
+            <p><strong>Gruppi selezionati: {gruppiDestinatari.length} su {gruppiDisponibili.length}</strong></p>
+          </fieldset>}
           {bozza.attivitaPrincipaleId && <p>Questa attività fa parte {principaleBozza?.tipo?.toLowerCase() === "grest" ? `del ${principaleBozza.titolo}` : `di «${principaleBozza?.titolo || "attività principale"}»`}.</p>}
           {bozza.statoOriginale === "pubblicata" && <p>Le modifiche salvate saranno subito visibili nell’attività pubblicata.</p>}
                      <label style={stile.campo}>Tipo di attività
@@ -728,6 +799,7 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
             <label style={stile.campo}>Quota fissa in euro <input style={stile.controllo} type="number" min="0.01" step="0.01" required value={bozza.importoQuota} onChange={(e) => setBozza({ ...bozza, importoQuota: e.target.value })} /></label>
             <label style={stile.campo}>Scadenza quota <input style={stile.controllo} type="date" value={bozza.scadenzaQuota} onChange={(e) => setBozza({ ...bozza, scadenzaQuota: e.target.value })} /></label>
           </>}
+          {modalitaCatechismo && <p>Le attività del catechismo mantengono attive le iscrizioni: il pulsante «Sì, ci sarò!» utilizza la procedura ordinaria con la relativa informativa.</p>}
           {bozza.iscrizioniOnline && <fieldset style={{ border: "1px solid #ded5c6", borderRadius: 10, margin: "16px 0", padding: 16 }}>
             <legend>Informativa privacy per le iscrizioni online</legend>
             <p>L'informativa standard usa i dati della parrocchia. Verifica che i recapiti e le modalità descritte corrispondano alla tua attività.</p>
@@ -780,7 +852,8 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
           </fieldset>
           </>}
           <label style={{ display: "flex", gap: 9, alignItems: "flex-start", marginBottom: 16 }}>
-            <input type="checkbox" checked={bozza.iscrizioniOnline} onChange={(e) => cambiaIscrizioniOnline(e.target.checked)} />
+            <input type="checkbox" checked={bozza.iscrizioniOnline} disabled={modalitaCatechismo}
+              onChange={(e) => cambiaIscrizioniOnline(e.target.checked)} />
             <span><strong>Questa attività prevede iscrizioni?</strong><small style={{ display: "block", marginTop: 4 }}>Se selezionato, le iscrizioni sono disponibili dalla pubblicazione. Compila l’informativa privacy qui sopra.</small></span>
           </label>
           <button type="submit" style={stile.pulsante} disabled={salvataggio || caricamentoInformativa}>{salvataggio ? "Salvataggio…" : bozza.statoOriginale === "pubblicata" ? "Salva modifiche" : "Salva bozza"}</button>{" "}
@@ -812,6 +885,12 @@ export default function AttivitaGruppiParroco({ parrocchiaId, tornaDashboard }) 
                 {voce.descrizione && <p>{voce.descrizione}</p>}
                 {(inizio || fine) && <p>{[inizio, fine].filter(Boolean).join(" – ")}</p>}
                 {voce.luogo && <p>Luogo: {voce.luogo}</p>}
+                {modalitaCatechismo && <p><strong>Gruppi:</strong> {
+                  (voce.configurazione_modulo?.gruppi_destinatari || []).map(id => {
+                    const g = gruppiDisponibili.find(x => x.gruppo_annuale_id === id);
+                    return g ? `${g.nome} (${g.anno_percorso}°)` : "Gruppo non disponibile";
+                  }).join(", ") || "Nessuno selezionato"
+                }</p>}
                 <p>{voce.modello_quota === "quota_fissa" ? `Quota: ${Number(voce.importo_quota).toLocaleString("it-IT", { style: "currency", currency: "EUR" })}` : voce.modello_quota === "contributo_libero" ? "Contributo libero" : "Gratuita"}</p>
                 <button type="button" style={stile.pulsante} onClick={() => apriCartella(voce)}>Apri attività</button>{" "}
                 {["bozza", "pubblicata"].includes(voce.stato) && (
