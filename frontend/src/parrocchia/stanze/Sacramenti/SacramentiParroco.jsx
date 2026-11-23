@@ -1851,8 +1851,19 @@ function CatechistiComunioneParroco({ parrocchiaId, annoPastorale }) {
   const nomeCompleto = p => [p?.cognome, p?.nome].filter(Boolean).join(" ");
   const normalizza = testo => String(testo || "").toLocaleLowerCase("it-IT");
   const filtrati = catechisti.filter(p => normalizza(nomeCompleto(p)).includes(normalizza(ricerca.trim())));
-  const candidati = persone.filter(p => !catechisti.some(c => c.persona_parrocchia_id === p.persona_parrocchia_id) &&
+  const idsCatechisti = new Set(catechisti.map(p => p.persona_parrocchia_id));
+  // La disponibilità arriva dalla pagina fedele «Il tuo posto nella Comunità».
+  // Una disponibilità NON è una nomina e non crea automaticamente un incarico.
+  const disponibiliComunita = persone.filter(p => p.disponibilita_catechismo === true &&
+    !idsCatechisti.has(p.persona_parrocchia_id));
+  const candidati = persone.filter(p => !idsCatechisti.has(p.persona_parrocchia_id) &&
+    p.disponibilita_catechismo !== true &&
     normalizza(nomeCompleto(p)).includes(normalizza(ricercaPersona.trim()))).slice(0, 35);
+  function scegliPersona(id) {
+    setSelezionato(id);
+    setMostraAggiunta(false);
+    setAvviso(""); setErrore("");
+  }
 
   useEffect(() => {
     const presenti = quadro?.catechisti?.find(p => p.persona_parrocchia_id === selezionato)?.gruppi || [];
@@ -1885,11 +1896,13 @@ function CatechistiComunioneParroco({ parrocchiaId, annoPastorale }) {
 
   return <section className="ars-sac-pannello ars-com-catechisti" aria-label="Gestione catechisti">
     <h3>Catechisti</h3>
-    <p>Consulta i catechisti e assegna loro uno o più gruppi. Le modifiche sono condivise con la Card 05.</p>
+    <p>Consulta i catechisti già incaricati e le persone disponibili per il catechismo nella Comunità.
+      Scegli chi seguirà uno o più gruppi: le assegnazioni sono condivise con la Card 05.</p>
     <details className="ars-com-cat-guida"><summary>Come utilizzare questa pagina</summary>
-      <p>Seleziona un catechista, spunta i gruppi che deve seguire e premi «Salva assegnazioni».
-        Per scegliere una nuova persona già registrata in parrocchia, utilizza «Aggiungi catechista».
-        Puoi assegnare più catechisti allo stesso gruppo.</p>
+      <p>Le persone che hanno scelto «Catechismo» nella pagina «Il tuo posto nella Comunità»
+        compaiono sotto «Disponibilità dalla Comunità». La disponibilità non assegna un incarico.
+        Scegli una persona, seleziona uno o più gruppi e premi «Salva assegnazioni».
+        Puoi scegliere anche altre persone della parrocchia e affidare più catechisti allo stesso gruppo.</p>
     </details>
     <div className="ars-com-cat-intestazione">
       <strong>Anno pastorale {annoPastorale || "—"}</strong>
@@ -1912,26 +1925,38 @@ function CatechistiComunioneParroco({ parrocchiaId, annoPastorale }) {
             <strong>{nomeCompleto(p)}</strong>
             <small>{(p.gruppi || []).length} {(p.gruppi || []).length === 1 ? "gruppo assegnato" : "gruppi assegnati"}</small>
           </button>)}
-          {!filtrati.length && <p>{ricerca ? "Nessun nominativo trovato." : "Nessun catechista ancora assegnato."}</p>}
+          {!filtrati.length && <p>{ricerca ? "Nessun nominativo trovato." : "Nessun catechista ancora incaricato."}</p>}
         </div>
+        <section aria-label="Disponibilità dalla Comunità"
+          style={{borderTop:"1px solid #dfebe5", marginTop:18, paddingTop:16}}>
+          <h4 style={{fontSize:"1.08rem",margin:"0 0 6px"}}>Disponibilità dalla Comunità</h4>
+          <p style={{fontSize:"0.93rem",margin:"0 0 12px"}}>
+            Persone che hanno scelto «Catechismo» in «Il tuo posto nella Comunità».
+          </p>
+          {disponibiliComunita.length ? <div className="ars-com-cat-risultati">
+            {disponibiliComunita.map(p => <button type="button" key={p.persona_parrocchia_id}
+              disabled={occupato} onClick={() => scegliPersona(p.persona_parrocchia_id)}>
+              {nomeCompleto(p)}{selezionato === p.persona_parrocchia_id ? " · Selezionato" : ""}
+            </button>)}
+          </div> : <p style={{fontSize:"0.92rem"}}>Nessuna disponibilità per il catechismo registrata al momento.</p>}
+        </section>
         <button type="button" className="ars-com-cat-aggiungi" disabled={occupato}
           onClick={() => { setMostraAggiunta(v => !v); setRicercaPersona(""); }}>
-          {mostraAggiunta ? "Chiudi ricerca" : "+ Aggiungi catechista"}
+          {mostraAggiunta ? "Chiudi ricerca" : "Cerca un'altra persona"}
         </button>
         {mostraAggiunta && <div className="ars-com-cat-candidati">
-          <label className="ars-com-cat-campo">Cerca tra le persone della parrocchia
+          <label className="ars-com-cat-campo">Altre persone della parrocchia
             <input type="search" value={ricercaPersona} onChange={e => setRicercaPersona(e.target.value)}
               placeholder="Nome o cognome" disabled={occupato} />
           </label>
           <div className="ars-com-cat-risultati">
             {candidati.map(p => <button type="button" key={p.persona_parrocchia_id}
-              disabled={occupato} onClick={() => {
-                setSelezionato(p.persona_parrocchia_id); setMostraAggiunta(false);
-                setAvviso(""); setErrore("");
-              }}>{nomeCompleto(p)}</button>)}
-            {!candidati.length && <p>Nessun'altra persona disponibile.</p>}
+              disabled={occupato} onClick={() => scegliPersona(p.persona_parrocchia_id)}>
+              {nomeCompleto(p)}</button>)}
+            {!candidati.length && <p>Nessun altro nominativo trovato.</p>}
           </div>
-          {persone.length > 35 && !ricercaPersona.trim() && <small>Per trovare altri nominativi, scrivi nella ricerca.</small>}
+          {persone.length - disponibiliComunita.length - catechisti.length > 35 && !ricercaPersona.trim() &&
+            <small>Per trovare altri nominativi, scrivi nella ricerca.</small>}
         </div>}
       </aside>
       <div className="ars-com-cat-dettaglio">
@@ -1958,7 +1983,7 @@ function CatechistiComunioneParroco({ parrocchiaId, annoPastorale }) {
             <button type="button" className="ars-sac-stampa" disabled={!modificato || occupato}
               onClick={() => setGruppiScelti(gruppiPrecedenti)}>Annulla modifiche</button>
           </div>
-        </form> : <p>Seleziona un catechista dall'elenco, oppure scegli una persona da aggiungere.</p>}
+        </form> : <p>Seleziona un catechista incaricato, una disponibilità dalla Comunità oppure un'altra persona.</p>}
       </div>
     </div>}
   </section>;
