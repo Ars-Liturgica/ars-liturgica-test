@@ -1790,6 +1790,180 @@ function AttivitaCatechismoParroco({ parrocchiaId, annoPastorale, durata }) {
   </section>;
 }
 
+// CARD 04 — Catechisti: gli stessi collegamenti usati dalla Card 05.
+function CatechistiComunioneParroco({ parrocchiaId, annoPastorale }) {
+  const [quadro, setQuadro] = useState(null);
+  const [persone, setPersone] = useState([]);
+  const [selezionato, setSelezionato] = useState("");
+  const [gruppiScelti, setGruppiScelti] = useState([]);
+  const [ricerca, setRicerca] = useState("");
+  const [ricercaPersona, setRicercaPersona] = useState("");
+  const [mostraAggiunta, setMostraAggiunta] = useState(false);
+  const [ricarica, setRicarica] = useState(0);
+  const [caricamento, setCaricamento] = useState(true);
+  const [occupato, setOccupato] = useState(false);
+  const [errore, setErrore] = useState("");
+  const [avviso, setAvviso] = useState("");
+  const salvataggioInCorso = useRef(false);
+
+  useEffect(() => {
+    let attivo = true;
+    setCaricamento(true); setErrore("");
+    (async () => {
+      try {
+        if (!parrocchiaId || !annoPastorale) throw new Error("Configura prima l'anno catechistico.");
+        const [elenco, anagrafica] = await Promise.all([
+          supabase.rpc("ars_comunione_catechisti_quadro", {
+            p_parrocchia_id: parrocchiaId, p_anno_pastorale: annoPastorale
+          }),
+          supabase.rpc("ars_comunione_persone_per_gruppi", {
+            p_parrocchia_id: parrocchiaId, p_ricerca: ""
+          })
+        ]);
+        if (elenco.error) throw elenco.error;
+        if (anagrafica.error) throw anagrafica.error;
+        if (!attivo) return;
+        const dati = elenco.data || {};
+        const catechisti = Array.isArray(dati.catechisti) ? dati.catechisti : [];
+        setQuadro({
+          catechisti,
+          gruppi: Array.isArray(dati.gruppi) ? dati.gruppi : []
+        });
+        setPersone(Array.isArray(anagrafica.data) ? anagrafica.data : []);
+        setSelezionato(id => id && (catechisti.some(p => p.persona_parrocchia_id === id) ||
+          (Array.isArray(anagrafica.data) && anagrafica.data.some(p => p.persona_parrocchia_id === id)))
+          ? id : (catechisti[0]?.persona_parrocchia_id || ""));
+      } catch (err) {
+        if (attivo) { setErrore(err?.message || "Impossibile caricare i catechisti."); setQuadro(null); }
+      } finally { if (attivo) setCaricamento(false); }
+    })();
+    return () => { attivo = false; };
+  }, [parrocchiaId, annoPastorale, ricarica]);
+
+  const catechisti = quadro?.catechisti || [];
+  const gruppi = quadro?.gruppi || [];
+  const persona = catechisti.find(p => p.persona_parrocchia_id === selezionato) ||
+    persone.find(p => p.persona_parrocchia_id === selezionato);
+  const gruppiPrecedenti = (catechisti.find(p => p.persona_parrocchia_id === selezionato)?.gruppi || [])
+    .map(g => g.gruppo_annuale_id);
+  const firmaGruppi = ids => [...new Set(ids)].sort().join("|");
+  const modificato = firmaGruppi(gruppiPrecedenti) !== firmaGruppi(gruppiScelti);
+  const nomeCompleto = p => [p?.cognome, p?.nome].filter(Boolean).join(" ");
+  const normalizza = testo => String(testo || "").toLocaleLowerCase("it-IT");
+  const filtrati = catechisti.filter(p => normalizza(nomeCompleto(p)).includes(normalizza(ricerca.trim())));
+  const candidati = persone.filter(p => !catechisti.some(c => c.persona_parrocchia_id === p.persona_parrocchia_id) &&
+    normalizza(nomeCompleto(p)).includes(normalizza(ricercaPersona.trim()))).slice(0, 35);
+
+  useEffect(() => {
+    const presenti = quadro?.catechisti?.find(p => p.persona_parrocchia_id === selezionato)?.gruppi || [];
+    setGruppiScelti(presenti.map(g => g.gruppo_annuale_id));
+  }, [quadro, selezionato]);
+
+  async function salva(evento) {
+    evento.preventDefault();
+    if (salvataggioInCorso.current || !persona || !modificato) return;
+    salvataggioInCorso.current = true;
+    setOccupato(true); setErrore(""); setAvviso("");
+    try {
+      const { data, error } = await supabase.rpc("ars_comunione_catechisti_salva_gruppi", {
+        p_parrocchia_id: parrocchiaId,
+        p_persona_parrocchia_id: selezionato,
+        p_anno_pastorale: annoPastorale,
+        p_gruppi_precedenti: gruppiPrecedenti,
+        p_gruppi_nuovi: gruppiScelti
+      });
+      if (error) throw error;
+      if (!data?.ok) throw new Error("Il salvataggio non è stato confermato.");
+      setAvviso("Assegnazioni di " + nomeCompleto(persona) + " salvate. La Card 05 mostrerà gli stessi gruppi.");
+      setMostraAggiunta(false);
+      setRicercaPersona("");
+      setRicarica(v => v + 1);
+    } catch (err) {
+      setErrore(err?.message || "Impossibile salvare. Aggiorna la pagina e riprova.");
+    } finally { salvataggioInCorso.current = false; setOccupato(false); }
+  }
+
+  return <section className="ars-sac-pannello ars-com-catechisti" aria-label="Gestione catechisti">
+    <h3>Catechisti</h3>
+    <p>Consulta i catechisti e assegna loro uno o più gruppi. Le modifiche sono condivise con la Card 05.</p>
+    <details className="ars-com-cat-guida"><summary>Come utilizzare questa pagina</summary>
+      <p>Seleziona un catechista, spunta i gruppi che deve seguire e premi «Salva assegnazioni».
+        Per scegliere una nuova persona già registrata in parrocchia, utilizza «Aggiungi catechista».
+        Puoi assegnare più catechisti allo stesso gruppo.</p>
+    </details>
+    <div className="ars-com-cat-intestazione">
+      <strong>Anno pastorale {annoPastorale || "—"}</strong>
+      <button type="button" className="ars-sac-stampa" disabled={occupato || caricamento}
+        onClick={() => { setAvviso(""); setRicarica(v => v + 1); }}>Aggiorna elenco</button>
+    </div>
+    {caricamento && <p role="status">Caricamento dei catechisti…</p>}
+    {errore && <p className="ars-com-cat-errore" role="alert">{errore}</p>}
+    {avviso && <p className="ars-com-cat-successo" role="status">{avviso}</p>}
+    {quadro && <div className="ars-com-cat-colonne">
+      <aside className="ars-com-cat-elenco" aria-label="Elenco catechisti">
+        <label className="ars-com-cat-campo">Cerca catechista
+          <input type="search" value={ricerca} onChange={e => setRicerca(e.target.value)}
+            placeholder="Nome o cognome" disabled={occupato} />
+        </label>
+        <div className="ars-com-cat-persone">
+          {filtrati.map(p => <button type="button" key={p.persona_parrocchia_id}
+            disabled={occupato} className={selezionato === p.persona_parrocchia_id ? "ars-com-cat-persona ars-com-cat-persona-attiva" : "ars-com-cat-persona"}
+            onClick={() => { setSelezionato(p.persona_parrocchia_id); setAvviso(""); setErrore(""); }}>
+            <strong>{nomeCompleto(p)}</strong>
+            <small>{(p.gruppi || []).length} {(p.gruppi || []).length === 1 ? "gruppo assegnato" : "gruppi assegnati"}</small>
+          </button>)}
+          {!filtrati.length && <p>{ricerca ? "Nessun nominativo trovato." : "Nessun catechista ancora assegnato."}</p>}
+        </div>
+        <button type="button" className="ars-com-cat-aggiungi" disabled={occupato}
+          onClick={() => { setMostraAggiunta(v => !v); setRicercaPersona(""); }}>
+          {mostraAggiunta ? "Chiudi ricerca" : "+ Aggiungi catechista"}
+        </button>
+        {mostraAggiunta && <div className="ars-com-cat-candidati">
+          <label className="ars-com-cat-campo">Cerca tra le persone della parrocchia
+            <input type="search" value={ricercaPersona} onChange={e => setRicercaPersona(e.target.value)}
+              placeholder="Nome o cognome" disabled={occupato} />
+          </label>
+          <div className="ars-com-cat-risultati">
+            {candidati.map(p => <button type="button" key={p.persona_parrocchia_id}
+              disabled={occupato} onClick={() => {
+                setSelezionato(p.persona_parrocchia_id); setMostraAggiunta(false);
+                setAvviso(""); setErrore("");
+              }}>{nomeCompleto(p)}</button>)}
+            {!candidati.length && <p>Nessun'altra persona disponibile.</p>}
+          </div>
+          {persone.length > 35 && !ricercaPersona.trim() && <small>Per trovare altri nominativi, scrivi nella ricerca.</small>}
+        </div>}
+      </aside>
+      <div className="ars-com-cat-dettaglio">
+        {persona ? <form onSubmit={salva}>
+          <h4>{nomeCompleto(persona)}</h4>
+          <p>Seleziona i gruppi affidati a questo catechista.</p>
+          {!gruppi.length ? <p>Non sono ancora stati creati gruppi per questo anno pastorale. Puoi crearli nella Card 05.</p> :
+            [...new Set(gruppi.map(g => g.anno_percorso))].sort((a,b) => a-b).map(anno =>
+              <fieldset key={anno} disabled={occupato}>
+                <legend>{anno}° anno del percorso</legend>
+                {gruppi.filter(g => g.anno_percorso === anno).map(g => <label key={g.gruppo_annuale_id}
+                  className="ars-com-cat-spunta">
+                  <input type="checkbox" checked={gruppiScelti.includes(g.gruppo_annuale_id)}
+                    onChange={e => setGruppiScelti(v => e.target.checked
+                      ? [...v, g.gruppo_annuale_id] : v.filter(id => id !== g.gruppo_annuale_id))} />
+                  <span>{g.nome}</span>
+                </label>)}
+              </fieldset>)}
+          <p className="ars-com-cat-contatore">{gruppiScelti.length} {gruppiScelti.length === 1 ? "gruppo selezionato" : "gruppi selezionati"}</p>
+          <div className="ars-sac-azioni">
+            <button type="submit" className="ars-sac-conferma" disabled={!modificato || occupato || !gruppi.length}>
+              {occupato ? "Salvataggio…" : "Salva assegnazioni"}
+            </button>
+            <button type="button" className="ars-sac-stampa" disabled={!modificato || occupato}
+              onClick={() => setGruppiScelti(gruppiPrecedenti)}>Annulla modifiche</button>
+          </div>
+        </form> : <p>Seleziona un catechista dall'elenco, oppure scegli una persona da aggiungere.</p>}
+      </div>
+    </div>}
+  </section>;
+}
+
 function GruppiChatComunione({ parrocchiaId, annoPastorale, durata }) {
   const [anno, setAnno] = useState(1);
   const [quadro, setQuadro] = useState(null);
@@ -1798,6 +1972,12 @@ function GruppiChatComunione({ parrocchiaId, annoPastorale, durata }) {
   const [ricarica, setRicarica] = useState(0);
   const [gruppoDaRinominare, setGruppoDaRinominare] = useState(null);
   const [nomeGruppo, setNomeGruppo] = useState("");
+  const [modificaCatechisti, setModificaCatechisti] = useState(null);
+  const [catechistiScelti, setCatechistiScelti] = useState([]);
+  const [personeCatechisti, setPersoneCatechisti] = useState([]);
+  const [ricercaCatechisti, setRicercaCatechisti] = useState("");
+  const [erroreCatechisti, setErroreCatechisti] = useState("");
+  const [caricaCatechisti, setCaricaCatechisti] = useState(false);
 
   useEffect(() => {
     let corrente = true;
@@ -1916,6 +2096,55 @@ function GruppiChatComunione({ parrocchiaId, annoPastorale, durata }) {
     }
   }
 
+  function annullaModificaCatechisti() {
+    setModificaCatechisti(null);
+    setCatechistiScelti([]);
+    setRicercaCatechisti("");
+    setErroreCatechisti("");
+  }
+
+  async function apriModificaCatechisti(gruppo) {
+    if (occupato || caricaCatechisti) return;
+    if (modificaCatechisti === gruppo.gruppo_annuale_id) { annullaModificaCatechisti(); return; }
+    setCaricaCatechisti(true);
+    setErroreCatechisti("");
+    try {
+      const {data, error} = await supabase.rpc("ars_comunione_persone_per_gruppi", {
+        p_parrocchia_id: parrocchiaId, p_ricerca: ""
+      });
+      if (error) throw error;
+      setPersoneCatechisti(Array.isArray(data) ? data : []);
+      setCatechistiScelti((gruppo.catechisti || []).map(p => p.persona_parrocchia_id));
+      setRicercaCatechisti("");
+      setModificaCatechisti(gruppo.gruppo_annuale_id);
+    } catch (err) { setErroreCatechisti(err?.message || "Impossibile leggere le persone."); }
+    finally { setCaricaCatechisti(false); }
+  }
+
+  async function salvaCatechistiGruppo(evento, gruppo) {
+    evento.preventDefault();
+    if (occupato || operazione.current) return;
+    operazione.current = true;
+    setOccupato(true); setErroreCatechisti(""); setAvviso("");
+    try {
+      const {data, error} = await supabase.rpc("ars_comunione_modifica_gruppo", {
+        p_parrocchia_id: parrocchiaId,
+        p_gruppo_annuale_id: gruppo.gruppo_annuale_id,
+        p_nome_precedente: gruppo.nome,
+        p_catechisti_precedenti: (gruppo.catechisti || []).map(p => p.persona_parrocchia_id),
+        p_nome: gruppo.nome,
+        p_catechisti: catechistiScelti
+      });
+      if (error) throw error;
+      if (!data?.ok) throw new Error("Salvataggio non confermato.");
+      setAvviso("Catechisti del gruppo aggiornati. Troverai le stesse assegnazioni nella Card 04.");
+      annullaModificaCatechisti();
+      setQuadro(null);
+      setRicarica(v => v + 1);
+    } catch (err) { setErroreCatechisti(err?.message || "Impossibile salvare i catechisti."); }
+    finally { operazione.current = false; setOccupato(false); }
+  }
+
   if (aperto) return <ChatGruppoComunione key={aperto.gruppo_annuale_id} gruppo={aperto}
     indietro={() => { setAperto(null); setRicarica(n => n + 1); }} />;
 
@@ -1926,10 +2155,12 @@ function GruppiChatComunione({ parrocchiaId, annoPastorale, durata }) {
       <p>Scegli l’anno e indica i catechisti disponibili e il massimo di ragazzi per gruppo. Controlla la proposta prima di salvare. Usa «Rinomina gruppo» per dare a un gruppo un nome personalizzato senza cambiare iscritti o messaggi della chat. Per cambiare le assegnazioni, seleziona i ragazzi e il gruppo di destinazione. I ragazzi con domanda presentata possono essere inseriti nei gruppi anche se mancano documenti: la segreteria continuerà a seguirli nella Card 03.</p>
     </details>
     <label>Anno di percorso <select disabled={occupato} value={anno} onChange={e => {
-      setSelezione([]); setAvviso(""); setCatechisti(""); setMassimo(""); setDestinazione(""); annullaRinomina(); setQuadro(null); setAnno(Number(e.target.value));
+      setSelezione([]); setAvviso(""); setCatechisti(""); setMassimo(""); setDestinazione(""); annullaRinomina(); annullaModificaCatechisti(); setQuadro(null); setAnno(Number(e.target.value));
     }}>{[1, 2, 3].filter(n => n <= Number(durata)).map(n =>
       <option key={n} value={n}>{n}° anno</option>)}</select></label>
     {avviso && <p role="status">{avviso}</p>}
+    {caricaCatechisti && <p role="status">Caricamento dei nominativi…</p>}
+    {erroreCatechisti && modificaCatechisti === null && <p role="alert">{erroreCatechisti}</p>}
     {quadro && <form onSubmit={e => { e.preventDefault(); aggiornaGruppi(true); }}>
       <p>{quadro.totale_da_assegnare} ragazzi con domanda presentata da assegnare (anche con documenti da completare).</p>
       <label>Catechisti disponibili per questi ragazzi <input type="number" min="0" step="1" required
@@ -1955,13 +2186,54 @@ function GruppiChatComunione({ parrocchiaId, annoPastorale, durata }) {
       : !quadro.gruppi.length ? <p>Nessun gruppo per questo anno di percorso.</p>
       : quadro.gruppi.map(g => <article key={g.gruppo_annuale_id}>
         <h4>{g.nome}</h4><p>Ragazzi assegnati: {g.numero_ragazzi}</p>
+        <p className="ars-gruppi-cat-nomi"><strong>Catechisti: </strong>
+          {(g.catechisti || []).length
+            ? g.catechisti.map(c => [c.nome, c.cognome].filter(Boolean).join(" ")).join(", ")
+            : "Da assegnare"}</p>
         <div className="ars-sac-azioni">
           <button type="button" disabled={occupato} onClick={() => setAperto(g)}>Apri chat</button>
           <button type="button" className="ars-sac-stampa" disabled={occupato}
             onClick={() => gruppoDaRinominare === g.gruppo_annuale_id ? annullaRinomina() : iniziaRinomina(g)}>
             {gruppoDaRinominare === g.gruppo_annuale_id ? "Chiudi modifica nome" : "Rinomina gruppo"}
           </button>
+          <button type="button" className="ars-sac-stampa" disabled={occupato || caricaCatechisti}
+            onClick={() => apriModificaCatechisti(g)}>
+            {modificaCatechisti === g.gruppo_annuale_id ? "Chiudi catechisti" : "Gestisci catechisti"}
+          </button>
         </div>
+        {modificaCatechisti === g.gruppo_annuale_id && <form
+          onSubmit={e => salvaCatechistiGruppo(e, g)} className="ars-com-cat-gruppo-form">
+          <p>Seleziona i catechisti di questo gruppo. Le assegnazioni saranno visibili anche nella Card 04.</p>
+          <label className="ars-com-cat-campo">Cerca tra le persone della parrocchia
+            <input type="search" value={ricercaCatechisti} disabled={occupato}
+              onChange={e => setRicercaCatechisti(e.target.value)} placeholder="Nome o cognome" />
+          </label>
+          <div className="ars-com-cat-scelte-gruppo">
+            {personeCatechisti.filter(p => catechistiScelti.includes(p.persona_parrocchia_id) ||
+              [p.nome,p.cognome].join(" ").toLocaleLowerCase("it-IT").includes(ricercaCatechisti.trim().toLocaleLowerCase("it-IT")) ||
+              [p.cognome,p.nome].join(" ").toLocaleLowerCase("it-IT").includes(ricercaCatechisti.trim().toLocaleLowerCase("it-IT")))
+              .slice(0, ricercaCatechisti.trim() ? 80 : 35).map(p => <label key={p.persona_parrocchia_id}
+                className="ars-com-cat-spunta">
+                <input type="checkbox" disabled={occupato}
+                  checked={catechistiScelti.includes(p.persona_parrocchia_id)}
+                  onChange={e => setCatechistiScelti(ids => e.target.checked
+                    ? [...ids, p.persona_parrocchia_id] : ids.filter(id => id !== p.persona_parrocchia_id))} />
+                <span>{p.cognome} {p.nome}</span>
+              </label>)}
+          </div>
+          {personeCatechisti.length > 35 && !ricercaCatechisti.trim() && <small>Per altri nominativi usa la ricerca.</small>}
+          <p>{catechistiScelti.length} selezionati</p>
+          {erroreCatechisti && <p role="alert" className="ars-com-cat-errore">{erroreCatechisti}</p>}
+          <div className="ars-sac-azioni">
+            <button type="submit" className="ars-sac-conferma" disabled={occupato ||
+              [...catechistiScelti].sort().join("|") ===
+              (g.catechisti || []).map(p => p.persona_parrocchia_id).sort().join("|")}>
+              {occupato ? "Salvataggio…" : "Salva catechisti"}
+            </button>
+            <button type="button" className="ars-sac-stampa" disabled={occupato}
+              onClick={annullaModificaCatechisti}>Annulla</button>
+          </div>
+        </form>}
         {gruppoDaRinominare === g.gruppo_annuale_id && <form
           onSubmit={e => rinominaGruppo(e, g)} className="ars-sac-form">
           <label>Nuovo nome del gruppo
@@ -2934,6 +3206,9 @@ export default function SacramentiParroco({ tornaDashboard, nomeParrocchia = "",
             </div>}
           </div>
         </section>
+      ) : sezione === "catechisti" ? (
+        <CatechistiComunioneParroco key={[parrocchiaId, impostazioni.anno].join("-")}
+          parrocchiaId={parrocchiaId} annoPastorale={impostazioni.anno} />
       ) : sezione === "gruppi" ? (
         <GruppiChatComunione key={[parrocchiaId, impostazioni.anno, impostazioni.durata].join("-")}
           parrocchiaId={parrocchiaId} annoPastorale={impostazioni.anno} durata={impostazioni.durata} />
@@ -3315,6 +3590,41 @@ const STILE = `
 .ars-gruppi-chat button{font:inherit;margin:4px;padding:8px 12px;cursor:pointer;border:1px solid #bdab89;border-radius:8px;background:#fffaf1;color:#173955}
 .ars-gruppi-chat textarea{display:block;box-sizing:border-box;width:100%;padding:10px;font:inherit}
 
+
+/* CARD 04 Catechisti e gestione condivisa nella CARD 05. */
+.ars-com-catechisti{max-width:940px}
+.ars-com-catechisti>p{margin-bottom:14px}
+.ars-com-cat-guida{padding:10px 13px;border:1px solid #d4dfd8;border-radius:10px;background:#f6fbf7;margin:12px 0}
+.ars-com-cat-guida summary{cursor:pointer;color:#275969;font-weight:700}
+.ars-com-cat-guida p{margin:9px 0 0}
+.ars-com-cat-intestazione{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin:14px 0;color:#294959}
+.ars-com-cat-colonne{display:grid;grid-template-columns:minmax(220px,290px) minmax(0,1fr);gap:15px;align-items:start}
+.ars-com-cat-elenco,.ars-com-cat-dettaglio{border:1px solid #dfd5c4;background:#fff;border-radius:13px;padding:14px;min-width:0}
+.ars-com-cat-dettaglio h4{font:700 1.28rem Georgia,serif;margin:0 0 8px;color:#274d59}
+.ars-com-cat-dettaglio p{color:#536875}
+.ars-com-cat-campo{display:flex;flex-direction:column;gap:6px;font-weight:650;color:#39515d;font-size:.92rem}
+.ars-com-cat-campo input{box-sizing:border-box;width:100%;padding:9px 11px;background:#fff;color:#243e4d;border:1px solid #bccdc9;border-radius:9px;font:inherit;min-height:40px}
+.ars-com-cat-persone{max-height:420px;overflow:auto;margin:10px 0}
+.ars-com-cat-persona{display:flex;flex-direction:column;gap:3px;width:100%;text-align:left;background:#fffdf8;border:1px solid #e4d8c6;border-radius:9px;padding:10px;margin:6px 0;color:#2f4852;cursor:pointer}
+.ars-com-cat-persona strong{font-weight:700}
+.ars-com-cat-persona small{font-size:.82rem;color:#5d7279}
+.ars-com-cat-persona-attiva{background:#e6f5ed;border-color:#43886b;box-shadow:0 0 0 1px #43886b}
+.ars-com-cat-aggiungi{background:#eaf3f9;border:1px solid #8aaec4;color:#244f67;border-radius:9px;padding:9px 12px;font-weight:700;cursor:pointer;width:100%}
+.ars-com-cat-candidati{margin-top:12px;padding:10px;background:#f7fbfc;border:1px solid #d1e2e9;border-radius:10px}
+.ars-com-cat-risultati{max-height:240px;overflow:auto;margin-top:8px}
+.ars-com-cat-risultati button{display:block;width:100%;text-align:left;background:#fff;border:1px solid #e3e8ea;border-radius:7px;margin:4px 0;padding:7px;color:#304b58;cursor:pointer}
+.ars-com-cat-dettaglio fieldset{margin:14px 0;padding:12px 14px;border:1px solid #d7e0d5;border-radius:11px;background:#f8fcf9}
+.ars-com-cat-dettaglio legend{font-weight:700;color:#31674d;padding:0 5px}
+.ars-com-cat-spunta{display:flex!important;flex-direction:row!important;align-items:center!important;justify-content:flex-start!important;gap:10px!important;text-align:left!important;margin:8px 0!important;padding:8px 9px;border:1px solid #e1e7e1;background:#fff;border-radius:8px;font-weight:500;cursor:pointer}
+.ars-com-cat-spunta input[type=checkbox]{width:19px!important;height:19px!important;min-height:19px;flex:0 0 19px;padding:0;margin:0;accent-color:#2c8160;cursor:pointer}
+.ars-com-cat-contatore{font-size:.92rem;margin-bottom:12px!important}
+.ars-com-cat-successo{padding:10px 12px;border:1px solid #bcd8bc;border-radius:9px;background:#f2faef;color:#226140!important;margin:12px 0!important}
+.ars-com-cat-errore{padding:10px 12px;border:1px solid #edc6c1;border-radius:9px;background:#fff7f5;color:#a02d28!important;margin:12px 0!important}
+.ars-com-cat-gruppo-form{margin:12px 0 17px;padding:13px;background:#f8fbf7;border:1px solid #cadfcd;border-radius:11px;text-align:left}
+.ars-com-cat-gruppo-form>p{margin:7px 0!important}
+.ars-com-cat-scelte-gruppo{margin:9px 0;max-height:260px;overflow:auto}
+.ars-gruppi-cat-nomi{line-height:1.45}
+@media(max-width:660px){.ars-com-cat-colonne{grid-template-columns:1fr}.ars-com-cat-persone{max-height:230px}.ars-com-catechisti{padding:17px 12px}}
 
 /* Chat di Prima Comunione: bolle compatte, riconoscimento del ruolo e scorrimento. */
 .ars-chat-messaggi{display:flex;flex-direction:column;gap:8px;max-height:min(57vh,590px);overflow-y:auto;overscroll-behavior:contain;padding:12px 8px;margin:12px 0;background:#fffcf8;border:1px solid #e5d9c6;border-radius:12px;text-align:left}
